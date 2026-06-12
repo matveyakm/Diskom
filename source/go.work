@@ -25,4 +25,5 @@ use (
 	./shared
 	./directory/ms_disciplinary_measures
 	./directory/ms_reasons_for_the_dcs_disagreement
+	./report/ms_job_report
 )

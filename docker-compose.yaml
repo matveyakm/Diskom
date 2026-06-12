@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # --- Infrastructure services ---
   traefik:
@@ -97,23 +95,22 @@ services:
       vnet:
         ipv4_address: 172.25.0.7 # Assign a static IP within your subnet
 
-  frontend-old:
-    build:
-      context: ./protofront
-      dockerfile: Dockerfile
-    container_name: frontend-old
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=disciplinary-committee_vnet"
-      - "traefik.http.routers.frontend-old.rule=Host(`old.discom.spbgu.90.188.89.63.nip.io`) || Host(`old.discom.spbgu.localhost`)"
-      - "traefik.http.routers.frontend-old.entrypoints=websecure"
-      - "traefik.http.routers.frontend-old.tls=true"
-      - "traefik.http.services.frontend-old.loadbalancer.server.port=80"
-      - "traefik.http.routers.frontend-old.priority=1000"
-    networks:
-      vnet:
-        ipv4_address: 172.25.0.8 # Assign a static IP within your subnet
+  #  frontend-js:
+  #    build:
+  #      context: ./protofront
+  #      dockerfile: Dockerfile
+  #    container_name: frontend-js
+  #    restart: unless-stopped
+  #    labels:
+  #      - "traefik.enable=true"
+  #      - "traefik.docker.network=disciplinary-committee_vnet"
+  #      - "traefik.http.routers.frontend-js.rule=Host(`discom.spbgu.90.188.89.63.nip.io`) || Host('discom.spbgu.localhost`)"
+  #      - "traefik.http.routers.frontend-js.entrypoints=websecure"
+  #      - "traefik.http.services.frontend-js.loadbalancer.server.port=80"
+  #      - "traefik.http.routers.frontend-js.priority=1000"
+  #    networks:
+  #      vnet:
+  #        ipv4_address: 172.25.0.8 # Assign a static IP within your subnet
 
   frontend-app:
     image: node:20-alpine
@@ -902,6 +899,24 @@ services:
       - "traefik.http.routers.api_ms_organization_data_ledger.entrypoints=websecure" # Слушаем только 443
       - "traefik.http.routers.api_ms_organization_data_ledger.tls=true" # Включаем TLS снаружи
 
+  api_ms_job_report:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_job_report
+    container_name: api_ms_job_report
+    restart: always
+    env_file:
+      - ./source/report/ms_job_report/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.62
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api_ms_job_report.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/job_report`)"
+      - "traefik.http.services.api_ms_job_report.loadbalancer.server.port=8443"
+      - "traefik.http.routers.api_ms_job_report.entrypoints=websecure"
+      - "traefik.http.routers.api_ms_job_report.tls=true"
+
   # Catalog of system objects
   postgres_ms_system_object_directory:
     image: postgres:latest
@@ -1013,11 +1028,6 @@ services:
       - "traefik.http.services.api_ms_reasons_for_the_dcs_disagreement.loadbalancer.server.port=8443"
       - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.entrypoints=websecure"
       - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.tls=true"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://discom.spbgu.localhost,https://old.discom.spbgu.localhost,https://old.discom.spbgu.localhost,https://discom.spbgu.localhost"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,OPTIONS,PUT,DELETE"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
-      - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=1728000"
-      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.middlewares=backend-cors"
 
 volumes:
   frontend_node_modules:
@@ -1066,6 +1076,7 @@ volumes:
   api_ms_disciplinary_measures:
   postgres_ms_reasons_for_the_dcs_disagreement:
   api_ms_reasons_for_the_dcs_disagreement:
+  api_ms_job_report:
 
 # --- Shared resources ---
 networks:

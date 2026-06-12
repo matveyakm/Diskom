@@ -31,6 +31,13 @@ collect_inserts() {
     f="$dir/system_description/01_system_object.sql"
     [ -f "$f" ] && echo "$f"
   done
+
+  # Report entities
+  for dir in "$SOURCE_DIR"/report/ms_*/; do
+    f="$dir/system_description/01_system_object.sql"
+    [ -f "$f" ] && echo "$f"
+  done
+
 }
 
 {

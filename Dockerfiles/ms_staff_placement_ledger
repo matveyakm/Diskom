@@ -30,9 +30,11 @@ COPY ./source/ledger/ms_department_data_ledger/go.mod ./ledger/ms_department_dat
 COPY ./source/ledger/ms_job_title_data_ledger/go.mod ./ledger/ms_job_title_data_ledger/
 COPY ./source/ledger/ms_organization_data_ledger/go.mod ./ledger/ms_organization_data_ledger/
 
+COPY ./source/report/ms_job_report/go.mod ./report/ms_job_report/
 
 COPY ./source/shared/go.mod ./shared/
 COPY ./source/shared/go.sum ./shared/
+COPY ./source/report/ms_job_report/assets/ ./report/ms_job_report/assets/
 
 COPY ./source/go.work ./
 COPY ./source/go.work.sum ./
@@ -66,6 +68,7 @@ COPY ./source/ledger/ms_department_data_ledger/ ./ledger/ms_department_data_ledg
 COPY ./source/ledger/ms_job_title_data_ledger/ ./ledger/ms_job_title_data_ledger/
 COPY ./source/ledger/ms_organization_data_ledger/ ./ledger/ms_organization_data_ledger/
 
+COPY ./source/report/ms_job_report/ ./report/ms_job_report/
 
 COPY ./source/shared/ ./shared/
 

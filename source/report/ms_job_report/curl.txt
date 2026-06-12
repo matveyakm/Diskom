@@ -1,0 +1,4 @@
+curl -k -X POST https://discom.spbgu.localhost:8443/api/job_report \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d @data.json \
+  --output report.pdf

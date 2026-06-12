@@ -29,7 +29,8 @@ MODULES=(
     "source/ledger/ms_department_data_ledger:ms_department_data_ledger"
     "source/ledger/ms_job_title_data_ledger:ms_job_title_data_ledger"
     "source/ledger/ms_organization_data_ledger:ms_organization_data_ledger"
-#    ""
+    "source/report/ms_job_report:ms_job_report"
+    ""
 )
 
 cd ./source/shared/
