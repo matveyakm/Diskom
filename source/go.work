@@ -1,0 +1,28 @@
+go 1.26.4
+
+use (
+	./document/ms_appointment_document
+	./document/ms_dismissal_document
+	./document/ms_acceptance_document
+	./document/ms_create_department_document
+	./document/ms_create_job_title_document
+	./document/ms_create_counterparty_document
+	./document/ms_create_organization_document
+	./document/ms_create_regulations_clauses_document
+	./document/ms_document
+	./directory/ms_system_object_directory
+	./directory/ms_counterparty_directory
+	./directory/ms_department_directory
+	./directory/ms_employee_directory
+	./directory/ms_job_title_directory
+	./directory/ms_organization_directory
+	./directory/ms_regulations_clauses_directory
+	./ledger/ms_employee_data_ledger
+	./ledger/ms_staff_placement_ledger
+	./ledger/ms_department_data_ledger
+	./ledger/ms_job_title_data_ledger
+	./ledger/ms_organization_data_ledger
+	./shared
+	./directory/ms_disciplinary_measures
+	./directory/ms_reasons_for_the_dcs_disagreement
+)

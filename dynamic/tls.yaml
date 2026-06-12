@@ -1,0 +1,8 @@
+tls:
+  certificates:
+    - certFile: /certs/server.crt
+      keyFile: /certs/server.key
+    - certFile: /certs/local.crt
+      keyFile: /certs/local.key
+    - certFile: /certs/discom.spbgu.localhost+1.pem
+      keyFile: /certs/discom.spbgu.localhost+1-key.pem

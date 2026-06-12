@@ -1,0 +1,42 @@
+FROM golang:1.26-alpine AS builder
+WORKDIR /app
+
+# Сначала копируем файлы модулей для кэширования слоев
+#
+# Копируем go.mod и go.sum ОБОИХ проектов
+COPY ./source/{type}/{msgo}/go.mod ./{type}/{msgo}/
+
+COPY ./source/shared/go.mod ./shared/
+COPY ./source/shared/go.sum ./shared/
+
+COPY ./source/go.work ./
+COPY ./source/go.work.sum ./
+
+# Копируем исходники
+COPY ./source/{type}/{msgo}/ ./{type}/{msgo}/
+COPY ./source/shared/ ./shared/
+
+WORKDIR /app/{type}/{msgo}
+# Собираем бинарный файл
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o main .
+
+# Финальный минимальный образ (Distroless или Alpine)
+#FROM alpine:latest
+#WORKDIR /root/
+#COPY --from=builder /app/main .
+#ENTRYPOINT ["./main"]
+CMD ["./main"]
+
+
+# Build stage
+#FROM golang:1.21-alpine AS builder
+#WORKDIR /app
+#COPY . .
+#RUN go build -o main main.go
+#
+## Run stage
+#FROM alpine:latest
+#WORKDIR /root/
+#COPY --from=builder /app/main .
+#EXPOSE 8080
+#CMD ["./main"]

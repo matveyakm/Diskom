@@ -1,0 +1,81 @@
+FROM golang:1.26.4-alpine AS builder
+WORKDIR /app
+
+# Сначала копируем файлы модулей для кэширования слоев
+#
+# Копируем go.mod и go.sum ОБОИХ проектов
+COPY ./source/directory/ms_system_object_directory/go.mod ./directory/ms_system_object_directory/
+COPY ./source/directory/ms_counterparty_directory/go.mod ./directory/ms_counterparty_directory/
+COPY ./source/directory/ms_department_directory/go.mod ./directory/ms_department_directory/
+COPY ./source/directory/ms_employee_directory/go.mod ./directory/ms_employee_directory/
+COPY ./source/directory/ms_job_title_directory/go.mod ./directory/ms_job_title_directory/
+COPY ./source/directory/ms_organization_directory/go.mod ./directory/ms_organization_directory/
+COPY ./source/directory/ms_regulations_clauses_directory/go.mod ./directory/ms_regulations_clauses_directory/
+COPY ./source/directory/ms_disciplinary_measures/go.mod ./directory/ms_disciplinary_measures/
+COPY ./source/directory/ms_reasons_for_the_dcs_disagreement/go.mod ./directory/ms_reasons_for_the_dcs_disagreement/
+
+COPY ./source/document/ms_appointment_document/go.mod ./document/ms_appointment_document/
+COPY ./source/document/ms_dismissal_document/go.mod ./document/ms_dismissal_document/
+COPY ./source/document/ms_acceptance_document/go.mod ./document/ms_acceptance_document/
+COPY ./source/document/ms_create_department_document/go.mod ./document/ms_create_department_document/
+COPY ./source/document/ms_create_job_title_document/go.mod ./document/ms_create_job_title_document/
+COPY ./source/document/ms_document/go.mod ./document/ms_document/
+COPY ./source/document/ms_create_counterparty_document/go.mod ./document/ms_create_counterparty_document/
+COPY ./source/document/ms_create_organization_document/go.mod ./document/ms_create_organization_document/
+COPY ./source/document/ms_create_regulations_clauses_document/go.mod ./document/ms_create_regulations_clauses_document/
+
+COPY ./source/ledger/ms_employee_data_ledger/go.mod ./ledger/ms_employee_data_ledger/
+COPY ./source/ledger/ms_staff_placement_ledger/go.mod ./ledger/ms_staff_placement_ledger/
+COPY ./source/ledger/ms_department_data_ledger/go.mod ./ledger/ms_department_data_ledger/
+COPY ./source/ledger/ms_job_title_data_ledger/go.mod ./ledger/ms_job_title_data_ledger/
+COPY ./source/ledger/ms_organization_data_ledger/go.mod ./ledger/ms_organization_data_ledger/
+
+
+COPY ./source/shared/go.mod ./shared/
+COPY ./source/shared/go.sum ./shared/
+
+COPY ./source/go.work ./
+COPY ./source/go.work.sum ./
+
+# Копируем исходники
+COPY ./source/directory/ms_system_object_directory/ ./directory/ms_system_object_directory/
+COPY ./source/directory/ms_counterparty_directory/ ./directory/ms_counterparty_directory/
+COPY ./source/directory/ms_department_directory/ ./directory/ms_department_directory/
+COPY ./source/directory/ms_employee_directory/ ./directory/ms_employee_directory/
+COPY ./source/directory/ms_job_title_directory/ ./directory/ms_job_title_directory/
+COPY ./source/directory/ms_organization_directory/ ./directory/ms_organization_directory/
+COPY ./source/directory/ms_regulations_clauses_directory/ ./directory/ms_regulations_clauses_directory/
+COPY ./source/directory/ms_disciplinary_measures/ ./directory/ms_disciplinary_measures/
+COPY ./source/directory/ms_reasons_for_the_dcs_disagreement/ ./directory/ms_reasons_for_the_dcs_disagreement/
+
+
+COPY ./source/document/ms_appointment_document/ ./document/ms_appointment_document/
+COPY ./source/document/ms_dismissal_document/ ./document/ms_dismissal_document/
+COPY ./source/document/ms_acceptance_document/ ./document/ms_acceptance_document/
+COPY ./source/document/ms_create_department_document/ ./document/ms_create_department_document/
+COPY ./source/document/ms_create_job_title_document/ ./document/ms_create_job_title_document/
+COPY ./source/document/ms_document/ ./document/ms_document/
+COPY ./source/document/ms_create_counterparty_document/ ./document/ms_create_counterparty_document/
+COPY ./source/document/ms_create_organization_document/ ./document/ms_create_organization_document/
+COPY ./source/document/ms_create_regulations_clauses_document/ ./document/ms_create_regulations_clauses_document/
+
+
+COPY ./source/ledger/ms_employee_data_ledger/ ./ledger/ms_employee_data_ledger/
+COPY ./source/ledger/ms_staff_placement_ledger/ ./ledger/ms_staff_placement_ledger/
+COPY ./source/ledger/ms_department_data_ledger/ ./ledger/ms_department_data_ledger/
+COPY ./source/ledger/ms_job_title_data_ledger/ ./ledger/ms_job_title_data_ledger/
+COPY ./source/ledger/ms_organization_data_ledger/ ./ledger/ms_organization_data_ledger/
+
+
+COPY ./source/shared/ ./shared/
+
+WORKDIR /app/document/ms_dismissal_document
+# Собираем бинарный файл
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o main .
+
+# Финальный минимальный образ (Distroless или Alpine)
+#FROM alpine:latest
+#WORKDIR /root/
+#COPY --from=builder /app/main .
+#ENTRYPOINT ["./main"]
+CMD ["./main"]

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Дисциплинарный комитет</title>
+        <link rel="stylesheet" href="index.css" />
+    </head>
+    <body>
+        <div id="desktop"></div>
+
+        <div id="start-menu">
+            <h3>Акименко М.И.</h3>
+            <div id="menu-content">
+                <div class="loader">Загрузка...</div>
+            </div>
+        </div>
+
+        <div id="taskbar">
+            <button id="start-button" title="Пуск">
+                <div class="start-icon">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </button>
+            <div id="time">00:00</div>
+        </div>
+
+        <script src="apiService.js"></script>
+        <script src="window.js"></script>
+        <script src="windowManager.js"></script>
+        <script src="timerManager.js"></script>
+        <script src="startMenuApp.js"></script>
+        <script src="menuManager.js"></script>
+        <script src="menuApiService.js"></script>
+        <script src="index.js"></script>
+    </body>
+</html>

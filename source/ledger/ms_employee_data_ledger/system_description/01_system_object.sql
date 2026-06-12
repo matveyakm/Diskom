@@ -1,0 +1,76 @@
+  insert into ${DB_TABLENAME}
+  (
+    name,
+    description,
+    status,
+    prefix,
+    prefix_number,
+    level,
+    is_group,
+    id_group,
+    ref,
+    output_order,
+    icon,
+    table_columns,
+    table_title,
+    item_title,
+    item_fields,
+    on_save_new,
+    on_save_edit,
+    on_acceptance,
+    on_delete,
+    privileges,
+    related_documents,
+    printing_template,
+    id_transaction
+  ) values (
+    'Транзакции по реквизитам сотрудников',
+    'Транзакции по реквизитам сотрудников',
+    1,
+    0,
+    'ТР-',
+    1,
+    FALSE,
+    4,
+    'employee_data_ledger',
+    1,
+    'document.png',
+    '{
+      "columns": [
+        { "field": "id_document", "label": "Документ", "end_point": "document_directory"},
+        { "field": "ddate", "label": "Дата"},
+        { "field": "first_name", "label": "Имя"},
+        { "field": "last_name", "label": "Фамилия"},
+        { "field": "middle_name", "label": "Отчество"},
+        { "field": "first_genitive", "label": "Имя (род. падеж)"},
+        { "field": "last_genitive", "label": "Фамилия (род. падеж)"},
+        { "field": "middle_genitive", "label": "Отчество (род. падеж)"},
+        { "field": "first_accusative", "label": "Имя (вин. падеж)"},
+        { "field": "last_accusative", "label": "Фамилия (вин. падеж)"},
+        { "field": "middle_accusative", "label": "Отчество (вин. падеж)"},
+        { "field": "id_vk", "label": "ID VK"},
+        { "field": "id_employee", "label": "ID сотрудника"}
+      ]
+    }',
+    'Транзакции по реквизитам сотрудников',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '{
+      "privileges": [
+        { "open_list": "true" },
+        { "open_item": "true" },
+        { "create": "false" },
+        { "edit": "false" },
+        { "delete": "false" },
+        { "accept": "false" },
+        { "create_related_documents": "false" }
+      ]
+    }',
+    '',
+    '',
+    ''
+  );

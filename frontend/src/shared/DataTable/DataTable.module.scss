@@ -1,0 +1,144 @@
+@use '@/app/styles/variables' as *;
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 92%;
+}
+
+.tableContainer {
+  width: 100%;
+  background: var(--background);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.tableScroll {
+  width: 100%;
+  max-height: 82vh;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+.table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+  animation: fadeSlideIn 0.2s ease;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  padding: 12px 14px;
+  justify-content: flex-start;
+  text-align: left;
+  font-weight: 400;
+  background: var(--primary);
+  color: var(--primary-text);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.05);
+  user-select: none;
+  z-index: 100;
+}
+
+.headerContent {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 5px;
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.resizer:hover,
+.resizer:active {
+  background: var(--accent, #3498db);
+}
+
+.table tbody td {
+  padding: 10px 14px;
+  color: var(--text-primary);
+}
+
+.row {
+  opacity: 0;
+  animation: fadeSlideIn 0.3s ease forwards;
+}
+
+.table tbody tr:nth-child(even) {
+  background: var(--background-alt);
+}
+
+.table tbody .row:hover {
+  background: var(--hover);
+  cursor: pointer;
+}
+
+.table tbody .row:active {
+  background: var(--active);
+}
+
+.rowActive {
+  background: var(--row-hover)!important;
+}
+
+.cellEllipsis {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tableScroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tableScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tableScroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar);
+  border-radius: 8px;
+}
+
+.tableScroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar);
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  border-top: solid 1px var(--border-subtle);
+  width: 100%;
+  height: 40px;
+  background: var(--background);
+  box-shadow: var(--shadow);
+}

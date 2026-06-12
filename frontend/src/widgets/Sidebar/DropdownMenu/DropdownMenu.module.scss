@@ -1,0 +1,126 @@
+@use '@/app/styles/variables' as *;
+
+.dropdownMenu {
+  position: absolute;
+  bottom: 20px;
+  left: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  padding: 8px;
+  background: var(--background);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  color: var(--text-primary);
+  opacity: 0;
+  transform: translate(-12px, 10px) scale(0.96);
+  pointer-events: none;
+  transform-origin: top right;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  will-change: opacity, transform;
+}
+
+.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.infoUsers {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.infoName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.infoMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dropdownLink {
+  display: flex;
+  align-items: center;
+  justify-content: left;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.1s ease;
+}
+
+.dropdownLink svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  fill: currentColor;
+}
+
+.dropdownLink:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+  transform: translateX(1px);
+}
+
+.dropdownLink:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.dropdownLink:active {
+  transform: scale(0.98);
+}
+
+.dropdownLinkDanger:hover {
+  background: oklch(0.45 0.12 25 / 0.12) !important;
+  color: oklch(0.55 0.15 25) !important;
+
+  svg {
+    color: oklch(0.55 0.15 25) !important;
+  }
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 0.18);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.backdropOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dropdownLink svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  opacity: 0.85;
+}
+
+.dropdownLink:hover svg {
+  transform: scale(1.08);
+  opacity: 1;
+}
+
+.dropdownLink:active svg {
+  transform: scale(0.95);
+}

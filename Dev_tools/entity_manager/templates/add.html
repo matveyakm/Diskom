@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Новая сущность — Entity Manager{% endblock %}
+
+{% block content %}
+<h3 class="mb-3">➕ Новая сущность</h3>
+
+<form method="POST" id="entityForm">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary mb-3">
+                <div class="card-header"><strong>Основные метаданные</strong></div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="form-label">Название (рус.)</label>
+                        <input type="text" name="name" class="form-control form-control-sm" required
+                               oninput="document.getElementById('refField').value = this.value.toLowerCase().replace(/[^а-яa-z0-9]+/g,'_').replace(/^_|_$/g,'')">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Описание</label>
+                        <textarea name="description" class="form-control form-control-sm" rows="2"></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Ref (endpoint)</label>
+                        <input type="text" name="ref" id="refField" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Категория</label>
+                        <select name="category" id="categorySelect" class="form-select form-select-sm" onchange="switchCategory()">
+                            {% for cat in categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Группа меню</label>
+                        <select name="id_group" class="form-select form-select-sm">
+                            {% for gid, gname in group_names.items() %}
+                            <option value="{{ gid }}">{{ gname }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <label class="form-label">Output Order</label>
+                            <input type="number" name="output_order" class="form-control form-control-sm" value="10">
+                        </div>
+                        <div class="col-6 mb-2">
+                            <label class="form-label">Prefix</label>
+                            <input type="number" name="prefix" class="form-control form-control-sm" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Prefix Number</label>
+                        <input type="text" name="prefix_number" class="form-control form-control-sm" placeholder="e.g. СК-">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Icon (filename)</label>
+                        <input type="text" name="icon" class="form-control form-control-sm" value="dictionary.png">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card bg-dark border-secondary mb-3">
+                <div class="card-header"><strong>Заголовки окон</strong></div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="form-label">Table Title</label>
+                        <input type="text" name="table_title" class="form-control form-control-sm">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Item Title</label>
+                        <input type="text" name="item_title" class="form-control form-control-sm">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <strong>Поля модели</strong>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="addField()">+ Добавить поле</button>
+                </div>
+                <div class="card-body p-2">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-dark table-bordered mb-0" id="fieldsTable">
+                            <thead>
+                                <tr class="small text-secondary">
+                                    <th style="width:18%">Колонка</th>
+                                    <th style="width:12%">Тип</th>
+                                    <th style="width:25%">Подпись (рус.)</th>
+                                    <th style="width:12%">Скрыть</th>
+                                    <th style="width:12%">Обяз.</th>
+                                    <th style="width:8%"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="fieldsContainer"></tbody>
+                        </table>
+                    </div>
+                    <textarea name="fields_json" id="fieldsJson" class="d-none">[]</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-dark border-secondary mb-3">
+        <div class="card-header"><strong>Предпросмотр генерируемых файлов</strong></div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <ul class="nav nav-tabs nav-tabs-sm" id="previewTabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" data-file="model_go">model.go</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-file="db_sh">db.sh</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-file="insert_sql">INSERT SQL</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-file="table_columns">table_columns</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-file="item_fields">item_fields</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-file="parameters_env">parameters.env</a></li>
+                    </ul>
+                    <pre class="code mt-2" id="previewArea">Выберите категорию и заполните ref</pre>
+                </div>
+                <div class="col-md-6 text-secondary small">
+                    <p class="mb-1">ℹ️ Будут созданы/изменены:</p>
+                    <ul class="mb-0">
+                        <li><code>source/{category}/ms_{ref}/</code> — микросервис</li>
+                        <li><code>Dockerfiles/ms_{ref}</code> — Dockerfile</li>
+                        <li><code>docker-compose.yaml</code> — postgres + api сервисы</li>
+                        <li><code>source/go.work</code> — добавление модуля</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">🚀 Создать сущность</button>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Отмена</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const BASE_FIELDS = {{ base_fields_json | safe }};
+const CATEGORIES = {{ categories | tojson }};
+
+let fields = [];
+
+function switchCategory() {
+    const cat = document.getElementById('categorySelect').value;
+    // Keep any user-added extra fields, reset base fields to defaults
+    const extras = fields.filter(f => f._is_extra);
+    const base = (BASE_FIELDS[cat] || []).map(f => ({...f, _is_extra: false}));
+    fields = [...base, ...extras];
+    renderFields();
+    refreshPreview();
+}
+
+function addField(col, gt, label) {
+    const colName = col || prompt('Введите имя колонки (snake_case):');
+    if (!colName) return;
+    const goType = gt || 'string';
+    fields.push({
+        name: pascalCase(colName),
+        go_type: goType,
+        column: colName,
+        json_name: colName,
+        is_pk: false,
+        is_auto_increment: false,
+        not_null: goType === 'int64',
+        ui_label: label || '',
+        hidden: false,
+        exclude_from_table: false,
+        exclude_from_form: false,
+        _is_extra: true,
+    });
+    renderFields();
+    refreshPreview();
+}
+
+function removeField(idx) {
+    if (fields[idx] && fields[idx]._is_extra) {
+        fields.splice(idx, 1);
+        renderFields();
+        refreshPreview();
+    }
+}
+
+function pascalCase(snake) {
+    return snake.replace(/(^|_)([a-z])/g, (_, __, c) => c.toUpperCase());
+}
+
+function renderFields() {
+    const container = document.getElementById('fieldsContainer');
+    container.innerHTML = '';
+    fields.forEach((f, i) => {
+        const tr = document.createElement('tr');
+        const isExtra = f._is_extra;
+        const isSystemHidden = f.hidden && !isExtra;
+        tr.className = isSystemHidden ? 'table-secondary' : '';
+        tr.innerHTML = `
+            <td class="small">${f.column}</td>
+            <td class="small">${f.go_type}</td>
+            <td>
+                <input type="text" class="form-control form-control-sm" value="${f.ui_label || ''}"
+                       placeholder="подпись" onchange="updateField(${i},'ui_label',this.value)">
+            </td>
+            <td class="text-center">
+                <input type="checkbox" class="form-check-input" ${f.is_pk || f.hidden ? 'checked' : ''}
+                       ${f.is_pk ? 'disabled' : ''} onchange="toggleHidden(${i}, this.checked)">
+            </td>
+            <td class="text-center">
+                <input type="checkbox" class="form-check-input" ${f.not_null ? 'checked' : ''}
+                       onchange="updateField(${i},'not_null',this.checked)">
+            </td>
+            <td class="text-center">
+                ${isExtra ? `<button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removeField(${i})">✕</button>` : ''}
+            </td>
+        `;
+        container.appendChild(tr);
+    });
+    document.getElementById('fieldsJson').value = JSON.stringify(fields);
+}
+
+function updateField(idx, key, value) {
+    fields[idx][key] = value;
+    document.getElementById('fieldsJson').value = JSON.stringify(fields);
+    refreshPreview();
+}
+
+function toggleHidden(idx, checked) {
+    fields[idx].hidden = checked;
+    fields[idx].exclude_from_table = checked;
+    fields[idx].exclude_from_form = checked;
+    document.getElementById('fieldsJson').value = JSON.stringify(fields);
+    refreshPreview();
+}
+
+function onFieldChange() {
+    document.getElementById('fieldsJson').value = JSON.stringify(fields);
+    refreshPreview();
+}
+
+let previewTimeout = null;
+function refreshPreview() {
+    clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(async () => {
+        const ref = document.getElementById('refField').value.trim();
+        const cat = document.getElementById('categorySelect').value;
+        if (!ref) return;
+
+        const resp = await fetch('{{ url_for("preview_files") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ref, category: cat, fields}),
+        });
+        const data = await resp.json();
+        const activeTab = document.querySelector('#previewTabs .nav-link.active');
+        const fn = activeTab ? activeTab.dataset.file : 'model_go';
+        document.getElementById('previewArea').textContent = data[fn] || '';
+    }, 500);
+}
+
+function showFile(name, content) {
+    document.getElementById('previewArea').textContent = content;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    switchCategory();
+
+    document.getElementById('previewTabs').addEventListener('click', async (e) => {
+        if (e.target.tagName !== 'A') return;
+        e.preventDefault();
+        document.querySelectorAll('#previewTabs .nav-link').forEach(a => a.classList.remove('active'));
+        e.target.classList.add('active');
+
+        const ref = document.getElementById('refField').value.trim();
+        const cat = document.getElementById('categorySelect').value;
+
+        const resp = await fetch('{{ url_for("preview_files") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ref, category: cat, fields}),
+        });
+        const data = await resp.json();
+        const fn = e.target.dataset.file;
+        document.getElementById('previewArea').textContent = data[fn] || '';
+    });
+
+    document.getElementById('refField').addEventListener('input', refreshPreview);
+});
+</script>
+{% endblock %}

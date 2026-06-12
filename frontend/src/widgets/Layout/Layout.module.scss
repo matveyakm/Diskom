@@ -1,0 +1,23 @@
+@use '@/app/styles/variables' as *;
+
+.layout {
+  display: flex;
+  flex-direction: row;
+  min-height: 100vh;
+  background-color: var(--background-secondary);
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  }
+}

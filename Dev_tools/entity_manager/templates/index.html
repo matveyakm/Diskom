@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Сущности — Entity Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Сущности системы</h3>
+    <div>
+        <span class="badge bg-primary me-1">MS: {{ ms_count }}</span>
+        <span class="badge bg-success me-1">Seed: {{ seed_count }}</span>
+        <span class="badge bg-info">Index: {{ entities|length }}</span>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-dark table-hover entity-table">
+        <thead>
+            <tr>
+                <th>Ref</th>
+                <th>Название</th>
+                <th>Группа</th>
+                <th>Категория</th>
+                <th>MS</th>
+                <th>Seed</th>
+                <th>Поля</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in entities %}
+            <tr>
+                <td><code>{{ e.ref }}</code></td>
+                <td>{{ e.name or '—' }}</td>
+                <td><span class="badge bg-secondary">{{ e.group_name or '—' }}</span></td>
+                <td>
+                    {% if e.category %}
+                    <span class="badge bg-{{ 'warning' if e.category == 'directory' else 'info' if e.category == 'document' else 'secondary' }}">
+                        {{ e.category }}
+                    </span>
+                    {% else %}—{% endif %}
+                </td>
+                <td>
+                    {% if e.has_ms %}
+                    <span class="badge badge-ms">да</span>
+                    {% else %}
+                    <span class="badge badge-none">нет</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if e.has_seed %}
+                    <span class="badge badge-seed">да</span>
+                    {% else %}
+                    <span class="badge badge-none">нет</span>
+                    {% endif %}
+                </td>
+                <td>{{ e.fields_count }}</td>
+                <td>
+                    <a href="{{ url_for('entity_detail', ref=e.ref) }}" class="btn btn-sm btn-outline-light">→</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-secondary">Нет данных</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

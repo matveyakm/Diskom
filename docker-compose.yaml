@@ -1,0 +1,1080 @@
+version: "3.8"
+
+services:
+  # --- Infrastructure services ---
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.5
+
+    ports:
+      - "8080:80"
+      - "8443:443"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/certs:ro
+      - ./dynamic:/dynamic:ro
+
+    command:
+      # EntryPoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+
+      # File provider для TLS
+      - "--providers.file.filename=/dynamic/tls.yaml"
+      - "--providers.file.watch=true"
+
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=disciplinary-committee_vnet"
+
+      # API & Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+
+      # Observability
+      - "--log.level=DEBUG" # Временно DEBUG для отладки
+      - "--accesslog=true"
+      - "--metrics.prometheus=true"
+
+      # Tracing
+      - "--tracing=true"
+      - "--tracing.otlp=true"
+      - "--tracing.otlp.grpc=true"
+      - "--tracing.otlp.grpc.endpoint=jaeger:4317"
+      - "--tracing.otlp.grpc.insecure=true"
+
+    labels:
+      # Enable self‑routing
+      - "traefik.enable=true"
+      - "traefik.docker.network=disciplinary-committee_vnet"
+
+      # Dashboard router
+      - "traefik.http.routers.dashboard.rule=(Host(`dashboard.docker.90.188.89.63.nip.io`) || Host(`dashboard.docker.localhost`))"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth@docker"
+
+      # Basic‑auth middleware
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=traefik_admin:$$apr1$$3m3TPtw2$$bR2Gj8CtLaSUKWdlg0X9V."
+
+  # Whoami application
+  whoami:
+    image: traefik/whoami
+    container_name: whoami
+    restart: unless-stopped
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.6
+
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=(Host(`whoami.docker.90.188.89.63.nip.io`) || Host(`whoami.docker.localhost`))"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls=true"
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Web UI to see your traces
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.7 # Assign a static IP within your subnet
+
+  frontend-old:
+    build:
+      context: ./protofront
+      dockerfile: Dockerfile
+    container_name: frontend-old
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=disciplinary-committee_vnet"
+      - "traefik.http.routers.frontend-old.rule=Host(`old.discom.spbgu.90.188.89.63.nip.io`) || Host(`old.discom.spbgu.localhost`)"
+      - "traefik.http.routers.frontend-old.entrypoints=websecure"
+      - "traefik.http.routers.frontend-old.tls=true"
+      - "traefik.http.services.frontend-old.loadbalancer.server.port=80"
+      - "traefik.http.routers.frontend-old.priority=1000"
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.8 # Assign a static IP within your subnet
+
+  frontend-app:
+    image: node:20-alpine
+    container_name: frontend-app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: >
+      sh -c "
+        if [ ! -d node_modules ] || [ ! -f node_modules/.npm-ready ];
+        then npm install && touch node_modules/.npm-ready;
+        fi;
+        npm run dev -- --host 0.0.0.0
+      "
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend-app.rule=Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)"
+      - "traefik.http.routers.frontend-app.entrypoints=websecure"
+      - "traefik.http.routers.frontend-app.tls=true"
+      - "traefik.http.services.frontend-app.loadbalancer.server.port=5173"
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.9
+
+  # ---  Microservices ---
+
+  #Document
+  postgres_ms_document:
+    image: postgres:latest
+    container_name: postgres_ms_document
+    command: postgres -c listen_addresses=172.25.0.20 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_document/parameters.env
+    volumes:
+      - postgres_ms_document:/var/lib/postgresql
+      - ./source/document/ms_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.20
+
+  api_ms_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_document
+    container_name: api_ms_document
+    restart: always
+    env_file:
+      - ./source/document/ms_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.21
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/document`)" # Укажите домен
+      - "traefik.http.services.api_ms_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_document.tls=true" # Включаем TLS снаружи
+
+  #Employee directory
+  postgres_ms_employee_directory:
+    image: postgres:latest
+    container_name: postgres_ms_employee_directory
+    command: postgres -c listen_addresses=172.25.0.24 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_employee_directory/parameters.env
+    volumes:
+      - postgres_ms_employee_directory:/var/lib/postgresql
+      - ./source/directory/ms_employee_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.24
+
+  api_ms_employee_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_employee_directory
+    container_name: api_ms_employee_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_employee_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.25
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_employee_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/employee_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_employee_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_employee_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_employee_directory.tls=true" # Включаем TLS снаружи
+
+  #Department directory
+  postgres_ms_department_directory:
+    image: postgres:latest
+    container_name: postgres_ms_department_directory
+    command: postgres -c listen_addresses=172.25.0.26 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_department_directory/parameters.env
+    volumes:
+      - postgres_ms_department_directory:/var/lib/postgresql
+      - ./source/directory/ms_department_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.26
+
+  api_ms_department_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_department_directory
+    container_name: api_ms_department_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_department_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.27
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_department_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/department_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_department_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_department_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_department_directory.tls=true" # Включаем TLS снаружи
+
+  #Clauses of local regulations directory
+  postgres_ms_regulations_clauses_directory:
+    image: postgres:latest
+    container_name: postgres_ms_regulations_clauses_directory
+    command: postgres -c listen_addresses=172.25.0.28 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_regulations_clauses_directory/parameters.env
+    volumes:
+      - postgres_ms_regulations_clauses_directory:/var/lib/postgresql
+      - ./source/directory/ms_regulations_clauses_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.28
+
+  api_ms_regulations_clauses_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_regulations_clauses_directory
+    container_name: api_ms_regulations_clauses_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_regulations_clauses_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.29
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_regulations_clauses_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/regulations_clauses_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_regulations_clauses_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_regulations_clauses_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_regulations_clauses_directory.tls=true" # Включаем TLS снаружи
+
+  #Directory of organizations
+  postgres_ms_organization_directory:
+    image: postgres:latest
+    container_name: postgres_ms_organization_directory
+    command: postgres -c listen_addresses=172.25.0.30 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_organization_directory/parameters.env
+    volumes:
+      - postgres_ms_organization_directory:/var/lib/postgresql
+      - ./source/directory/ms_organization_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.30
+
+  api_ms_organization_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_organization_directory
+    container_name: api_ms_organization_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_organization_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.31
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_organization_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/organization_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_organization_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_organization_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_organization_directory.tls=true" # Включаем TLS снаружи
+
+  #Counterparty of the organization
+  postgres_ms_counterparty_directory:
+    image: postgres:latest
+    container_name: postgres_ms_counterparty_directory
+    command: postgres -c listen_addresses=172.25.0.32 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_counterparty_directory/parameters.env
+    volumes:
+      - postgres_ms_counterparty_directory:/var/lib/postgresql
+      - ./source/directory/ms_counterparty_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.32
+
+  api_ms_counterparty_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_counterparty_directory
+    container_name: api_ms_counterparty_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_counterparty_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.33
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_counterparty_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/counterparty_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_counterparty_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_counterparty_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_counterparty_directory.tls=true" # Включаем TLS снаружи
+
+  # Directory of job title
+  postgres_ms_job_title_directory:
+    image: postgres:latest
+    container_name: postgres_ms_job_title_directory
+    command: postgres -c listen_addresses=172.25.0.34 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_job_title_directory/parameters.env
+    volumes:
+      - postgres_ms_job_title_directory:/var/lib/postgresql
+      - ./source/directory/ms_job_title_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.34
+
+  api_ms_job_title_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_job_title_directory
+    container_name: api_ms_job_title_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_job_title_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.35
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_job_title_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/job_title_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_job_title_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_job_title_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_job_title_directory.tls=true" # Включаем TLS снаружи  # Appointment document
+
+  postgres_ms_appointment_document:
+    image: postgres:latest
+    container_name: postgres_ms_appointment_document
+    command: postgres -c listen_addresses=172.25.0.36 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_appointment_document/parameters.env
+    volumes:
+      - postgres_ms_appointment_document:/var/lib/postgresql
+      - ./source/document/ms_appointment_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.36
+
+  api_ms_appointment_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_appointment_document
+    container_name: api_ms_appointment_document
+    restart: always
+    env_file:
+      - ./source/document/ms_appointment_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.37
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_appointment_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/appointment_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_appointment_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_appointment_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_appointment_document.tls=true" # Включаем TLS снаружи
+
+  # Employee dismissal document
+  postgres_ms_dismissal_document:
+    image: postgres:latest
+    container_name: postgres_ms_dismissal_document
+    command: postgres -c listen_addresses=172.25.0.38 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_dismissal_document/parameters.env
+    volumes:
+      - postgres_ms_dismissal_document:/var/lib/postgresql
+      - ./source/document/ms_dismissal_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.38
+
+  api_ms_dismissal_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_dismissal_document
+    container_name: api_ms_dismissal_document
+    restart: always
+    env_file:
+      - ./source/document/ms_dismissal_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.39
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_dismissal_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/dismissal_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_dismissal_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_dismissal_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_dismissal_document.tls=true" # Включаем TLS снаружи
+
+  # Employee acceptance document
+  postgres_ms_acceptance_document:
+    image: postgres:latest
+    container_name: postgres_ms_acceptance_document
+    command: postgres -c listen_addresses=172.25.0.40 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_acceptance_document/parameters.env
+    volumes:
+      - postgres_ms_acceptance_document:/var/lib/postgresql
+      - ./source/document/ms_acceptance_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.40
+
+  api_ms_acceptance_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_acceptance_document
+    container_name: api_ms_acceptance_document
+    restart: always
+    env_file:
+      - ./source/document/ms_acceptance_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.41
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_acceptance_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/acceptance_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_acceptance_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_acceptance_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_acceptance_document.tls=true" # Включаем TLS снаружи
+
+  # Employee data ledger
+  postgres_ms_employee_data_ledger:
+    image: postgres:latest
+    container_name: postgres_ms_employee_data_ledger
+    command: postgres -c listen_addresses=172.25.0.42 -c port=5434
+    restart: always
+    env_file:
+      - ./source/ledger/ms_employee_data_ledger/parameters.env
+    volumes:
+      - postgres_ms_employee_data_ledger:/var/lib/postgresql
+      - ./source/ledger/ms_employee_data_ledger/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.42
+
+  api_ms_employee_data_ledger:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_employee_data_ledger
+    container_name: api_ms_employee_data_ledger
+    restart: always
+    env_file:
+      - ./source/ledger/ms_employee_data_ledger/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.43
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_employee_data_ledger.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/employee_data_ledger`)" # Укажите домен
+      - "traefik.http.services.api_ms_employee_data_ledger.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_employee_data_ledger.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_employee_data_ledger.tls=true" # Включаем TLS снаружи
+
+  # Staff placement ledger
+  postgres_ms_staff_placement_ledger:
+    image: postgres:latest
+    container_name: postgres_ms_staff_placement_ledger
+    command: postgres -c listen_addresses=172.25.0.44 -c port=5434
+    restart: always
+    env_file:
+      - ./source/ledger/ms_staff_placement_ledger/parameters.env
+    volumes:
+      - postgres_ms_staff_placement_ledger:/var/lib/postgresql
+      - ./source/ledger/ms_staff_placement_ledger/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.44
+
+  api_ms_staff_placement_ledger:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_staff_placement_ledger
+    container_name: api_ms_staff_placement_ledger
+    restart: always
+    env_file:
+      - ./source/ledger/ms_staff_placement_ledger/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.45
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_staff_placement_ledger.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/staff_placement_ledger`)" # Укажите домен
+      - "traefik.http.services.api_ms_staff_placement_ledger.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_staff_placement_ledger.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_staff_placement_ledger.tls=true" # Включаем TLS снаружи
+
+  # Create department document
+  postgres_ms_create_department_document:
+    image: postgres:latest
+    container_name: postgres_ms_create_department_document
+    command: postgres -c listen_addresses=172.25.0.46 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_create_department_document/parameters.env
+    volumes:
+      - postgres_ms_create_department_document:/var/lib/postgresql
+      - ./source/document/ms_create_department_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.46
+
+  api_ms_create_department_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_create_department_document
+    container_name: api_ms_create_department_document
+    restart: always
+    env_file:
+      - ./source/document/ms_create_department_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.47
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_create_department_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/create_department_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_create_department_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_create_department_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_create_department_document.tls=true" # Включаем TLS снаружи
+
+  # Department data ledger
+  postgres_ms_department_data_ledger:
+    image: postgres:latest
+    container_name: postgres_ms_department_data_ledger
+    command: postgres -c listen_addresses=172.25.0.48 -c port=5434
+    restart: always
+    env_file:
+      - ./source/ledger/ms_department_data_ledger/parameters.env
+    volumes:
+      - postgres_ms_department_data_ledger:/var/lib/postgresql
+      - ./source/ledger/ms_department_data_ledger/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.48
+
+  api_ms_department_data_ledger:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_department_data_ledger
+    container_name: api_ms_department_data_ledger
+    restart: always
+    env_file:
+      - ./source/ledger/ms_department_data_ledger/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.49
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_department_data_ledger.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/department_data_ledger`)" # Укажите домен
+      - "traefik.http.services.api_ms_department_data_ledger.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_department_data_ledger.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_department_data_ledger.tls=true" # Включаем TLS снаружи
+
+  # Create job title document
+  postgres_ms_create_job_title_document:
+    image: postgres:latest
+    container_name: postgres_ms_create_job_title_document
+    command: postgres -c listen_addresses=172.25.0.50 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_create_job_title_document/parameters.env
+    volumes:
+      - postgres_ms_create_job_title_document:/var/lib/postgresql
+      - ./source/document/ms_create_job_title_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.50
+
+  api_ms_create_job_title_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_create_job_title_document
+    container_name: api_ms_create_job_title_document
+    restart: always
+    env_file:
+      - ./source/document/ms_create_job_title_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.51
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_create_job_title_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/create_job_title_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_create_job_title_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_create_job_title_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_create_job_title_document.tls=true" # Включаем TLS снаружи
+
+  # Job Title Data Ledger
+  postgres_ms_job_title_data_ledger:
+    image: postgres:latest
+    container_name: postgres_ms_job_title_data_ledger
+    command: postgres -c listen_addresses=172.25.0.52 -c port=5434
+    restart: always
+    env_file:
+      - ./source/ledger/ms_job_title_data_ledger/parameters.env
+    volumes:
+      - postgres_ms_job_title_data_ledger:/var/lib/postgresql
+      - ./source/ledger/ms_job_title_data_ledger/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.52
+
+  api_ms_job_title_data_ledger:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_job_title_data_ledger
+    container_name: api_ms_job_title_data_ledger
+    restart: always
+    env_file:
+      - ./source/ledger/ms_job_title_data_ledger/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.53
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_job_title_data_ledger.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/job_title_data_ledger`)" # Укажите домен
+      - "traefik.http.services.api_ms_job_title_data_ledger.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_job_title_data_ledger.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_job_title_data_ledger.tls=true" # Включаем TLS снаружи
+
+  # Create counterparty document
+  postgres_ms_create_counterparty_document:
+    image: postgres:latest
+    container_name: postgres_ms_create_counterparty_document
+    command: postgres -c listen_addresses=172.25.0.54 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_create_counterparty_document/parameters.env
+    volumes:
+      - postgres_ms_create_counterparty_document:/var/lib/postgresql
+      - ./source/document/ms_create_counterparty_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.54
+
+  api_ms_create_counterparty_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_create_counterparty_document
+    container_name: api_ms_create_counterparty_document
+    restart: always
+    env_file:
+      - ./source/document/ms_create_counterparty_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.55
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_create_counterparty_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/create_counterparty_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_create_counterparty_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_create_counterparty_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_create_counterparty_document.tls=true" # Включаем TLS снаружи
+
+  # Create organization document
+  postgres_ms_create_organization_document:
+    image: postgres:latest
+    container_name: postgres_ms_create_organization_document
+    command: postgres -c listen_addresses=172.25.0.56 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_create_organization_document/parameters.env
+    volumes:
+      - postgres_ms_create_organization_document:/var/lib/postgresql
+      - ./source/document/ms_create_organization_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.56
+
+  api_ms_create_organization_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_create_organization_document
+    container_name: api_ms_create_organization_document
+    restart: always
+    env_file:
+      - ./source/document/ms_create_organization_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.57
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_create_organization_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/create_organization_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_create_organization_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_create_organization_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_create_organization_document.tls=true" # Включаем TLS снаружи
+
+  # Create regulations clauses document
+  postgres_ms_create_regulations_clauses_document:
+    image: postgres:latest
+    container_name: postgres_ms_create_regulations_clauses_document
+    command: postgres -c listen_addresses=172.25.0.58 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_create_regulations_clauses_document/parameters.env
+    volumes:
+      - postgres_ms_create_regulations_clauses_document:/var/lib/postgresql
+      - ./source/document/ms_create_regulations_clauses_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.58
+
+  api_ms_create_regulations_clauses_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_create_regulations_clauses_document
+    container_name: api_ms_create_regulations_clauses_document
+    restart: always
+    env_file:
+      - ./source/document/ms_create_regulations_clauses_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.59
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_create_regulations_clauses_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/create_regulations_clauses_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_create_regulations_clauses_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_create_regulations_clauses_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_create_regulations_clauses_document.tls=true" # Включаем TLS снаружи
+
+  # Organization Data Ledger
+  postgres_ms_organization_data_ledger:
+    image: postgres:latest
+    container_name: postgres_ms_organization_data_ledger
+    command: postgres -c listen_addresses=172.25.0.60 -c port=5434
+    restart: always
+    env_file:
+      - ./source/ledger/ms_organization_data_ledger/parameters.env
+    volumes:
+      - postgres_ms_organization_data_ledger:/var/lib/postgresql
+      - ./source/ledger/ms_organization_data_ledger/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.60
+
+  api_ms_organization_data_ledger:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_organization_data_ledger
+    container_name: api_ms_organization_data_ledger
+    restart: always
+    env_file:
+      - ./source/ledger/ms_organization_data_ledger/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.61
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_organization_data_ledger.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/organization_data_ledger`)" # Укажите домен
+      - "traefik.http.services.api_ms_organization_data_ledger.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_organization_data_ledger.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_organization_data_ledger.tls=true" # Включаем TLS снаружи
+
+  # Catalog of system objects
+  postgres_ms_system_object_directory:
+    image: postgres:latest
+    container_name: postgres_system_object_directory
+    command: postgres -c listen_addresses=172.25.0.99 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_system_object_directory/parameters.env
+    volumes:
+      - postgres_ms_system_object_directory:/var/lib/postgresql
+      - ./source/directory/ms_system_object_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.99
+
+  api_ms_system_object_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_system_object_directory
+    container_name: api_ms_system_object_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_system_object_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.100
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_system_object_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/system_object_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_system_object_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_system_object_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_system_object_directory.tls=true" # Включаем TLS снаружи
+
+  postgres_ms_disciplinary_measures:
+    image: postgres:latest
+    container_name: postgres_disciplinary_measures
+    command: postgres -c listen_addresses=172.25.0.101 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_disciplinary_measures/parameters.env
+    volumes:
+      - postgres_ms_disciplinary_measures:/var/lib/postgresql
+      - ./source/directory/ms_disciplinary_measures/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.101
+
+  api_ms_disciplinary_measures:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_disciplinary_measures
+    container_name: api_ms_disciplinary_measures
+    restart: always
+    env_file:
+      - ./source/directory/ms_disciplinary_measures/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.102
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api_ms_disciplinary_measures.rule=Host(`discom.spbgu.localhost`) && PathPrefix(`/api/disciplinary_measures`)"
+      - "traefik.http.services.api_ms_disciplinary_measures.loadbalancer.server.port=8443"
+      - "traefik.http.routers.api_ms_disciplinary_measures.entrypoints=websecure"
+      - "traefik.http.routers.api_ms_disciplinary_measures.tls=true"
+
+  postgres_ms_reasons_for_the_dcs_disagreement:
+    image: postgres:latest
+    container_name: postgres_reasons_for_the_dcs_disagreement
+    command: postgres -c listen_addresses=172.25.0.103 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_reasons_for_the_dcs_disagreement/parameters.env
+    volumes:
+      - postgres_ms_reasons_for_the_dcs_disagreement:/var/lib/postgresql
+      - ./source/directory/ms_reasons_for_the_dcs_disagreement/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.103
+
+  api_ms_reasons_for_the_dcs_disagreement:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_reasons_for_the_dcs_disagreement
+    container_name: api_ms_reasons_for_the_dcs_disagreement
+    restart: always
+    env_file:
+      - ./source/directory/ms_reasons_for_the_dcs_disagreement/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.104
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/reasons_for_the_dcs_disagreement`)"
+      - "traefik.http.services.api_ms_reasons_for_the_dcs_disagreement.loadbalancer.server.port=8443"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.entrypoints=websecure"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.tls=true"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolalloworiginlist=https://discom.spbgu.localhost,https://old.discom.spbgu.localhost,https://old.discom.spbgu.localhost,https://discom.spbgu.localhost"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowmethods=GET,POST,OPTIONS,PUT,DELETE"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolallowheaders=DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+      - "traefik.http.middlewares.backend-cors.headers.accesscontrolmaxage=1728000"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.middlewares=backend-cors"
+
+volumes:
+  frontend_node_modules:
+  postgres_ms_document:
+  api_ms_document:
+  postgres_ms_employee_directory:
+  api_ms_employee_directory:
+  postgres_ms_department_directory:
+  api_ms_department_directory:
+  postgres_ms_regulations_clauses_directory:
+  api_ms_regulations_clauses_directory:
+  postgres_ms_organization_directory:
+  api_ms_organization_directory:
+  postgres_ms_counterparty_directory:
+  api_ms_counterparty_directory:
+  postgres_ms_job_title_directory:
+  api_ms_job_title_directory:
+  postgres_ms_appointment_document:
+  api_ms_appointment_document:
+  postgres_ms_dismissal_document:
+  api_ms_dismissal_document:
+  postgres_ms_acceptance_document:
+  api_ms_acceptance_document:
+  postgres_ms_employee_data_ledger:
+  api_ms_employee_data_ledger:
+  postgres_ms_staff_placement_ledger:
+  api_ms_staff_placement_ledger:
+  postgres_ms_system_object_directory:
+  api_ms_create_department_document:
+  postgres_ms_create_department_document:
+  postgres_ms_department_data_ledger:
+  api_ms_department_data_ledger:
+  postgres_ms_create_job_title_document:
+  api_ms_create_job_title_document:
+  postgres_ms_job_title_data_ledger:
+  api_ms_job_title_data_ledger:
+  postgres_ms_create_counterparty_document:
+  api_ms_create_counterparty_document:
+  postgres_ms_create_regulations_clauses_document:
+  api_ms_create_regulations_clauses_document:
+  postgres_ms_create_organization_document:
+  api_ms_create_organization_document:
+  postgres_ms_organization_data_ledger:
+  api_ms_organization_data_ledger:
+  postgres_ms_disciplinary_measures:
+  api_ms_disciplinary_measures:
+  postgres_ms_reasons_for_the_dcs_disagreement:
+  api_ms_reasons_for_the_dcs_disagreement:
+
+# --- Shared resources ---
+networks:
+  vnet:
+    name: disciplinary-committee_vnet
+    driver: bridge
+    attachable: true
+    # --- IPAM ---
+    ipam:
+      config:
+        - subnet: 172.25.0.0/24
+          gateway: 172.25.0.1

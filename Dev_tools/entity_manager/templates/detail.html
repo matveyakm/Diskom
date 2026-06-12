@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ ref }} — Entity Manager{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Сущности</a></li>
+        <li class="breadcrumb-item active">{{ ref }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header"><strong>{{ seed.name or ref }}</strong></div>
+            <div class="card-body">
+                <table class="table table-dark table-sm">
+                    <tr><td>Ref</td><td><code>{{ ref }}</code></td></tr>
+                    <tr><td>Описание</td><td>{{ seed.description or '—' }}</td></tr>
+                    <tr><td>Группа</td><td>{{ group_names.get(seed.id_group, seed.id_group) }}</td></tr>
+                    <tr><td>Категория</td><td><span class="badge bg-{{ 'warning' if ms and ms.category == 'directory' else 'info' if ms and ms.category == 'document' else 'secondary' }}">{{ ms.category if ms else '—' }}</span></td></tr>
+                    <tr><td>Prefix</td><td>{{ seed.prefix }}</td></tr>
+                    <tr><td>Prefix Number</td><td>{{ seed.prefix_number or '—' }}</td></tr>
+                    <tr><td>Output Order</td><td>{{ seed.output_order }}</td></tr>
+                    <tr><td>Icon</td><td>{{ seed.icon or '—' }}</td></tr>
+                    <tr><td>Table Title</td><td>{{ seed.table_title or '—' }}</td></tr>
+                    <tr><td>Item Title</td><td>{{ seed.item_title or '—' }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        {% if ms %}
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header"><strong>Микросервис</strong></div>
+            <div class="card-body">
+                <table class="table table-dark table-sm">
+                    <tr><td>Папка</td><td><code>source/{{ ms.category }}/{{ ms.name }}/</code></td></tr>
+                    <tr><td>Таблица</td><td><code>{{ ms.table_name }}</code></td></tr>
+                    <tr><td>DB Host</td><td><code>{{ ms.db_host }}</code></td></tr>
+                    <tr><td>DB User</td><td><code>{{ ms.db_user }}</code></td></tr>
+                    <tr><td>Поля</td><td>{{ ms.fields|length }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card bg-dark border-secondary mb-3">
+            <div class="card-header"><strong>Поля модели</strong></div>
+            <div class="card-body p-0">
+                <table class="table table-dark table-sm mb-0">
+                    <thead><tr><th>Поле</th><th>Go тип</th><th>Колонка</th><th>PK</th><th>Auto</th></tr></thead>
+                    <tbody>
+                        {% for f in ms.fields %}
+                        <tr>
+                            <td><code>{{ f.name }}</code></td>
+                            <td>{{ f.go_type }}</td>
+                            <td><code>{{ f.column }}</code></td>
+                            <td>{% if f.is_pk %}🔑{% endif %}</td>
+                            <td>{% if f.is_auto_increment %}🔄{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="card bg-dark border-warning mb-3">
+            <div class="card-header text-warning">Микросервис не найден</div>
+            <div class="card-body">
+                <p class="mb-0">Для этой сущности нет микросервиса в <code>source/go.work</code>.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if preview %}
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-header"><strong>Предпросмотр файлов</strong></div>
+    <div class="card-body">
+        <ul class="nav nav-tabs" id="detailTabs">
+            <li class="nav-item"><a class="nav-link active" href="#" data-file="model_go">model.go</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="db_sh">db.sh</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="insert_sql">INSERT SQL</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="table_columns">table_columns</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="item_fields">item_fields</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="main_go">main.go</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="parameters_env">parameters.env</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" data-file="dockerfile">Dockerfile</a></li>
+        </ul>
+        <pre class="code mt-2" id="detailPreview">{{ preview.model_go }}</pre>
+    </div>
+</div>
+{% endif %}
+
+<a href="{{ url_for('index') }}" class="btn btn-outline-secondary">← Назад</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('detailTabs')?.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'A') return;
+    e.preventDefault();
+    document.querySelectorAll('#detailTabs .nav-link').forEach(a => a.classList.remove('active'));
+    e.target.classList.add('active');
+    const fileKey = e.target.dataset.file;
+    const content = {{ preview | tojson | safe }};
+    document.getElementById('detailPreview').textContent = content[fileKey] || '';
+});
+</script>
+{% endblock %}

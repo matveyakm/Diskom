@@ -1,0 +1,42 @@
+@use '@/app/styles/variables' as *;
+
+.contextMenu {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  position: fixed;
+  background-color: var(--background, #ffffff);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+
+  .contextBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    color: var(--text-secondary, #4a5568);
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+
+    svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+
+    &:hover {
+      background-color: var(--hover);
+      color: var(--text-primary);
+    }
+
+    &:active {
+      background-color: var(--active);
+    }
+  }
+}

@@ -1,0 +1,48 @@
+@use '@/app/styles/variables' as *;
+
+.pagination {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    user-select: none;
+
+    button, span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        height: 24px;
+        padding: 4px;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--text-primary);
+        font-size: 10px;
+        font-weight: $fw-medium;
+
+    }
+
+    button {
+        cursor: pointer;
+
+        &:hover:not(.active):not(:disabled) {
+            background: var(--hover);
+        }
+
+        &:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        &.active {
+            background: var(--primary);
+            color: var(--primary-text);
+        }
+    }
+
+    span {
+        cursor: default;
+        color: var(--text-secondary);
+        letter-spacing: 0.5px;
+    }
+}
