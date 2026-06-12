@@ -1,5 +1,7 @@
 # Disciplinary Committee
 
+Этот проект является информационной системой документооборота, предназначенный для использования в Дисциплинарном комитете БСС СПбГУ. На данный момент он находится на раннем этапе разработки.
+
 <img width="1469" height="739" alt="Снимок экрана 2026-06-12 в 08 46 17" src="https://github.com/user-attachments/assets/5919ab4c-775d-4d64-b370-e4cb3a73e856" />
 
 <img width="1470" height="739" alt="Снимок экрана 2026-06-12 в 08 46 37" src="https://github.com/user-attachments/assets/2aef868a-b8a5-496c-a8aa-ca9ed1fdb904" />
