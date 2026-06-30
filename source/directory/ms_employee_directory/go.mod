@@ -1,3 +1,3 @@
-module ms_employee_directory
+module shared
 
 go 1.26.4

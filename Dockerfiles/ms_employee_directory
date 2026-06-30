@@ -15,7 +15,6 @@ COPY ./source/directory/ms_disciplinary_measures/go.mod ./directory/ms_disciplin
 COPY ./source/directory/ms_reasons_for_the_dcs_disagreement/go.mod ./directory/ms_reasons_for_the_dcs_disagreement/
 
 COPY ./source/document/ms_appointment_document/go.mod ./document/ms_appointment_document/
-COPY ./source/document/ms_dismissal_document/go.mod ./document/ms_dismissal_document/
 COPY ./source/document/ms_acceptance_document/go.mod ./document/ms_acceptance_document/
 COPY ./source/document/ms_create_department_document/go.mod ./document/ms_create_department_document/
 COPY ./source/document/ms_create_job_title_document/go.mod ./document/ms_create_job_title_document/
@@ -51,8 +50,8 @@ COPY ./source/directory/ms_disciplinary_measures/ ./directory/ms_disciplinary_me
 COPY ./source/directory/ms_reasons_for_the_dcs_disagreement/ ./directory/ms_reasons_for_the_dcs_disagreement/
 
 
+
 COPY ./source/document/ms_appointment_document/ ./document/ms_appointment_document/
-COPY ./source/document/ms_dismissal_document/ ./document/ms_dismissal_document/
 COPY ./source/document/ms_acceptance_document/ ./document/ms_acceptance_document/
 COPY ./source/document/ms_create_department_document/ ./document/ms_create_department_document/
 COPY ./source/document/ms_create_job_title_document/ ./document/ms_create_job_title_document/
