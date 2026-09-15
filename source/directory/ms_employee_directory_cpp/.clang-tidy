@@ -1,0 +1,17 @@
+Checks: >
+  modernize-*,
+  performance-*,
+  bugprone-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -bugprone-exception-escape
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*'
+CheckOptions:
+  - key: modernize-loop-convert.MaxCopySize
+    value: '16'
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: 'std::string_view;gsl::span'
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case

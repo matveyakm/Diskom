@@ -1,0 +1,20 @@
+install:
+    conan install . --build=missing
+    conan install . --build=missing -s build_type=Debug
+
+configure:
+    cmake --preset conan-release
+    cmake --preset conan-debug
+
+build:
+    cmake --build --preset conan-release -j20
+    cmake --build --preset conan-debug -j20
+
+run:
+    ./build/Release/ms_employee_dir
+
+run-debug:
+    ./build/Debug/main
+
+clean:
+    rm -rf build/
