@@ -1080,9 +1080,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -1120,7 +1119,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -1629,9 +1628,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -1669,7 +1667,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -1914,9 +1912,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -1955,7 +1952,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -2192,9 +2189,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -2233,7 +2229,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -2467,9 +2463,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -2508,7 +2503,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -2742,9 +2737,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -2783,7 +2777,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -3022,7 +3016,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -3033,7 +3027,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
             {
                 "Step": 2,
                 "method": "post",
-                "end_point": "appointment_document",
+                "end_point": "dismissal_document",
                 "fields":
                 [
                     {"status": 1}
