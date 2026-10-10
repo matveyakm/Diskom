@@ -5,6 +5,7 @@ export interface TableColumnConfig {
     key: string;
     label: string;
     type: "text";
+    end_point?: string;
 }
 
 export interface TableRow {

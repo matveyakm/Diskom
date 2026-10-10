@@ -11,4 +11,5 @@ export interface FormField {
 export interface RawColumnItem {
     field: string;
     label: string;
+    end_point?: string;
 }

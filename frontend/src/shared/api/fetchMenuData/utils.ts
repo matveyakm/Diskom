@@ -11,6 +11,7 @@ export const parseTableColumns = (rawColumnsStr: string | undefined) => {
                 key: c.field,
                 label: c.label,
                 type: "text",
+                end_point: c.end_point,
             })) as TableColumnConfig[];
         }
         return [];

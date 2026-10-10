@@ -6,6 +6,7 @@ import {DirectoryItem, DocumentItem} from "@/shared/api/fetchTableData/types";
 interface GetDataParams {
     page?: number;
     limit?: number;
+    expand?: string;
 }
 
 export const tableApi = (tableName: string) => {
@@ -16,6 +17,7 @@ export const tableApi = (tableName: string) => {
             const queryParams: Record<string, string> = {};
             if (params?.page) queryParams.page = String(params.page);
             if (params?.limit) queryParams.limit = String(params.limit);
+            if (params?.expand) queryParams.expand = params.expand;
 
             return await api.get<PaginatedResponse<DirectoryItem | DocumentItem>>(url, {params: queryParams});
         },
@@ -46,10 +48,10 @@ export const tableApi = (tableName: string) => {
     };
 };
 
-export const useTableData = (docName: string, page = 1, limit = 50) => {
+export const useTableData = (docName: string, page = 1, limit = 50, expand?: string) => {
     return useQuery({
-        queryKey: ["tableData", docName, page, limit],
-        queryFn: () => tableApi(docName).getData({page, limit}),
+        queryKey: ["tableData", docName, page, limit, expand ?? ""],
+        queryFn: () => tableApi(docName).getData({page, limit, expand}),
         enabled: !!docName,
     });
 };

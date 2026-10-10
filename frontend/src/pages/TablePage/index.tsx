@@ -30,15 +30,25 @@ const TablePage = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
 
-    const {data: tableResponse, isLoading, isError, refetch} = useTableData(docName ?? "", page, PAGE_SIZE);
-
-    const tableRowsResponse = tableResponse?.data ?? [];
-    const pagination = tableResponse?.pagination;
-
     const columns = useMemo(
         () => parseTableColumns(tableMeta?.table_columns),
         [tableMeta?.table_columns]
     );
+
+    // Reference expansion: columns carrying end_point ask the backend
+    // to resolve ids into human-readable names (see shared/controller/expand.go).
+    const expand = useMemo(
+        () => columns
+            .filter((c) => c.end_point)
+            .map((c) => `${c.key}:${c.end_point}`)
+            .join(",") || undefined,
+        [columns]
+    );
+
+    const {data: tableResponse, isLoading, isError, refetch} = useTableData(docName ?? "", page, PAGE_SIZE, expand);
+
+    const tableRowsResponse = tableResponse?.data ?? [];
+    const pagination = tableResponse?.pagination;
 
     const formFields = useMemo(
         () => parseFormFields(tableMeta?.item_fields),

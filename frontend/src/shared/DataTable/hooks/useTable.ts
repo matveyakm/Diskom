@@ -25,7 +25,11 @@ export const useTable = <T extends TableRow = TableRow>({columns, rows, fields}:
                 id: String(columnKey),
                 accessorKey: columnKey,
                 header: col.label || columnKey,
-                cell: ({getValue}) => {
+                cell: ({getValue, row}) => {
+                    // Prefer backend-resolved display name (see ?expand=),
+                    // fall back to the raw value when absent.
+                    const resolved = row.original[`${String(columnKey)}_name`];
+                    if (typeof resolved === "string" && resolved !== "") return resolved;
                     const value = getValue();
                     if (value === undefined || value === null) return "";
                     if (isDate) return formatDateForDisplay(value);
