@@ -95,8 +95,9 @@ type Pagination struct {
 
 // CRUDRepository handles basic CRUD operations for any GORM model
 type CRUDRepository[T any] struct {
-	db        *gorm.DB
-	tableName string
+	db         *gorm.DB
+	tableName  string
+	httpClient *http.Client
 }
 
 // NewCRUDRepository creates a new repository instance
@@ -104,6 +105,9 @@ func NewCRUDRepository[T any](db *gorm.DB, tableName string) *CRUDRepository[T] 
 	return &CRUDRepository[T]{
 		db:        db,
 		tableName: tableName,
+		httpClient: &http.Client{
+			Timeout: refRequestTimeout,
+		},
 	}
 }
 
@@ -203,6 +207,23 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 		query = r.applyFilters(query, req)
 	}
 
+	// Batch fetch by primary keys: ?ids=1,2,3 (see expand.go).
+	if idsRaw := req.URL.Query().Get("ids"); idsRaw != "" {
+		ids, err := parseIDs(idsRaw)
+		if err != nil {
+			r.writeError(w, "Invalid ids parameter: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if len(ids) == 0 {
+			r.writeJSONResponse(w, PaginatedResponse{
+				Data:       []T{},
+				Pagination: Pagination{Limit: paginationParams.Limit, Offset: paginationParams.Offset},
+			}, http.StatusOK)
+			return
+		}
+		query = query.Where("id IN ?", ids)
+	}
+
 	// Get total count for pagination metadata
 	var totalCount int64
 	if err := query.Count(&totalCount).Error; err != nil {
@@ -223,6 +244,31 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Reference expansion: ?expand=id_department:department_directory (see expand.go).
+	// Enriched rows carry "<column>_name"; the raw ids stay untouched.
+	var data any = entities
+	if expandRaw := req.URL.Query().Get("expand"); expandRaw != "" {
+		specs, err := parseExpand(expandRaw)
+		if err != nil {
+			r.writeError(w, "Invalid expand parameter: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if len(specs) > 0 {
+			raw, err := json.Marshal(entities)
+			if err != nil {
+				r.writeError(w, "Failed to encode records", http.StatusInternalServerError)
+				return
+			}
+			var rows []map[string]any
+			if err := json.Unmarshal(raw, &rows); err != nil {
+				r.writeError(w, "Failed to encode records", http.StatusInternalServerError)
+				return
+			}
+			enrichRows(r.httpClient, rows, specs)
+			data = rows
+		}
+	}
+
 	// Calculate pagination metadata
 	totalPages := int((totalCount + int64(paginationParams.Limit) - 1) / int64(paginationParams.Limit))
 	hasNext := paginationParams.Offset+paginationParams.Limit < int(totalCount)
@@ -230,7 +276,7 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 
 	// Build response
 	response := PaginatedResponse{
-		Data: entities,
+		Data: data,
 		Pagination: Pagination{
 			CurrentPage: paginationParams.Page,
 			PageSize:    len(entities),
