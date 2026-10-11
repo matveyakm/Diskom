@@ -7,4 +7,5 @@ certs/discom.spbgu.localhost+1-key.pem
 
 docker-compose.yaml
 source/directory/ms_system_object_directory/dbshell/db.sh
+MEMORY.md
 .env
