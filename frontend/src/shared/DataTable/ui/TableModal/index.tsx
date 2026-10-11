@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useRef, useState} from "react";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
 import {getRowValue} from "./utils";
@@ -23,6 +23,8 @@ type DialogState =
 
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
+    const formRef = useRef<HTMLFormElement>(null);
+    const submitActionRef = useRef<"save" | "saveAccept">("save");
 
     const visibleFields = fields.filter(f => !f.hidden);
     const itemName = tableMeta?.item_title;
@@ -37,14 +39,8 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
 
     const closeDialog = () => setDialog(null);
 
-    const {mutate: saveRow, isPending} = useSaveDocument({
+    const {mutate: saveRow, mutateAsync: saveRowAsync, isPending} = useSaveDocument({
         docName, mode, visibleFields, tableMeta,
-        onSuccess: () => {
-            setErrors({});
-            setIsEditing(false);
-            onClose();
-        },
-        onError: () => showAlert("Не удалось сохранить изменения. Проверьте введенные данные."),
     });
 
     const {mutate: deleteRow, isPending: isDeleting} = useDeleteDocument<T>({
@@ -53,16 +49,60 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         onError: () => showAlert("Не удалось удалить запись."),
     });
 
-    const {mutate: acceptRow, isPending: isAccepting} = useAcceptDocument<T>({
+    const {mutate: acceptRow, mutateAsync: acceptRowAsync, isPending: isAccepting} = useAcceptDocument<T>({
         docName, selectedRow, fields, tableMeta,
-        onSuccess: onClose,
-        onError: () => showAlert("Не удалось провести документ."),
     });
 
     const {errors, setErrors, isEditing, setIsEditing, handleSubmit} = useDocumentForm<T>({
         visibleFields, mode, selectedRow,
-        onSave: saveRow,
+        onSave: (payload) => {
+            if (submitActionRef.current === "saveAccept") {
+                submitActionRef.current = "save";
+                void handleSaveAndAccept(payload);
+            } else {
+                handleSave(payload);
+            }
+        },
     });
+
+    const handleSave = (payload: Record<string, unknown>) => {
+        saveRow(payload, {
+            onSuccess: () => {
+                setErrors({});
+                setIsEditing(false);
+                onClose();
+            },
+            onError: () => showAlert("Не удалось сохранить изменения. Проверьте введенные данные."),
+        });
+    };
+
+    const handleSaveAndAccept = async (payload: Record<string, unknown>) => {
+        let saved: Record<string, unknown>;
+        try {
+            saved = await saveRowAsync(payload);
+        } catch {
+            showAlert("Не удалось сохранить изменения. Проверьте введенные данные.");
+            return;
+        }
+        const savedId = saved.id ?? (selectedRow as TableRow | null)?.id;
+        if (savedId == null) {
+            showAlert("Документ сохранён, но провести не удалось: нет ID записи.");
+            return;
+        }
+        const rowForAccept = {
+            ...((selectedRow ?? {}) as Record<string, unknown>),
+            ...saved,
+            id: savedId,
+        } as unknown as T;
+        try {
+            await acceptRowAsync(rowForAccept);
+        } catch {
+            showAlert("Документ сохранён, но провести не удалось. Проверьте данные и проведите позже.");
+            return;
+        }
+        setErrors({});
+        onClose();
+    };
 
     const handleCancel = () => {
         setErrors({});
@@ -81,15 +121,30 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
 
     const handleAccept = () => {
         showConfirm("Провести документ?", () => {
-            acceptRow();
+            acceptRow(undefined, {
+                onSuccess: () => onClose(),
+                onError: () => showAlert("Не удалось провести документ."),
+            });
         });
+    };
+
+    const isBusy = isPending || isAccepting;
+
+    const handleSaveAcceptClick = () => {
+        submitActionRef.current = "saveAccept";
+        formRef.current?.requestSubmit();
     };
 
     // Кнопка "Провести" — только если проведение сконфигурировано:
     // иначе клик уходил во fallback и молча ставил status=2 где попало.
+    const hasAcceptancePipeline = (parseActionConfig(tableMeta?.on_acceptance)?.length ?? 0) > 0;
     const canAccept =
         Number((selectedRow as unknown as Record<string, unknown>)?.status) === 1 &&
-        (parseActionConfig(tableMeta?.on_acceptance)?.length ?? 0) > 0;
+        hasAcceptancePipeline;
+    // "Сохранить и провести": в создании — по наличию конфига (статуса ещё нет),
+    // в правке — по тем же правилам, что у "Провести". Где проводить нечего
+    // (справочники, dismissal) — кнопки нет, чтобы не портить данные.
+    const showSaveAccept = mode === "create" ? hasAcceptancePipeline : canAccept;
 
     return (
         <>
@@ -131,7 +186,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                 )}
 
                 <div className={styles.content}>
-                    <form id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
+                    <form ref={formRef} id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
                         <div className={styles.fieldsStack}>
                             {visibleFields.map(field => (
                                 <div
@@ -151,12 +206,18 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                         {isEditing && (
                             <div className={styles.formFooter}>
                                 <button type="button" onClick={handleCancel} className={styles.cancelBtn}
-                                        disabled={isPending}>
+                                        disabled={isBusy}>
                                     Отмена
                                 </button>
-                                <button type="submit" className={styles.saveBtn} disabled={isPending}>
-                                    {isPending ? "Сохранение..." : "Сохранить изменения"}
+                                <button type="submit" className={styles.saveBtn} disabled={isBusy}>
+                                    {isPending ? "Сохранение..." : "Сохранить"}
                                 </button>
+                                {showSaveAccept && (
+                                    <button type="button" onClick={handleSaveAcceptClick} className={styles.saveBtn}
+                                            disabled={isBusy}>
+                                        {isAccepting ? "Проведение..." : isPending ? "Сохранение..." : "Сохранить и провести"}
+                                    </button>
+                                )}
                             </div>
                         )}
                     </form>
