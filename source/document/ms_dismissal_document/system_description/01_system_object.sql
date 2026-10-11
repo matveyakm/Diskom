@@ -78,7 +78,7 @@
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -89,7 +89,7 @@
             {
                 "Step": 2,
                 "method": "post",
-                "end_point": "appointment_document",
+                "end_point": "dismissal_document",
                 "fields":
                 [
                     {"status": 1}

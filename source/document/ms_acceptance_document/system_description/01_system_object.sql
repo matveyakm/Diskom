@@ -84,9 +84,8 @@
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -124,7 +123,7 @@
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
