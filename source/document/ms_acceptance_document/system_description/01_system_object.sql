@@ -183,6 +183,38 @@
         "last_accusative",
         "first_accusative",
         "middle_accusative"
+      ],
+      "tag": "declension-table",
+      "columns": [
+        "Ф",
+        "И",
+        "О"
+      ],
+      "rows": [
+        {
+          "label": "Именительный",
+          "fields": [
+            "last_name",
+            "first_name",
+            "middle_name"
+          ]
+        },
+        {
+          "label": "Родительный",
+          "fields": [
+            "last_genitive",
+            "first_genitive",
+            "middle_genitive"
+          ]
+        },
+        {
+          "label": "Винительный",
+          "fields": [
+            "last_accusative",
+            "first_accusative",
+            "middle_accusative"
+          ]
+        }
       ]
     },
     {

@@ -17,4 +17,5 @@ export type FieldRowProps = {
     value: unknown;
     isEditing: boolean;
     error?: boolean;
+    bare?: boolean;
 };

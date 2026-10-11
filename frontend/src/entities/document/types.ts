@@ -15,11 +15,18 @@ export interface RawColumnItem {
     end_point?: string;
 }
 
+export interface FormBlockRow {
+    label: string;
+    fields: string[];
+}
+
 export interface FormBlock {
     id?: string;
     title: string;
     tag?: string;
     fields: string[];
+    columns?: string[];
+    rows?: FormBlockRow[];
 }
 
 export interface RawFormItem {

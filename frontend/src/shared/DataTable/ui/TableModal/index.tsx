@@ -2,6 +2,7 @@ import {useMemo, useState} from "react";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
 import {FormField} from "@/entities/document/types";
+import {resolveBlockRenderer} from "./blocks/blockRegistry";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
@@ -34,10 +35,18 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     const visibleByName = useMemo(() => new Map(visibleFields.map(f => [f.field, f])), [visibleFields]);
     const visibleBlocks = useMemo(
         () => (blocks ?? [])
-            .map(b => ({...b, fields: b.fields.filter(name => visibleByName.has(name))}))
+            .map(b => {
+                const fields = b.fields.filter(name => visibleByName.has(name));
+                const rows = b.rows
+                    ?.map(r => ({...r, fields: r.fields.filter(name => visibleByName.has(name))}))
+                    .filter(r => r.fields.length > 0);
+                return {...b, fields, rows: rows && rows.length > 0 ? rows : undefined};
+            })
             .filter(b => {
                 if (b.fields.length === 0) return false;
-                if (b.tag) console.warn(`[form] блок "${b.title}": тег "${b.tag}" пока не поддерживается, обычный рендер`);
+                if (b.tag && !resolveBlockRenderer(b.tag)) {
+                    console.warn(`[form] блок "${b.title}": неизвестный тег "${b.tag}", обычный рендер`);
+                }
                 return true;
             }),
         [blocks, visibleByName],
@@ -216,12 +225,30 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                     <form id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
                         <div className={styles.fieldsStack}>
                             {ungroupedFields.map(renderField)}
-                            {visibleBlocks.map(block => (
-                                <section key={block.id ?? block.title} className={styles.blockSection}>
-                                    <h4 className={styles.blockTitle}>{block.title}</h4>
-                                    {block.fields.map(name => renderField(visibleByName.get(name)!))}
-                                </section>
-                            ))}
+                            {visibleBlocks.map((block, blockIdx) => {
+                                const Renderer = resolveBlockRenderer(block.tag);
+                                const blockKey = block.id ?? `${block.title}-${blockIdx}`;
+                                if (!Renderer) {
+                                    return (
+                                        <section key={blockKey} className={styles.blockSection}>
+                                            <h4 className={styles.blockTitle}>{block.title}</h4>
+                                            {block.fields.map(name => renderField(visibleByName.get(name)!))}
+                                        </section>
+                                    );
+                                }
+                                return (
+                                    <section key={blockKey} className={styles.blockSection}>
+                                        <h4 className={styles.blockTitle}>{block.title}</h4>
+                                        <Renderer
+                                            block={block}
+                                            fields={block.fields.map(name => visibleByName.get(name)!)}
+                                            getValue={name => getRowValue(selectedRow, name)}
+                                            isEditing={isEditing}
+                                            errors={errors}
+                                        />
+                                    </section>
+                                );
+                            })}
                         </div>
 
                         {isEditing && (

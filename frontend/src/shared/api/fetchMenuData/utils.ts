@@ -1,4 +1,4 @@
-import {FormBlock, FormField, RawColumnItem, RawFormItem} from "@/entities/document/types";
+import {FormBlock, FormBlockRow, FormField, RawColumnItem, RawFormItem} from "@/entities/document/types";
 import {TableColumnConfig} from "@/shared/DataTable/types";
 
 export const parseTableColumns = (rawColumnsStr: string | undefined) => {
@@ -56,6 +56,7 @@ export const parseFormBlocks = (rawFieldsStr: string | undefined): FormBlock[] =
             console.error("Некорректный блок формы, пропущен:", b);
             continue;
         }
+        const inBlock = new Set<string>();
         const fields = b.fields.filter(f => {
             if (typeof f !== "string" || !known.has(f)) {
                 console.error(`Блок "${b.title}": неизвестное поле "${String(f)}", пропущено`);
@@ -66,10 +67,39 @@ export const parseFormBlocks = (rawFieldsStr: string | undefined): FormBlock[] =
                 return false;
             }
             seen.add(f);
+            inBlock.add(f);
             return true;
         });
         if (fields.length === 0) continue;
-        out.push({id: b.id, title: b.title, tag: b.tag, fields});
+        // Необязательная табличная раскладка: строки ссылаются на поля блока.
+        let rows: FormBlockRow[] | undefined;
+        if (b.rows !== undefined) {
+            if (!Array.isArray(b.rows)) {
+                console.error(`Блок "${b.title}": rows должно быть массивом, игнорирую`);
+            } else {
+                rows = [];
+                for (const r of b.rows) {
+                    if (!r || typeof r.label !== "string" || !Array.isArray(r.fields)) {
+                        console.error(`Блок "${b.title}": некорректная строка таблицы, пропущена:`, r);
+                        continue;
+                    }
+                    const rowFields = r.fields.filter((f: unknown) => {
+                        if (typeof f !== "string" || !inBlock.has(f)) {
+                            console.error(`Блок "${b.title}": строка "${r.label}": поле "${String(f)}" вне блока, пропущено`);
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (rowFields.length === 0) continue;
+                    rows.push({label: r.label, fields: rowFields});
+                }
+                if (rows.length === 0) rows = undefined;
+            }
+        }
+        const columns = Array.isArray(b.columns) && b.columns.every((c: unknown) => typeof c === "string")
+            ? (b.columns as string[])
+            : undefined;
+        out.push({id: b.id, title: b.title, tag: b.tag, fields, columns, rows});
     }
     return out;
 };

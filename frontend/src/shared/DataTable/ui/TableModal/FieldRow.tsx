@@ -6,7 +6,7 @@ import styles from "./TableModal.module.scss";
 import {useEffect, useState, useRef, useCallback} from "react";
 import {isDateField, formatDateForDisplay, toDateInputValue, getTodayDate} from "./utils";
 
-export const FieldRow = ({field, value, isEditing, error}: FieldRowProps) => {
+export const FieldRow = ({field, value, isEditing, error, bare}: FieldRowProps) => {
     const [currentValue, setCurrentValue] = useState(String(value ?? ""));
 
     useEffect(() => {
@@ -14,24 +14,26 @@ export const FieldRow = ({field, value, isEditing, error}: FieldRowProps) => {
     }, [value]);
 
     if (field.readonly) {
-        return <ReadonlyField field={field} value={value} isEditing={isEditing} error={error}/>;
+        return <ReadonlyField field={field} value={value} isEditing={isEditing} error={error} bare={bare}/>;
     }
 
     if (field.type === "select" && field.end_point) {
-        return <SelectField field={field} value={value} isEditing={isEditing} error={error}/>;
+        return <SelectField field={field} value={value} isEditing={isEditing} error={error} bare={bare}/>;
     }
 
     if (isDateField(field)) {
-        return <DateField field={field} value={value} isEditing={isEditing} error={error}/>;
+        return <DateField field={field} value={value} isEditing={isEditing} error={error} bare={bare}/>;
     }
 
     const isRequired = field.required ?? false;
 
     return (
         <>
-            <label>
-                {field.label} {isRequired && <span style={{color: "red"}}>*</span>}
-            </label>
+            {!bare && (
+                <label>
+                    {field.label} {isRequired && <span style={{color: "red"}}>*</span>}
+                </label>
+            )}
             {isEditing ? (
                 field.type === "textarea" ? (
                     <textarea
@@ -57,7 +59,7 @@ export const FieldRow = ({field, value, isEditing, error}: FieldRowProps) => {
     );
 };
 
-const DateField = ({field, value, isEditing}: FieldRowProps) => {
+const DateField = ({field, value, isEditing, bare}: FieldRowProps) => {
     const [currentValue, setCurrentValue] = useState(() => {
         if (value) return toDateInputValue(value);
         if (isEditing) return getTodayDate();
@@ -68,9 +70,11 @@ const DateField = ({field, value, isEditing}: FieldRowProps) => {
 
     return (
         <>
-            <label>
-                {field.label} {isRequired && <span style={{color: "red"}}>*</span>}
-            </label>
+            {!bare && (
+                <label>
+                    {field.label} {isRequired && <span style={{color: "red"}}>*</span>}
+                </label>
+            )}
             {isEditing ? (
                 <input
                     name={field.field}
@@ -94,19 +98,19 @@ interface SelectOption {
 // ReadonlyField shows the value as text (or a placeholder when empty) and
 // always submits it via a hidden input, so the backend stays the source
 // of truth (e.g. auto-generated document numbers).
-const ReadonlyField = ({field, value, isEditing}: FieldRowProps) => {
+const ReadonlyField = ({field, value, isEditing, bare}: FieldRowProps) => {
     const text = value === null || value === undefined || value === "" ? "" : String(value);
     const emptyText = isEditing ? "Сгенерируется автоматически" : "—";
     return (
         <>
-            <label>{field.label}</label>
+            {!bare && <label>{field.label}</label>}
             <div className={styles.viewValue}>{text !== "" ? text : emptyText}</div>
             <input type="hidden" name={field.field} value={text}/>
         </>
     );
 };
 
-const SelectField = ({field, value, isEditing}: FieldRowProps) => {
+const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
     const [search, setSearch] = useState("");
     const [open, setOpen] = useState(false);
     const [selectedId, setSelectedId] = useState<string | number>(() =>
@@ -180,7 +184,7 @@ const SelectField = ({field, value, isEditing}: FieldRowProps) => {
     if (queryError) {
         return (
             <>
-                <label>{field.label}</label>
+                {!bare && <label>{field.label}</label>}
                 <div style={{color: "red", fontSize: "12px"}}>Ошибка загрузки справочника</div>
             </>
         );
@@ -191,7 +195,7 @@ const SelectField = ({field, value, isEditing}: FieldRowProps) => {
         const displayValue = selectedOption ? selectedOption.name : String(value ?? "—");
         return (
             <>
-                <label>{field.label}</label>
+                {!bare && <label>{field.label}</label>}
                 <div className={styles.viewValue}>{displayValue}</div>
             </>
         );
@@ -199,7 +203,7 @@ const SelectField = ({field, value, isEditing}: FieldRowProps) => {
 
     return (
         <div className={styles.autocompleteWrapper} ref={wrapperRef}>
-            <label>{field.label}</label>
+            {!bare && <label>{field.label}</label>}
             <input
                 ref={inputRef}
                 type="text"
