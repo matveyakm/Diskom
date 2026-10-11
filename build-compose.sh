@@ -5,7 +5,7 @@
 #   1. Положи его compose-блок в source/<type>/ms_<name>/system_description/compose_part.yaml
 #      (verbatim, как в docker-compose.yaml: комментарий-заголовок + postgres_/api_ блоки,
 #      без завершающей пустой строки).
-#   2. Volumes для нового сервиса допиши руками в docker-compose.base.yaml (автоматизация volumes — фаза 2).
+#   2. Volumes для него подхватятся сами (ключи postgres_/api_ из фрагмента).
 #   3. Запусти ./build-compose.sh и проверь diff.
 #
 # Порядок сервисов: автообнаружение по группам directory -> document -> ledger -> report,
@@ -36,6 +36,7 @@ trap 'rm -f "$TMP"' EXIT
 awk '/# compose:services:begin/ {exit} {print}' "$BASE" > "$TMP"
 
 COUNT=0
+SERVICES=""
 for t in directory document ledger report; do
   for d in "$ROOT"/source/$t/ms_*/; do
     [ -d "$d" ] || continue
@@ -43,8 +44,7 @@ for t in directory document ledger report; do
       echo "WARNING: no $FRAG in $d — skipped" >&2
       continue
     fi
-    cat "$d$FRAG" >> "$TMP"
-    echo "" >> "$TMP"
+    SERVICES="$SERVICES $d"
     COUNT=$((COUNT + 1))
   done
 done
@@ -54,8 +54,23 @@ if [ "$COUNT" -eq 0 ]; then
   exit 1
 fi
 
-# Хвост base после маркера.
-awk 'seen{print} /# compose:services:end/ {seen=1}' "$BASE" >> "$TMP"
+# Блоки сервисов.
+for d in $SERVICES; do
+  cat "$d$FRAG" >> "$TMP"
+  echo "" >> "$TMP"
+done
+
+# Блок volumes: зерно + ключи postgres_/api_ из фрагментов в порядке сборки.
+# (api_ms_system_object_directory берётся из фрагмента system_object как обычно —
+# отсутствовала только строка в старом статичном блоке, quirk закрыт генерацией.)
+echo "volumes:" >> "$TMP"
+echo "  frontend_node_modules:" >> "$TMP"
+for d in $SERVICES; do
+  grep -oE "^  ((postgres|api)_[a-z_0-9]+):" "$d$FRAG" >> "$TMP" || true
+done
+
+# Хвост base после маркера volumes (начинается с пустой строки-разделителя).
+awk 'seen{print} /# compose:volumes:end/ {seen=1}' "$BASE" >> "$TMP"
 
 # Оригинал заканчивается без перевода строки — воспроизводим байт-в-байт.
 # (Холостой truncate невозможен: файл заведомо непуст.)

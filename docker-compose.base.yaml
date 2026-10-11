@@ -142,54 +142,8 @@ services:
 
 # compose:services:begin
 # compose:services:end
-volumes:
-  frontend_node_modules:
-  postgres_ms_document:
-  api_ms_document:
-  postgres_ms_employee_directory:
-  api_ms_employee_directory:
-  postgres_ms_department_directory:
-  api_ms_department_directory:
-  postgres_ms_regulations_clauses_directory:
-  api_ms_regulations_clauses_directory:
-  postgres_ms_organization_directory:
-  api_ms_organization_directory:
-  postgres_ms_counterparty_directory:
-  api_ms_counterparty_directory:
-  postgres_ms_job_title_directory:
-  api_ms_job_title_directory:
-  postgres_ms_appointment_document:
-  api_ms_appointment_document:
-  postgres_ms_dismissal_document:
-  api_ms_dismissal_document:
-  postgres_ms_acceptance_document:
-  api_ms_acceptance_document:
-  postgres_ms_employee_data_ledger:
-  api_ms_employee_data_ledger:
-  postgres_ms_staff_placement_ledger:
-  api_ms_staff_placement_ledger:
-  postgres_ms_system_object_directory:
-  api_ms_create_department_document:
-  postgres_ms_create_department_document:
-  postgres_ms_department_data_ledger:
-  api_ms_department_data_ledger:
-  postgres_ms_create_job_title_document:
-  api_ms_create_job_title_document:
-  postgres_ms_job_title_data_ledger:
-  api_ms_job_title_data_ledger:
-  postgres_ms_create_counterparty_document:
-  api_ms_create_counterparty_document:
-  postgres_ms_create_regulations_clauses_document:
-  api_ms_create_regulations_clauses_document:
-  postgres_ms_create_organization_document:
-  api_ms_create_organization_document:
-  postgres_ms_organization_data_ledger:
-  api_ms_organization_data_ledger:
-  postgres_ms_disciplinary_measures:
-  api_ms_disciplinary_measures:
-  postgres_ms_reasons_for_the_dcs_disagreement:
-  api_ms_reasons_for_the_dcs_disagreement:
-  api_ms_job_report:
+# compose:volumes:begin
+# compose:volumes:end
 
 # --- Shared resources ---
 networks:
