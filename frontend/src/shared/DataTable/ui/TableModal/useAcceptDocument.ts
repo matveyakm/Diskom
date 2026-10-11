@@ -49,7 +49,8 @@ export const useAcceptDocument = <T extends TableRow = TableRow>({
     return useMutation({
         mutationFn: acceptRowMutation,
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ["tableData", docName]});
+            // См. комментарий в useSaveDocument: проведение трогает чужие таблицы.
+            queryClient.invalidateQueries({queryKey: ["tableData"]});
             queryClient.invalidateQueries({queryKey: ["reference"]});
         },
     });

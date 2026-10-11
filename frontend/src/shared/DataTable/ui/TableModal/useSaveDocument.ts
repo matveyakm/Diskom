@@ -42,7 +42,10 @@ export const useSaveDocument = ({
     return useMutation({
         mutationFn: saveViaPipeline,
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ["tableData", docName]});
+            // Инвалидируем все таблицы: пайплайны пишут не только в свой
+            // документ (проведение создаёт строки в справочниках/регистрах),
+            // иначе уже открытые списки показывают устаревшие данные.
+            queryClient.invalidateQueries({queryKey: ["tableData"]});
             queryClient.invalidateQueries({queryKey: ["reference"]});
         },
     });
