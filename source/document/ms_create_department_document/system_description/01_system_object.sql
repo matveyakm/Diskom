@@ -37,7 +37,6 @@
     'document.png',
     '{
       "columns": [
-        { "field": "id", "label": "", "hidden": true },
         { "field": "status", "label": "", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },

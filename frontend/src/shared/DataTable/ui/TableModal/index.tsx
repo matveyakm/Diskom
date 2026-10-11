@@ -93,11 +93,6 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                         <h3 className={styles.heading}>
                             {mode === "create" ? `Создание: ${itemName}` : itemName}
                         </h3>
-                        {mode !== "create" && (
-                            <span className={styles.docId}>
-                                #{String(selectedRow?.id ?? "")}
-                            </span>
-                        )}
                     </div>
                     <button className={styles.closeX} onClick={onClose} aria-label="Закрыть">
                         ✕

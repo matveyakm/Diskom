@@ -38,7 +38,6 @@
     '{
       "columns": [
         { "field": "status", "label": ""},
-        { "field": "id", "label": "Код" },
         { "field": "ddate", "label": "Дата"},
         { "field": "dnumber", "label": "Номер"},
         { "field": "note", "label": "Примечание"},
