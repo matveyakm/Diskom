@@ -145,7 +145,7 @@
       "label": "IdVk",
       "hidden": false,
       "required": false,
-      "default": 0
+      "default": ""
     },
     {
       "field": "id_user",
