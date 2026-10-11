@@ -2,8 +2,8 @@ import { api } from "@/shared/api/AxiosClient";
 import { FormField } from "@/entities/document/types";
 import type { ProcessingStep } from "./effects";
 
-export type { AcceptanceEffect, AcceptanceEffectVerb, ProcessingStep } from "./effects";
-export { describeAcceptanceEffects, formatAcceptanceEffect } from "./effects";
+export type { PipelineEffect, PipelineEffectVerb, ProcessingStep } from "./effects";
+export { describePipelineEffects, formatPipelineEffect } from "./effects";
 
 export interface ActionPipelineConfig {
     action: string;

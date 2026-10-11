@@ -8,8 +8,9 @@ import {resolveBlockRenderer} from "./blocks/blockRegistry";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
-import {describeAcceptanceEffects, formatAcceptanceEffect, parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
+import {describePipelineEffects, formatPipelineEffect, parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
 import type {MenuItem} from "@/shared/api/fetchMenuData/types";
+import type {PipelineEffect} from "@/shared/api/actionPipeline";
 import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
@@ -25,6 +26,37 @@ type DialogState =
     | { type: "confirm"; title: string; message: ReactNode; onConfirm: () => void }
     | { type: "alert"; title: string; message: ReactNode }
     | null;
+
+// Превью последствий пайплайна: выводится из конфига (поведение — в данных).
+// Имена сущностей — из кеша menuData (table_title → name → сырой end_point,
+// fail-open, новых запросов нет). Пустой конфиг → пустой список, вызывающий
+// показывает плоский текст как раньше.
+const usePipelinePreview = (rawConfig: string | null | undefined) => {
+    const queryClient = useQueryClient();
+    return useMemo(() => {
+        const steps = parseActionConfig(rawConfig);
+        if (!steps?.length) return [];
+        const menuData = queryClient.getQueryData<MenuItem[]>(["menuData"]);
+        return describePipelineEffects(steps, (endPoint) => {
+            const item = menuData?.find(i => i.ref === endPoint);
+            return item?.table_title || item?.name || endPoint;
+        });
+    }, [queryClient, rawConfig]);
+};
+
+const pipelineMessage = (question: string, consequences: string, effects: PipelineEffect[]): ReactNode =>
+    effects.length === 0
+        ? question
+        : (
+            <>
+                <div>{question} {consequences}</div>
+                <ul>
+                    {effects.map((e, i) => (
+                        <li key={`${e.endPoint}-${i}`}>{formatPipelineEffect(e)}</li>
+                    ))}
+                </ul>
+            </>
+        );
 
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
@@ -60,32 +92,14 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         [visibleFields, groupedNames],
     );
 
-    // Превью последствий проведения: выводится из конфига on_acceptance
-    // (поведение — в данных). Имена сущностей — из кеша menuData
-    // (table_title → name → сырой end_point, fail-open, новых запросов нет).
-    const queryClient = useQueryClient();
-    const currentRef = tableMeta?.ref ?? docName;
-    const acceptanceEffects = useMemo(() => {
-        const steps = parseActionConfig(tableMeta?.on_acceptance);
-        if (!steps?.length) return [];
-        const menuData = queryClient.getQueryData<MenuItem[]>(["menuData"]);
-        return describeAcceptanceEffects(steps, currentRef, (endPoint) => {
-            const item = menuData?.find(i => i.ref === endPoint);
-            return item?.table_title || item?.name || endPoint;
-        });
-    }, [queryClient, tableMeta?.on_acceptance, currentRef]);
-    const acceptanceMessage: ReactNode = acceptanceEffects.length === 0
-        ? "Провести документ?"
-        : (
-            <>
-                <div>Провести документ? Последствия проведения:</div>
-                <ul>
-                    {acceptanceEffects.map((e, i) => (
-                        <li key={`${e.endPoint}-${i}`}>{formatAcceptanceEffect(e)}</li>
-                    ))}
-                </ul>
-            </>
-        );
+    const acceptanceEffects = usePipelinePreview(tableMeta?.on_acceptance);
+    const deleteEffects = usePipelinePreview(tableMeta?.on_delete);
+    const acceptanceMessage = pipelineMessage(
+        "Провести документ?", "Последствия проведения:", acceptanceEffects,
+    );
+    const deleteMessage = pipelineMessage(
+        "Вы уверены, что хотите удалить эту запись?", "Последствия удаления:", deleteEffects,
+    );
 
     const renderField = (field: FormField) => (
         <div
@@ -187,7 +201,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     };
 
     const handleDelete = () => {
-        showConfirm("Вы уверены, что хотите удалить эту запись?", () => {
+        showConfirm(deleteMessage, () => {
             deleteRow();
         });
     };

@@ -1,23 +1,22 @@
-// Описание последствий проведения документа — превью для confirm-диалога
-// кнопок "Провести" / "Сохранить и провести".
+// Описание последствий пайплайна — превью для confirm-диалогов
+// ("Провести", "Сохранить и провести", "Удалить").
 //
-// Философия как у движка: поведение — в данных. Функция не знает имён
-// полей и конкретных сущностей, только роль шага в конфиге on_acceptance:
-//   - GET скрывается всегда (чтение, данные не меняет),
-//   - шаги в шапку (`document`) и в собственную строку вида скрываются
-//     (внутренний переворот status, пользователю неинтересен),
-//   - всё остальное описывается честным глаголом строго по method:
-//     POST — создание, PUT — изменение, DELETE — удаление.
-//     Содержимое шага (какие поля в какие) не интерпретируется осознанно:
-//     это было бы хардкодом.
-// Человеческое имя сущности подставляет вызывающий через resolveTitle
-// (по menuData: table_title → name → сырой end_point, fail-open).
+// Поведение — в данных: функция не знает имён полей, сущностей и того,
+// какие шаги "технические". Единственный источник скрытия — флаг
+// "hide_in_preview": true на самом шаге (строго boolean; мусор вроде
+// "yes" не скрывает — fail-closed на своём синтаксисе).
+// Нет флага — шаг виден (fail-open: немаркированное лучше показать,
+// чем потерять). Глагол — строго по method:
+//   GET — прочитать, POST — создать, PUT — изменить, DELETE — удалить.
+// Неизвестный method пропускается. На исполнение шагов флаг не влияет
+// (движок его игнорирует — читает только известные поля).
 
 export interface ProcessingStep {
     Step?: number;
     step?: number;
     method?: string;
     end_point: string;
+    hide_in_preview?: boolean;
     map?: Record<string, unknown>[];
     fields?: Record<string, unknown>[];
     filter?: string;
@@ -25,33 +24,28 @@ export interface ProcessingStep {
     conditions?: Record<string, unknown>[];
 }
 
-export type AcceptanceEffectVerb = "create" | "update" | "delete";
+export type PipelineEffectVerb = "read" | "create" | "update" | "delete";
 
-export interface AcceptanceEffect {
-    verb: AcceptanceEffectVerb;
+export interface PipelineEffect {
+    verb: PipelineEffectVerb;
     endPoint: string;
     title: string;
     conditional: boolean;
 }
 
-const TECHNICAL_END_POINT = "document";
-
-export const describeAcceptanceEffects = (
+export const describePipelineEffects = (
     steps: ProcessingStep[] | null | undefined,
-    currentRef: string | null | undefined,
     resolveTitle: (endPoint: string) => string,
-): AcceptanceEffect[] => {
+): PipelineEffect[] => {
     if (!steps?.length) return [];
-    const out: AcceptanceEffect[] = [];
+    const out: PipelineEffect[] = [];
     for (const step of steps) {
         if (!step || typeof step.end_point !== "string" || step.end_point === "") continue;
+        if (step.hide_in_preview === true) continue;
         const method = (step.method || "get").toLowerCase();
-        // Чтение и технические перевороты статуса — не последствия для пользователя.
-        if (method === "get") continue;
-        if (step.end_point === TECHNICAL_END_POINT) continue;
-        if (currentRef && step.end_point === currentRef) continue;
-        let verb: AcceptanceEffectVerb | null = null;
-        if (method === "post") verb = "create";
+        let verb: PipelineEffectVerb | null = null;
+        if (method === "get") verb = "read";
+        else if (method === "post") verb = "create";
         else if (method === "put") verb = "update";
         else if (method === "delete") verb = "delete";
         else continue;
@@ -66,9 +60,10 @@ export const describeAcceptanceEffects = (
     return out;
 };
 
-export const formatAcceptanceEffect = (effect: AcceptanceEffect): string => {
+export const formatPipelineEffect = (effect: PipelineEffect): string => {
     const head =
-        effect.verb === "create" ? "Новая запись"
+        effect.verb === "read" ? "Прочитать запись"
+        : effect.verb === "create" ? "Новая запись"
         : effect.verb === "update" ? "Изменение записи"
         : "Удаление";
     const scope = effect.verb === "delete" ? "из" : "в";
