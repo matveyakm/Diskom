@@ -51,7 +51,7 @@
       "fields": [
         { "field": "id", "label": "", "hidden": true, "required": false },
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "label": "Номер", "hidden": false, "required": true, "default": "id" },
+        { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
         { "field": "name", "label": "Название", "hidden": false, "required": false, "default": "" },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false, "default": "" },
         { "field": "id_user", "label": "", "hidden": true, "required": false, "default": 1 },

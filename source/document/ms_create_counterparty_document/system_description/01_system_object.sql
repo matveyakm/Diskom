@@ -53,7 +53,7 @@
       "fields": [
         { "field": "id", "label": "", "hidden": true, "required": false },
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "label": "Номер", "hidden": false, "required": true, "default": "id" },
+        { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false, "default": "" },
         { "field": "last_name", "label": "Фамилия", "hidden": false, "required": false, "default": "" },
         { "field": "first_name", "label": "Имя", "hidden": false, "required": false, "default": "" },

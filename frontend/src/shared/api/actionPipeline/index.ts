@@ -40,6 +40,10 @@ export const applyDefaults = (
     for (const f of fields) {
         const def = f.default;
         if (def === undefined) continue;
+        // Readonly fields are backend-owned (e.g. auto-generated numbers):
+        // defaults must never write into them, otherwise a numeric default
+        // like "id" lands in a string column and breaks Go decoding.
+        if (f.readonly) continue;
 
         const current = result[f.field];
         if (current !== undefined && current !== null && current !== "") continue;

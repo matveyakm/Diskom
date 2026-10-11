@@ -52,7 +52,7 @@
       "fields": [
         { "field": "id", "label": "Код", "hidden": true, "required": false },
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "label": "Номер", "hidden": false, "required": true, "default": "id" },
+        { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false },
         { "field": "id_employee", "label": "Сотрудник", "hidden": false, "required": false, "type": "select", "end_point": "employee_directory" },
         { "field": "id_organization", "label": "Комитет", "hidden": false, "required": false, "type": "select", "end_point": "organization_directory" },
