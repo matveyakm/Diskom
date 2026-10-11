@@ -7,8 +7,10 @@ type UseDocumentFormProps<T extends TableRow = TableRow> = {
     visibleFields: FormField[];
     mode: "edit" | "create";
     selectedRow: T | null;
-    onSave: (payload: Record<string, unknown>) => void;
+    onSave: (payload: Record<string, unknown>, action: SubmitAction) => void;
 };
+
+export type SubmitAction = "save" | "saveAccept";
 
 export const useDocumentForm = <T extends TableRow = TableRow>({
     visibleFields,
@@ -21,11 +23,16 @@ export const useDocumentForm = <T extends TableRow = TableRow>({
 
     const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (e) => {
         e.preventDefault();
+        // Какая кнопка отправила форму (у "Сохранить и провести" data-action).
+        // Enter и обычная кнопка дают "save". Читаем здесь, а не через ref,
+        // чтобы неудачная валидация не "залипала" на следующем сабмите.
+        const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+        const action: SubmitAction = submitter?.dataset?.action === "saveAccept" ? "saveAccept" : "save";
         const formData = new FormData(e.currentTarget);
         const result = validateAndCollect(formData, visibleFields, mode, selectedRow);
         setErrors(result.errors);
         if (!result.payload) return;
-        onSave(result.payload);
+        onSave(result.payload, action);
     };
 
     return {errors, setErrors, isEditing, setIsEditing, handleSubmit};

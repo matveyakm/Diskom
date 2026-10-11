@@ -24,7 +24,6 @@ type DialogState =
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
     const formRef = useRef<HTMLFormElement>(null);
-    const submitActionRef = useRef<"save" | "saveAccept">("save");
 
     const visibleFields = fields.filter(f => !f.hidden);
     const itemName = tableMeta?.item_title;
@@ -55,9 +54,8 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
 
     const {errors, setErrors, isEditing, setIsEditing, handleSubmit} = useDocumentForm<T>({
         visibleFields, mode, selectedRow,
-        onSave: (payload) => {
-            if (submitActionRef.current === "saveAccept") {
-                submitActionRef.current = "save";
+        onSave: (payload, action) => {
+            if (action === "saveAccept") {
                 void handleSaveAndAccept(payload);
             } else {
                 handleSave(payload);
@@ -131,7 +129,6 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     const isBusy = isPending || isAccepting;
 
     const handleSaveAcceptClick = () => {
-        submitActionRef.current = "saveAccept";
         formRef.current?.requestSubmit();
     };
 
@@ -213,7 +210,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                                     {isPending ? "Сохранение..." : "Сохранить"}
                                 </button>
                                 {showSaveAccept && (
-                                    <button type="button" onClick={handleSaveAcceptClick} className={styles.saveBtn}
+                                    <button type="button" data-action="saveAccept" onClick={handleSaveAcceptClick} className={styles.saveBtn}
                                             disabled={isBusy}>
                                         {isAccepting ? "Проведение..." : isPending ? "Сохранение..." : "Сохранить и провести"}
                                     </button>
