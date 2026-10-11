@@ -1,4 +1,4 @@
-import {useMemo, useRef, useState} from "react";
+import {useMemo, useState} from "react";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
 import {FormField} from "@/entities/document/types";
@@ -24,7 +24,6 @@ type DialogState =
 
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
-    const formRef = useRef<HTMLFormElement>(null);
 
     const visibleFields = fields.filter(f => !f.hidden);
     const itemName = tableMeta?.item_title;
@@ -163,10 +162,6 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
 
     const isBusy = isPending || isAccepting;
 
-    const handleSaveAcceptClick = () => {
-        formRef.current?.requestSubmit();
-    };
-
     // Кнопка "Провести" — только если проведение сконфигурировано:
     // иначе клик уходил во fallback и молча ставил status=2 где попало.
     const hasAcceptancePipeline = (parseActionConfig(tableMeta?.on_acceptance)?.length ?? 0) > 0;
@@ -218,7 +213,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                 )}
 
                 <div className={styles.content}>
-                    <form ref={formRef} id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
+                    <form id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
                         <div className={styles.fieldsStack}>
                             {ungroupedFields.map(renderField)}
                             {visibleBlocks.map(block => (
@@ -239,7 +234,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                                     {isPending ? "Сохранение..." : "Сохранить"}
                                 </button>
                                 {showSaveAccept && (
-                                    <button type="button" data-action="saveAccept" onClick={handleSaveAcceptClick} className={styles.saveBtn}
+                                    <button type="submit" data-action="saveAccept" className={styles.saveBtn}
                                             disabled={isBusy}>
                                         {isAccepting ? "Проведение..." : isPending ? "Сохранение..." : "Сохранить и провести"}
                                     </button>
