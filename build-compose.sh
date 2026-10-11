@@ -5,10 +5,12 @@
 #   1. Положи его compose-блок в source/<type>/ms_<name>/system_description/compose_part.yaml
 #      (verbatim, как в docker-compose.yaml: комментарий-заголовок + postgres_/api_ блоки,
 #      без завершающей пустой строки).
-#   2. Добавь строку "<type>/ms_<name>" в compose.order в нужное место
-#      (без compose.order сборка тоже работает — автообнаружение, но порядок будет другой).
-#   3. Volumes для нового сервиса допиши руками в docker-compose.base.yaml (автоматизация volumes — фаза 2).
-#   4. Запусти ./build-compose.sh и проверь diff.
+#   2. Volumes для нового сервиса допиши руками в docker-compose.base.yaml (автоматизация volumes — фаза 2).
+#   3. Запусти ./build-compose.sh и проверь diff.
+#
+# Порядок сервисов: автообнаружение по группам directory -> document -> ledger -> report,
+# внутри группы по алфавиту (как в build-db.sh). Порядок на работу не влияет.
+# docker-compose.yaml руками не править — только через этот скрипт.
 #
 # Использование: ./build-compose.sh [--check]
 #   --check: только сверить генерацию с текущим docker-compose.yaml, ничего не писать (для CI).
@@ -16,7 +18,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BASE="$ROOT/docker-compose.base.yaml"
-MANIFEST="$ROOT/compose.order"
 TARGET="$ROOT/docker-compose.yaml"
 FRAG="system_description/compose_part.yaml"
 
@@ -28,21 +29,6 @@ elif [ $# -gt 0 ]; then
   exit 2
 fi
 
-# Список "<type>/ms_<name>" в порядке сборки.
-list_services() {
-  if [ -f "$MANIFEST" ]; then
-    grep -v '^[[:space:]]*#' "$MANIFEST" | grep -v '^[[:space:]]*$' || true
-  else
-    echo "WARNING: $MANIFEST not found — auto-discovery, order may differ" >&2
-    for t in directory document ledger report; do
-      for d in "$ROOT"/source/$t/ms_*/; do
-        [ -f "$d$FRAG" ] || continue
-        echo "$t/$(basename "$d")"
-      done
-    done
-  fi
-}
-
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
@@ -50,18 +36,18 @@ trap 'rm -f "$TMP"' EXIT
 awk '/# compose:services:begin/ {exit} {print}' "$BASE" > "$TMP"
 
 COUNT=0
-while IFS= read -r line || [ -n "$line" ]; do
-  svc="$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-  case "$svc" in ""|\#*) continue ;; esac
-  frag="$ROOT/source/$svc/$FRAG"
-  if [ ! -f "$frag" ]; then
-    echo "ERROR: fragment not found: $frag" >&2
-    exit 1
-  fi
-  cat "$frag" >> "$TMP"
-  echo "" >> "$TMP"
-  COUNT=$((COUNT + 1))
-done < <(list_services)
+for t in directory document ledger report; do
+  for d in "$ROOT"/source/$t/ms_*/; do
+    [ -d "$d" ] || continue
+    if [ ! -f "$d$FRAG" ]; then
+      echo "WARNING: no $FRAG in $d — skipped" >&2
+      continue
+    fi
+    cat "$d$FRAG" >> "$TMP"
+    echo "" >> "$TMP"
+    COUNT=$((COUNT + 1))
+  done
+done
 
 if [ "$COUNT" -eq 0 ]; then
   echo "ERROR: no service fragments found, refusing to write empty compose" >&2
@@ -71,7 +57,7 @@ fi
 # Хвост base после маркера.
 awk 'seen{print} /# compose:services:end/ {seen=1}' "$BASE" >> "$TMP"
 
-# Исходник заканчивается без перевода строки — воспроизводим байт-в-байт.
+# Оригинал заканчивается без перевода строки — воспроизводим байт-в-байт.
 # (Холостой truncate невозможен: файл заведомо непуст.)
 if [ -z "$(tail -c 1 "$TMP")" ]; then
   truncate -s -1 "$TMP"
