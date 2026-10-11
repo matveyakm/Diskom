@@ -1,4 +1,6 @@
 import {useMemo, useState} from "react";
+import type {ReactNode} from "react";
+import {useQueryClient} from "@tanstack/react-query";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
 import {FormField} from "@/entities/document/types";
@@ -6,7 +8,8 @@ import {resolveBlockRenderer} from "./blocks/blockRegistry";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
-import {parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
+import {describeAcceptanceEffects, formatAcceptanceEffect, parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
+import type {MenuItem} from "@/shared/api/fetchMenuData/types";
 import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
@@ -19,8 +22,8 @@ import Delete from "@/assets/icons/delete.svg?react";
 import Check from "@/assets/icons/check.svg?react";
 
 type DialogState =
-    | { type: "confirm"; title: string; message: string; onConfirm: () => void }
-    | { type: "alert"; title: string; message: string }
+    | { type: "confirm"; title: string; message: ReactNode; onConfirm: () => void }
+    | { type: "alert"; title: string; message: ReactNode }
     | null;
 
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
@@ -57,6 +60,33 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         [visibleFields, groupedNames],
     );
 
+    // Превью последствий проведения: выводится из конфига on_acceptance
+    // (поведение — в данных). Имена сущностей — из кеша menuData
+    // (table_title → name → сырой end_point, fail-open, новых запросов нет).
+    const queryClient = useQueryClient();
+    const currentRef = tableMeta?.ref ?? docName;
+    const acceptanceEffects = useMemo(() => {
+        const steps = parseActionConfig(tableMeta?.on_acceptance);
+        if (!steps?.length) return [];
+        const menuData = queryClient.getQueryData<MenuItem[]>(["menuData"]);
+        return describeAcceptanceEffects(steps, currentRef, (endPoint) => {
+            const item = menuData?.find(i => i.ref === endPoint);
+            return item?.table_title || item?.name || endPoint;
+        });
+    }, [queryClient, tableMeta?.on_acceptance, currentRef]);
+    const acceptanceMessage: ReactNode = acceptanceEffects.length === 0
+        ? "Провести документ?"
+        : (
+            <>
+                <div>Провести документ? Последствия проведения:</div>
+                <ul>
+                    {acceptanceEffects.map((e, i) => (
+                        <li key={`${e.endPoint}-${i}`}>{formatAcceptanceEffect(e)}</li>
+                    ))}
+                </ul>
+            </>
+        );
+
     const renderField = (field: FormField) => (
         <div
             key={field.field}
@@ -71,11 +101,11 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         </div>
     );
 
-    const showConfirm = (message: string, onConfirm: () => void) => {
+    const showConfirm = (message: ReactNode, onConfirm: () => void) => {
         setDialog({type: "confirm", title: "Подтверждение", message, onConfirm});
     };
 
-    const showAlert = (message: string) => {
+    const showAlert = (message: ReactNode) => {
         setDialog({type: "alert", title: "Ошибка", message});
     };
 
@@ -99,7 +129,9 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         visibleFields, mode, selectedRow,
         onSave: (payload, action) => {
             if (action === "saveAccept") {
-                void handleSaveAndAccept(payload);
+                showConfirm(acceptanceMessage, () => {
+                    void handleSaveAndAccept(payload);
+                });
             } else {
                 handleSave(payload);
             }
@@ -161,7 +193,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     };
 
     const handleAccept = () => {
-        showConfirm("Провести документ?", () => {
+        showConfirm(acceptanceMessage, () => {
             acceptRow(undefined, {
                 onSuccess: () => onClose(),
                 onError: (err) => showAlert(`Не удалось провести документ (${describeActionError(err)}).`),
