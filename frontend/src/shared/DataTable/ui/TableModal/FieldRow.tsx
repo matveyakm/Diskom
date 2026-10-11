@@ -13,6 +13,10 @@ export const FieldRow = ({field, value, isEditing, error}: FieldRowProps) => {
         setCurrentValue(String(value ?? ""));
     }, [value]);
 
+    if (field.readonly) {
+        return <ReadonlyField field={field} value={value} isEditing={isEditing} error={error}/>;
+    }
+
     if (field.type === "select" && field.end_point) {
         return <SelectField field={field} value={value} isEditing={isEditing} error={error}/>;
     }
@@ -86,6 +90,21 @@ interface SelectOption {
     id: string | number;
     name: string;
 }
+
+// ReadonlyField shows the value as text (or a placeholder when empty) and
+// always submits it via a hidden input, so the backend stays the source
+// of truth (e.g. auto-generated document numbers).
+const ReadonlyField = ({field, value, isEditing}: FieldRowProps) => {
+    const text = value === null || value === undefined || value === "" ? "" : String(value);
+    const emptyText = isEditing ? "Сгенерируется автоматически" : "—";
+    return (
+        <>
+            <label>{field.label}</label>
+            <div className={styles.viewValue}>{text !== "" ? text : emptyText}</div>
+            <input type="hidden" name={field.field} value={text}/>
+        </>
+    );
+};
 
 const SelectField = ({field, value, isEditing}: FieldRowProps) => {
     const [search, setSearch] = useState("");

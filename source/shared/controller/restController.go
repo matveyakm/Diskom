@@ -150,6 +150,15 @@ func (r *CRUDRepository[T]) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Автогенерация "Кода" (см. dnumber.go): пустой dnumber + DNUMBER_PREFIX.
+	if prefix := dnumberPrefix(); prefix != "" {
+		if err := fillDnumber(tx, r.tableName, &entity, prefix); err != nil {
+			tx.Rollback()
+			r.writeError(w, "Failed to assign document number: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	// Если все успешно - коммитим
 	if err := tx.Commit().Error; err != nil {
 		r.writeError(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)

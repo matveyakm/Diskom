@@ -9,6 +9,7 @@ export const validateRequiredFields = (
     const errors: Record<string, boolean> = {};
     for (const field of fields) {
         if (field.required === false) continue;
+        if (field.readonly) continue;
         if (field.default !== undefined) continue;
         const value = formData.get(field.field);
         if (value === null || String(value).trim() === "") {

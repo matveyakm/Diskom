@@ -4,6 +4,7 @@ export interface FormField {
     type: string;
     hidden?: boolean;
     required?: boolean;
+    readonly?: boolean;
     default?: unknown;
     end_point?: string;
 }
