@@ -5,7 +5,7 @@ import {FormField} from "@/entities/document/types";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
-import {parseActionConfig} from "@/shared/api/actionPipeline";
+import {parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
 import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
@@ -128,8 +128,8 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         } as unknown as T;
         try {
             await acceptRowAsync(rowForAccept);
-        } catch {
-            showAlert("Документ сохранён, но провести не удалось. Проверьте данные и проведите позже.");
+        } catch (err) {
+            showAlert(`Документ сохранён, но провести не удалось (${describeActionError(err)}). Проверьте данные и проведите позже.`);
             return;
         }
         setErrors({});
@@ -155,7 +155,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         showConfirm("Провести документ?", () => {
             acceptRow(undefined, {
                 onSuccess: () => onClose(),
-                onError: () => showAlert("Не удалось провести документ."),
+                onError: (err) => showAlert(`Не удалось провести документ (${describeActionError(err)}).`),
             });
         });
     };
