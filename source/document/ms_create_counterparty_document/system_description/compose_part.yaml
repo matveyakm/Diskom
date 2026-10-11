@@ -1,0 +1,37 @@
+  # Create counterparty document
+  postgres_ms_create_counterparty_document:
+    image: postgres:latest
+    container_name: postgres_ms_create_counterparty_document
+    command: postgres -c listen_addresses=172.25.0.54 -c port=5434
+    restart: always
+    env_file:
+      - ./source/document/ms_create_counterparty_document/parameters.env
+    volumes:
+      - postgres_ms_create_counterparty_document:/var/lib/postgresql
+      - ./source/document/ms_create_counterparty_document/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.54
+
+  api_ms_create_counterparty_document:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_create_counterparty_document
+    container_name: api_ms_create_counterparty_document
+    restart: always
+    env_file:
+      - ./source/document/ms_create_counterparty_document/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.55
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_create_counterparty_document.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/create_counterparty_document`)" # Укажите домен
+      - "traefik.http.services.api_ms_create_counterparty_document.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_create_counterparty_document.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_create_counterparty_document.tls=true" # Включаем TLS снаружи

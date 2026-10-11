@@ -1,0 +1,37 @@
+  #Clauses of local regulations directory
+  postgres_ms_regulations_clauses_directory:
+    image: postgres:latest
+    container_name: postgres_ms_regulations_clauses_directory
+    command: postgres -c listen_addresses=172.25.0.28 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_regulations_clauses_directory/parameters.env
+    volumes:
+      - postgres_ms_regulations_clauses_directory:/var/lib/postgresql
+      - ./source/directory/ms_regulations_clauses_directory/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.28
+
+  api_ms_regulations_clauses_directory:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_regulations_clauses_directory
+    container_name: api_ms_regulations_clauses_directory
+    restart: always
+    env_file:
+      - ./source/directory/ms_regulations_clauses_directory/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.29
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_regulations_clauses_directory.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/regulations_clauses_directory`)" # Укажите домен
+      - "traefik.http.services.api_ms_regulations_clauses_directory.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_regulations_clauses_directory.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_regulations_clauses_directory.tls=true" # Включаем TLS снаружи

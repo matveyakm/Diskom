@@ -1,0 +1,37 @@
+  # Staff placement ledger
+  postgres_ms_staff_placement_ledger:
+    image: postgres:latest
+    container_name: postgres_ms_staff_placement_ledger
+    command: postgres -c listen_addresses=172.25.0.44 -c port=5434
+    restart: always
+    env_file:
+      - ./source/ledger/ms_staff_placement_ledger/parameters.env
+    volumes:
+      - postgres_ms_staff_placement_ledger:/var/lib/postgresql
+      - ./source/ledger/ms_staff_placement_ledger/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.44
+
+  api_ms_staff_placement_ledger:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_staff_placement_ledger
+    container_name: api_ms_staff_placement_ledger
+    restart: always
+    env_file:
+      - ./source/ledger/ms_staff_placement_ledger/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.45
+    labels:
+      - "traefik.enable=true" # Включает обнаружение
+      - "traefik.http.routers.api_ms_staff_placement_ledger.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/staff_placement_ledger`)" # Укажите домен
+      - "traefik.http.services.api_ms_staff_placement_ledger.loadbalancer.server.port=8443" #
+      - "traefik.http.routers.api_ms_staff_placement_ledger.entrypoints=websecure" # Слушаем только 443
+      - "traefik.http.routers.api_ms_staff_placement_ledger.tls=true" # Включаем TLS снаружи

@@ -1,0 +1,36 @@
+  postgres_ms_disciplinary_measures:
+    image: postgres:latest
+    container_name: postgres_disciplinary_measures
+    command: postgres -c listen_addresses=172.25.0.101 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_disciplinary_measures/parameters.env
+    volumes:
+      - postgres_ms_disciplinary_measures:/var/lib/postgresql
+      - ./source/directory/ms_disciplinary_measures/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.101
+
+  api_ms_disciplinary_measures:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_disciplinary_measures
+    container_name: api_ms_disciplinary_measures
+    restart: always
+    env_file:
+      - ./source/directory/ms_disciplinary_measures/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.102
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api_ms_disciplinary_measures.rule=Host(`discom.spbgu.localhost`) && PathPrefix(`/api/disciplinary_measures`)"
+      - "traefik.http.services.api_ms_disciplinary_measures.loadbalancer.server.port=8443"
+      - "traefik.http.routers.api_ms_disciplinary_measures.entrypoints=websecure"
+      - "traefik.http.routers.api_ms_disciplinary_measures.tls=true"
