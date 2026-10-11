@@ -4,7 +4,7 @@ import {MenuItem} from "@/shared/api/fetchMenuData/types";
 export interface TableColumnConfig {
     key: string;
     label: string;
-    type: "text";
+    type: "text" | "status";
     end_point?: string;
 }
 
