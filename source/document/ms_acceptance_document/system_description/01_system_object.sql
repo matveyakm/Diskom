@@ -141,7 +141,7 @@
       "default": ""
     },
     {
-      "field": "id_vk",
+      "field": "vk_id",
       "label": "IdVk",
       "hidden": false,
       "required": false,
@@ -221,7 +221,7 @@
       "id": "contacts",
       "title": "Реквизиты",
       "fields": [
-        "id_vk"
+        "vk_id"
       ]
     }
   ]
@@ -317,7 +317,7 @@
                     {"ddate":"ddate"},
                     {"dnumber":"dnumber"},
                     {"note":"note"},
-                    {"id_vk":"id_vk"},
+                    {"vk_id":"vk_id"},
                     {"prefix":"prefix"},
                     {"id_transaction":"id_transaction"}
                 ]
@@ -375,7 +375,7 @@
                     {"first_accusative": "first_accusative"},
                     {"last_accusative":  "last_accusative"},
                     {"middle_accusative":"middle_accusative"},
-                    {"id_vk":            "id_vk"},
+                    {"vk_id":            "vk_id"},
                     {"prefix":           "prefix"},
                     {"id_transaction":   "id_transaction"}
                 ]

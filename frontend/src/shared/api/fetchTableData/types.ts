@@ -43,7 +43,7 @@ export interface DocumentItem {
     first_accusative?: string;
     last_accusative?: string;
     middle_accusative?: string;
-    id_vk?: string;
+    vk_id?: string;
     id_employee?: number;
     id_organization?: number;
     id_department?: number;
@@ -86,7 +86,7 @@ export interface DocumentItem extends Record<string, unknown> {
     first_accusative?: string;
     last_accusative?: string;
     middle_accusative?: string;
-    id_vk?: string;
+    vk_id?: string;
     id_employee?: number;
     id_organization?: number;
     id_department?: number;
