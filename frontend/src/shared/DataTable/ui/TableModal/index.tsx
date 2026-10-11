@@ -4,6 +4,7 @@ import {TableModalProps} from "./types";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
+import {parseActionConfig} from "@/shared/api/actionPipeline";
 import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
@@ -84,6 +85,12 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         });
     };
 
+    // Кнопка "Провести" — только если проведение сконфигурировано:
+    // иначе клик уходил во fallback и молча ставил status=2 где попало.
+    const canAccept =
+        Number((selectedRow as unknown as Record<string, unknown>)?.status) === 1 &&
+        (parseActionConfig(tableMeta?.on_acceptance)?.length ?? 0) > 0;
+
     return (
         <>
             <div className={styles.overlay} onClick={onClose}/>
@@ -101,7 +108,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
 
                 {!isEditing && mode === "edit" && (
                     <div className={styles.toolbar}>
-                        {Number((selectedRow as unknown as Record<string, unknown>)?.status) === 1 && (
+                        {canAccept && (
                             <button type="button" onClick={handleAccept} className={styles.acceptBtn}
                                     disabled={isAccepting}>
                                 <div className={styles.icon}><Check/></div>
