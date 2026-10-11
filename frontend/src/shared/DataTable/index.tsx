@@ -18,6 +18,7 @@ const DataTable = <T extends TableRow = TableRow>({
                        rows,
                        docName,
                        fields,
+                       blocks,
                        pageIndex,
                        pageCount,
                        onPageChange,
@@ -133,6 +134,7 @@ const DataTable = <T extends TableRow = TableRow>({
                     onClose={close}
                     docName={docName ?? "Документ"}
                     fields={fields ?? []}
+                    blocks={blocks}
                     mode={mode}
                     tableMeta={tableMeta}
                 />

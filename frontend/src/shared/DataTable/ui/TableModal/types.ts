@@ -1,4 +1,4 @@
-import {FormField} from "@/entities/document/types";
+import {FormBlock, FormField} from "@/entities/document/types";
 import {TableRow} from "@/shared/DataTable/types";
 import {MenuItem} from "@/shared/api/fetchMenuData/types";
 
@@ -7,6 +7,7 @@ export type TableModalProps<T extends TableRow = TableRow> = {
     onClose: () => void;
     docName: string;
     fields: FormField[];
+    blocks?: FormBlock[];
     mode: "edit" | "create";
     tableMeta?: MenuItem;
 };

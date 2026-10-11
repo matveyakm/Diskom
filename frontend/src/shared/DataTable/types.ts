@@ -1,4 +1,4 @@
-import {FormField} from "@/entities/document/types";
+import {FormBlock, FormField} from "@/entities/document/types";
 import {MenuItem} from "@/shared/api/fetchMenuData/types";
 
 export interface TableColumnConfig {
@@ -17,6 +17,7 @@ export type DocumentsTableProps<T extends TableRow = TableRow> = {
     rows: T[];
     docName: string | undefined;
     fields: FormField[];
+    blocks?: FormBlock[];
     pageIndex: number;
     pageCount: number;
     totalCount: number;

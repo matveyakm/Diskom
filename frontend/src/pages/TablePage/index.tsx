@@ -5,7 +5,7 @@ import styles from "./TablePage.module.scss";
 import DataTable from "@/shared/DataTable";
 import useMenuData from "@/shared/api/fetchMenuData";
 import {useTableData} from "@/shared/api/fetchTableData";
-import {parseFormFields, parseTableColumns} from "@/shared/api/fetchMenuData/utils";
+import {parseFormBlocks, parseFormFields, parseTableColumns} from "@/shared/api/fetchMenuData/utils";
 
 const TablePage = () => {
     const {docName} = useParams();
@@ -55,6 +55,11 @@ const TablePage = () => {
         [tableMeta?.item_fields]
     );
 
+    const formBlocks = useMemo(
+        () => parseFormBlocks(tableMeta?.item_fields),
+        [tableMeta?.item_fields]
+    );
+
     useEffect(() => {
         document.title = tableMeta?.table_title || "Просмотр таблицы";
     }, [tableMeta?.table_title]);
@@ -91,6 +96,7 @@ const TablePage = () => {
                 rows={tableRowsResponse}
                 docName={docName}
                 fields={formFields}
+                blocks={formBlocks}
                 pageIndex={(pagination?.current_page ?? 1) - 1}
                 pageCount={pagination?.total_pages ?? 1}
                 totalCount={pagination?.total_count ?? 0}

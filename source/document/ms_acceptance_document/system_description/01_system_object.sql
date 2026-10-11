@@ -48,27 +48,152 @@
     }',
     'Журнал документов приёмки сотрудника',
     'Документ приём сотрудника',
-    '{
+    ''{
+  "fields": [
+    {
+      "field": "id",
+      "label": "",
+      "hidden": true,
+      "required": false
+    },
+    {
+      "field": "ddate",
+      "label": "Дата",
+      "hidden": false,
+      "required": true,
+      "default": "now()"
+    },
+    {
+      "field": "dnumber",
+      "readonly": true,
+      "label": "Номер",
+      "hidden": false,
+      "required": true
+    },
+    {
+      "field": "note",
+      "label": "Примечание",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "last_name",
+      "label": "Фамилия",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "first_name",
+      "label": "Имя",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "middle_name",
+      "label": "Отчество",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "last_genitive",
+      "label": "Фамилия(Р)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "first_genitive",
+      "label": "Имя(Р)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "middle_genitive",
+      "label": "Отчество(Р)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "last_accusative",
+      "label": "Фамилия(В)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "first_accusative",
+      "label": "Имя(В)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "middle_accusative",
+      "label": "Отчество(В)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "id_vk",
+      "label": "IdVk",
+      "hidden": false,
+      "required": false,
+      "default": 0
+    },
+    {
+      "field": "id_user",
+      "label": "",
+      "hidden": true,
+      "required": false,
+      "default": 1
+    },
+    {
+      "field": "id_basis",
+      "label": "",
+      "hidden": true,
+      "required": false,
+      "default": 0
+    },
+    {
+      "field": "prefix",
+      "label": "",
+      "hidden": true,
+      "required": false,
+      "default": 0
+    }
+  ],
+  "blocks": [
+    {
+      "id": "fio",
+      "title": "Персональные данные",
       "fields": [
-        { "field": "id", "label": "", "hidden": true, "required": false },
-        { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
-        { "field": "note", "label": "Примечание", "hidden": false, "required": false, "default": "" },
-        { "field": "last_name", "label": "Фамилия", "hidden": false, "required": false, "default": "" },
-        { "field": "first_name", "label": "Имя", "hidden": false, "required": false, "default": "" },
-        { "field": "middle_name", "label": "Отчество", "hidden": false, "required": false, "default": "" },
-        { "field": "last_genitive", "label": "Фамилия(Р)", "hidden": false, "required": false, "default": "" },
-        { "field": "first_genitive", "label": "Имя(Р)", "hidden": false, "required": false, "default": "" },
-        { "field": "middle_genitive", "label": "Отчество(Р)", "hidden": false, "required": false, "default": "" },
-        { "field": "last_accusative", "label": "Фамилия(В)", "hidden": false, "required": false, "default": "" },
-        { "field": "first_accusative", "label": "Имя(В)", "hidden": false, "required": false, "default": "" },
-        { "field": "middle_accusative", "label": "Отчество(В)", "hidden": false, "required": false, "default": "" },
-        { "field": "id_vk", "label": "IdVk", "hidden": false, "required": false, "default": 0 },
-        { "field": "id_user", "label": "", "hidden": true, "required": false, "default": 1 },
-        { "field": "id_basis", "label": "", "hidden": true, "required": false, "default": 0 },
-        { "field": "prefix", "label": "", "hidden": true, "required": false, "default": 0 }
+        "last_name",
+        "first_name",
+        "middle_name",
+        "last_genitive",
+        "first_genitive",
+        "middle_genitive",
+        "last_accusative",
+        "first_accusative",
+        "middle_accusative"
       ]
-    }',
+    },
+    {
+      "id": "contacts",
+      "title": "Реквизиты",
+      "fields": [
+        "id_vk"
+      ]
+    }
+  ]
+}',
     '{
         "action": "onSaveNew",
         "processing":

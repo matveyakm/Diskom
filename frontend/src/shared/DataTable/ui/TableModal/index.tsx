@@ -1,6 +1,7 @@
-import {useRef, useState} from "react";
+import {useMemo, useRef, useState} from "react";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
+import {FormField} from "@/entities/document/types";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
@@ -21,12 +22,46 @@ type DialogState =
     | { type: "alert"; title: string; message: string }
     | null;
 
-const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, mode, tableMeta}: TableModalProps<T>) => {
+const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
     const formRef = useRef<HTMLFormElement>(null);
 
     const visibleFields = fields.filter(f => !f.hidden);
     const itemName = tableMeta?.item_title;
+
+    // Группировка для отображения. Вся логика (валидация, сбор payload,
+    // дефолты, пайплайны) по-прежнему работает с плоским visibleFields выше —
+    // блоки меняют только раскладку.
+    const visibleByName = useMemo(() => new Map(visibleFields.map(f => [f.field, f])), [visibleFields]);
+    const visibleBlocks = useMemo(
+        () => (blocks ?? [])
+            .map(b => ({...b, fields: b.fields.filter(name => visibleByName.has(name))}))
+            .filter(b => {
+                if (b.fields.length === 0) return false;
+                if (b.tag) console.warn(`[form] блок "${b.title}": тег "${b.tag}" пока не поддерживается, обычный рендер`);
+                return true;
+            }),
+        [blocks, visibleByName],
+    );
+    const groupedNames = useMemo(() => new Set(visibleBlocks.flatMap(b => b.fields)), [visibleBlocks]);
+    const ungroupedFields = useMemo(
+        () => visibleFields.filter(f => !groupedNames.has(f.field)),
+        [visibleFields, groupedNames],
+    );
+
+    const renderField = (field: FormField) => (
+        <div
+            key={field.field}
+            className={`${styles.fieldWrapper} ${styles.viewMode} ${errors[field.field] ? styles.fieldError : ""}`}
+        >
+            <FieldRow
+                field={field}
+                value={getRowValue(selectedRow, field.field)}
+                isEditing={isEditing}
+                error={errors[field.field]}
+            />
+        </div>
+    );
 
     const showConfirm = (message: string, onConfirm: () => void) => {
         setDialog({type: "confirm", title: "Подтверждение", message, onConfirm});
@@ -185,18 +220,12 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                 <div className={styles.content}>
                     <form ref={formRef} id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
                         <div className={styles.fieldsStack}>
-                            {visibleFields.map(field => (
-                                <div
-                                    key={field.field}
-                                    className={`${styles.fieldWrapper} ${styles.viewMode} ${errors[field.field] ? styles.fieldError : ""}`}
-                                >
-                                    <FieldRow
-                                        field={field}
-                                        value={getRowValue(selectedRow, field.field)}
-                                        isEditing={isEditing}
-                                        error={errors[field.field]}
-                                    />
-                                </div>
+                            {ungroupedFields.map(renderField)}
+                            {visibleBlocks.map(block => (
+                                <section key={block.id ?? block.title} className={styles.blockSection}>
+                                    <h4 className={styles.blockTitle}>{block.title}</h4>
+                                    {block.fields.map(name => renderField(visibleByName.get(name)!))}
+                                </section>
                             ))}
                         </div>
 

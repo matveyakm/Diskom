@@ -14,3 +14,15 @@ export interface RawColumnItem {
     label: string;
     end_point?: string;
 }
+
+export interface FormBlock {
+    id?: string;
+    title: string;
+    tag?: string;
+    fields: string[];
+}
+
+export interface RawFormItem {
+    fields: FormField[];
+    blocks?: FormBlock[];
+}
