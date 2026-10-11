@@ -37,7 +37,7 @@
     'document.png',
     '{
       "columns": [
-        { "field": "status", "label": ""},
+        { "field": "status", "label": "", "type": "status"},
         { "field": "ddate", "label": "Дата"},
         { "field": "dnumber", "label": "Номер"},
         { "field": "note", "label": "Примечание"},
