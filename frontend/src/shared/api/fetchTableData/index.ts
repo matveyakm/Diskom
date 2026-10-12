@@ -33,8 +33,8 @@ export const tableApi = (tableName: string) => {
             return await api.get<PaginatedResponse<DirectoryItem | DocumentItem>>(url, {params: queryParams});
         },
 
-        getDistinct: async (column: string): Promise<DistinctResponse> => {
-            return await api.get<DistinctResponse>(url, {params: {distinct: column}});
+        getDistinct: async (column: string, extra?: Record<string, string>): Promise<DistinctResponse> => {
+            return await api.get<DistinctResponse>(url, {params: {distinct: column, ...extra}});
         },
 
         getById: async (id: number | string) => {

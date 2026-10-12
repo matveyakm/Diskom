@@ -42,6 +42,8 @@ interface FilterEditorProps {
     sortDir: SortDir | null;
     cond: ConditionFilter | null;
     checked: Array<string | number> | null;
+    /** Параметры фильтров соседних закладок: список сужается тем, что выбрано в них. */
+    siblingParams: Record<string, string>;
     onSort: (dir: SortDir | null) => void;
     onCond: (cond: ConditionFilter | null) => void;
     onChecked: (values: Array<string | number> | null) => void;
@@ -53,19 +55,23 @@ interface FilterEditorProps {
 // по галочкам. Монтируется заново на каждую закладку (key), поэтому
 // локального состояния фильтров не держит.
 export const FilterEditor = ({
-    docName, fieldKey, column, formField, sortDir, cond, checked,
+    docName, fieldKey, column, formField, sortDir, cond, checked, siblingParams,
     onSort, onCond, onChecked, onResetField,
 }: FilterEditorProps) => {
     const kind = kindOfField(column, formField);
     const ops = kind === "text" || kind === "date" ? FULL_OPS : EQ_OPS;
+    // Выбранный оператор живёт локально: пустое условие в черновик не
+    // пишется (иначе селект схлопывался бы обратно на "равно").
+    const [op, setOp] = useState<FilterOp>(cond?.op ?? "eq");
     const [checkSearch, setCheckSearch] = useState("");
 
-    // Значения галочек: статусы фиксированы, остальное — ?distinct=.
+    // Значения галочек: статусы фиксированы, остальное — ?distinct=,
+    // суженный фильтрами соседних закладок (свой столбец бэкенд вычитает сам).
     // Имена ссылок — из общего кеша ["reference", end_point].
     const endPoint = column?.end_point ?? formField?.end_point;
     const {data: distinct, isLoading: distinctLoading} = useQuery({
-        queryKey: ["distinct", docName, fieldKey],
-        queryFn: () => tableApi(docName ?? "").getDistinct(fieldKey) as Promise<DistinctResponse>,
+        queryKey: ["distinct", docName, fieldKey, siblingParams],
+        queryFn: () => tableApi(docName ?? "").getDistinct(fieldKey, siblingParams) as Promise<DistinctResponse>,
         enabled: !!docName && kind !== "status",
         staleTime: 60_000,
     });
@@ -120,7 +126,6 @@ export const FilterEditor = ({
     };
 
     const setCondValue = (value: string) => {
-        const op = cond?.op ?? "eq";
         if (op === "between") {
             const v2 = cond?.value2 ?? "";
             if (value.trim() === "" && v2.trim() === "") onCond(null);
@@ -133,26 +138,26 @@ export const FilterEditor = ({
     };
 
     const setCondValue2 = (value2: string) => {
-        const op = cond?.op ?? "between";
         const v = cond?.value ?? "";
         if (v.trim() === "" && value2.trim() === "") onCond(null);
         else onCond({op, value: v.trim(), value2: value2.trim()});
     };
 
-    const setCondOp = (op: FilterOp) => {
+    const setCondOp = (next: FilterOp) => {
+        setOp(next);
         const v = cond?.value ?? "";
         const v2 = cond?.value2 ?? "";
-        if (op === "between") {
+        if (next === "between") {
             if (v.trim() === "" && v2.trim() === "") onCond(null);
-            else onCond({op, value: v.trim(), value2: v2.trim()});
+            else onCond({op: next, value: v.trim(), value2: v2.trim()});
         } else if (v.trim() === "") {
             onCond(null);
         } else {
-            onCond({op, value: v.trim()});
+            onCond({op: next, value: v.trim()});
         }
     };
 
-    const condOp: FilterOp = cond?.op ?? "eq";
+    const condOp: FilterOp = op;
     const condValue = cond?.value ?? "";
     const condValue2 = cond?.value2 ?? "";
 
