@@ -1,7 +1,7 @@
 import {useReferenceOptions, ReferenceOption} from "@/shared/api/useReferenceOptions";
 import {FieldRowProps} from "./types";
 import styles from "./TableModal.module.scss";
-import {useEffect, useState, useRef, useCallback} from "react";
+import {useEffect, useState, useRef, useCallback, useMemo} from "react";
 import {isDateField, formatDateForDisplay, toDateInputValue, getTodayDate} from "./utils";
 
 export const FieldRow = ({field, value, isEditing, error, bare}: FieldRowProps) => {
@@ -116,7 +116,7 @@ const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
 
     const {data: allOptions, isLoading, error: queryError} = useReferenceOptions(field.end_point);
 
-    const typedOptions: ReferenceOption[] = allOptions ?? [];
+    const typedOptions = useMemo<ReferenceOption[]>(() => allOptions ?? [], [allOptions]);
 
     const filtered = !search.trim()
         ? typedOptions

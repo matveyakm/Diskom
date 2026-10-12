@@ -63,34 +63,6 @@
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  position: relative;
-}
-
-.headerPopupAnchor {
-  display: contents;
-}
-
-.headerFilterBtn {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.headerFilterLabel {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.filterMark {
-  color: var(--accent, #3498db);
 }
 
 .resizer {

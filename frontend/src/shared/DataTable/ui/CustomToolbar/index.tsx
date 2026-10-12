@@ -4,6 +4,7 @@ import Tree from "@/assets/icons/account_tree.svg?react";
 import Print from "@/assets/icons/printer.svg?react";
 import Next from "@/assets/icons/double_arrow_right.svg?react";
 import Add from "@/assets/icons/add.svg?react";
+import Filter from "@/assets/icons/filter.svg?react";
 import type {TableRow} from "@/shared/DataTable/types";
 
 type Props = {
@@ -11,12 +12,12 @@ type Props = {
     onEdit: () => void;
     selectedRow: TableRow | null;
     tableName?: string;
-    searchValue?: string;
     totalCount?: number;
-    onSearchChange?: (value: string) => void;
+    activeFilterCount?: number;
+    onOpenFilters?: () => void;
 };
 
-const CustomToolbar = ({onAdd, onEdit, selectedRow, tableName, searchValue, totalCount, onSearchChange}: Props) => {
+const CustomToolbar = ({onAdd, onEdit, selectedRow, tableName, totalCount, activeFilterCount, onOpenFilters}: Props) => {
     return (
         <div className={styles.toolbar}>
             <span className={styles.tableName}>
@@ -26,17 +27,16 @@ const CustomToolbar = ({onAdd, onEdit, selectedRow, tableName, searchValue, tota
                 )}
             </span>
 
-            {onSearchChange && (
-                <input
-                    type="text"
-                    value={searchValue ?? ""}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Поиск…"
-                    className={styles.searchInput}
-                />
-            )}
-
             <div className={styles.actionsWrapper}>
+                {onOpenFilters && (
+                    <button type="button" className={styles.filterButton} onClick={onOpenFilters}>
+                        <Filter/>
+                        Фильтры
+                        {(activeFilterCount ?? 0) > 0 && (
+                            <span className={styles.filterBadge}>{activeFilterCount}</span>
+                        )}
+                    </button>
+                )}
                 <div className={`${styles.editNav} ${selectedRow ? styles.visible : ""}`}>
                     <div className={styles.modalBtn}
                          onClick={(e) => {

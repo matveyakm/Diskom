@@ -36,17 +36,3 @@ export interface ColumnFilterState {
 }
 
 export type TableColumnFilters = Record<string, ColumnFilterState>;
-
-/**
- * Связка для шапки грида: сортировка одна на таблицу (бэкенд умеет
- * единственный ?sort=), фильтры — по колонкам.
- */
-export interface HeaderFiltering {
-    sort: ColumnSort | null;
-    filters: TableColumnFilters;
-    openKey: string | null;
-    docName: string | undefined;
-    onTogglePopup: (key: string | null) => void;
-    onSort: (key: string, dir: SortDir | null) => void;
-    onFilter: (key: string, state: ColumnFilterState | null) => void;
-}

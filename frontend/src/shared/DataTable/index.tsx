@@ -12,7 +12,7 @@ import ContextMenu from "@/shared/DataTable/ui/ContextMenu";
 import Pagination from "./ui/Pagination";
 import { asElementRef } from "@/shared/utils/refUtils";
 import {DocumentsTableProps, TableRow} from "@/shared/DataTable/types";
-import type {HeaderFiltering} from "@/shared/DataTable/filters/types";
+import {FiltersModal} from "@/shared/DataTable/ui/FiltersModal";
 
 const DataTable = <T extends TableRow = TableRow>({
                         columns,
@@ -26,30 +26,21 @@ const DataTable = <T extends TableRow = TableRow>({
                         tableMeta,
                         sort,
                         columnFilters,
-                        searchValue,
                         totalCount,
                         hasActiveFilters,
-                        onSort,
-                        onColumnFilter,
-                        onSearchChange,
+                        onApplyFilters,
                         onClearFilters,
                     }: DocumentsTableProps<T>) => {
-    const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
-    const filtering = useMemo<HeaderFiltering | undefined>(() => {
-        if (!onSort || !onColumnFilter) return undefined;
-        return {
-            sort: sort ?? null,
-            filters: columnFilters ?? {},
-            openKey: openFilterKey,
-            docName,
-            onTogglePopup: setOpenFilterKey,
-            onSort,
-            onFilter: onColumnFilter,
-        };
-    }, [onSort, onColumnFilter, sort, columnFilters, openFilterKey, docName]);
+    const activeFilterCount = useMemo(
+        () => Object.values(columnFilters ?? {}).filter(
+            s => s && (s.cond != null || s.checked != null),
+        ).length,
+        [columnFilters]
+    );
 
-    const {table} = useTable<T>({columns, rows, fields, filtering});
+    const {table} = useTable<T>({columns, rows, fields});
     const {isOpen, data: selectedRow, mode, openForEdit, openForCreate, close} = useModal<T>();
     const {menu, openMenu, closeMenu} = useContextMenu<T>();
     const {activeRow, selectRow, clearSelection} = useRowSelection<T>();
@@ -77,9 +68,9 @@ const DataTable = <T extends TableRow = TableRow>({
                     onAdd={openForCreate}
                     onEdit={onEdit}
                     tableName={tableName}
-                    searchValue={searchValue}
-                    onSearchChange={onSearchChange}
                     totalCount={totalCount}
+                    activeFilterCount={activeFilterCount}
+                    onOpenFilters={onApplyFilters ? () => setFiltersOpen(true) : undefined}
                 />
                 <div className={styles.tableScroll}>
                     <table className={styles.table}>
@@ -175,6 +166,18 @@ const DataTable = <T extends TableRow = TableRow>({
                     blocks={blocks}
                     mode={mode}
                     tableMeta={tableMeta}
+                />
+            )}
+
+            {filtersOpen && onApplyFilters && (
+                <FiltersModal
+                    docName={docName}
+                    columns={columns}
+                    formFields={fields ?? []}
+                    sort={sort ?? null}
+                    filters={columnFilters ?? {}}
+                    onApply={onApplyFilters}
+                    onClose={() => setFiltersOpen(false)}
                 />
             )}
 

@@ -7,7 +7,7 @@ import useMenuData from "@/shared/api/fetchMenuData";
 import {useTableData} from "@/shared/api/fetchTableData";
 import {parseFormBlocks, parseFormFields, parseTableColumns} from "@/shared/api/fetchMenuData/utils";
 import {buildListParams} from "@/shared/DataTable/filters/queryParams";
-import type {ColumnFilterState, ColumnSort, SortDir, TableColumnFilters} from "@/shared/DataTable/filters/types";
+import type {ColumnSort, TableColumnFilters} from "@/shared/DataTable/filters/types";
 
 const TablePage = () => {
     const {docName} = useParams();
@@ -38,19 +38,10 @@ const TableView = ({docName}: { docName: string | undefined }) => {
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
 
-    // Excel-фильтры: сортировка одна на таблицу, условия/галочки — по колонкам,
-    // глобальный поиск — с debounce. Любое изменение сбрасывает на страницу 1.
+    // Excel-фильтры: сортировка одна на таблицу, условия/галочки — по колонкам.
+    // Окно фильтров коммитит всё одной кнопкой. Любое изменение сбрасывает на страницу 1.
     const [sort, setSort] = useState<ColumnSort | null>(null);
     const [columnFilters, setColumnFilters] = useState<TableColumnFilters>({});
-    const [searchInput, setSearchInput] = useState("");
-    const [search, setSearch] = useState("");
-
-    // Глобальный поиск уходит в запрос с задержкой, чтобы не дёргать
-    // сервер на каждую клавишу.
-    useEffect(() => {
-        const timer = setTimeout(() => setSearch(searchInput), 400);
-        return () => clearTimeout(timer);
-    }, [searchInput]);
 
     const columns = useMemo(
         () => parseTableColumns(tableMeta?.table_columns),
@@ -67,46 +58,24 @@ const TableView = ({docName}: { docName: string | undefined }) => {
         [columns]
     );
 
-    // Глобальный поиск — только по локальным колонкам: имена *_name
-    // резолвятся другими сервисами и на сервере недоступны.
-    const searchFields = useMemo(
-        () => columns.filter((c) => !c.end_point).map((c) => c.key),
-        [columns]
-    );
-
     const extraParams = useMemo(
-        () => buildListParams({sort, filters: columnFilters, q: search, qFields: searchFields}),
-        [sort, columnFilters, search, searchFields]
+        () => buildListParams({sort, filters: columnFilters}),
+        [sort, columnFilters]
     );
 
     const hasActiveFilters =
         sort !== null ||
-        search.trim() !== "" ||
         Object.values(columnFilters).some(s => s && (s.cond != null || s.checked != null));
 
-    const handleSort = (key: string, dir: SortDir | null) => {
-        setSort(dir ? {key, dir} : null);
-        setPage(1);
-    };
-
-    const handleColumnFilter = (key: string, state: ColumnFilterState | null) => {
-        setColumnFilters(prev => {
-            if (state === null) {
-                if (!(key in prev)) return prev;
-                const next = {...prev};
-                delete next[key];
-                return next;
-            }
-            return {...prev, [key]: state};
-        });
+    const handleApplyFilters = (nextSort: ColumnSort | null, nextFilters: TableColumnFilters) => {
+        setSort(nextSort);
+        setColumnFilters(nextFilters);
         setPage(1);
     };
 
     const handleClearFilters = () => {
         setSort(null);
         setColumnFilters({});
-        setSearchInput("");
-        setSearch("");
         setPage(1);
     };
 
@@ -169,14 +138,8 @@ const TableView = ({docName}: { docName: string | undefined }) => {
                 tableMeta={tableMeta}
                 sort={sort}
                 columnFilters={columnFilters}
-                searchValue={searchInput}
                 hasActiveFilters={hasActiveFilters}
-                onSort={handleSort}
-                onColumnFilter={handleColumnFilter}
-                onSearchChange={(v) => {
-                    setSearchInput(v);
-                    setPage(1);
-                }}
+                onApplyFilters={handleApplyFilters}
                 onClearFilters={handleClearFilters}
             />
         </div>

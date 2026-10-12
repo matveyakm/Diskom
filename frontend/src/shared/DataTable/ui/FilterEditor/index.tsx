@@ -1,7 +1,6 @@
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
-import tableStyles from "@/shared/DataTable/DataTable.module.scss";
-import styles from "./FilterPopup.module.scss";
+import styles from "./FilterEditor.module.scss";
 import {TableColumnConfig} from "@/shared/DataTable/types";
 import {FormField} from "@/entities/document/types";
 import {isDateField} from "@/shared/DataTable/dateUtils";
@@ -9,7 +8,7 @@ import {STATUS_OPTIONS} from "@/shared/DataTable/ui/statusMeta";
 import {tableApi} from "@/shared/api/fetchTableData";
 import type {DistinctResponse} from "@/shared/api/fetchTableData/types";
 import {useReferenceOptions} from "@/shared/api/useReferenceOptions";
-import type {ColumnFilterState, FilterOp, SortDir} from "@/shared/DataTable/filters/types";
+import type {ConditionFilter, FilterOp, SortDir} from "@/shared/DataTable/filters/types";
 
 type ColumnKind = "status" | "ref" | "date" | "text";
 
@@ -27,102 +26,50 @@ const OP_LABELS: Record<FilterOp, string> = {
 const FULL_OPS: FilterOp[] = ["eq", "ne", "gt", "gte", "lt", "lte", "between", "contains"];
 const EQ_OPS: FilterOp[] = ["eq", "ne"];
 
-interface FilterPopupProps {
-    docName: string | undefined;
-    column: TableColumnConfig;
-    formField?: FormField;
-    sortDir: SortDir | null;
-    filter: ColumnFilterState | null;
-    onSort: (dir: SortDir | null) => void;
-    onApplyFilter: (state: ColumnFilterState | null) => void;
-    onClose: () => void;
-}
-
-interface HeaderCellProps {
-    column: TableColumnConfig;
-    formField?: FormField;
-    docName: string | undefined;
-    sortDir: SortDir | null;
-    filter: ColumnFilterState | null;
-    isOpen: boolean;
-    onToggle: () => void;
-    onClose: () => void;
-    onSort: (dir: SortDir | null) => void;
-    onApplyFilter: (state: ColumnFilterState | null) => void;
-}
-
-// Ячейка шапки: кнопка (Excel) + якорь попапа. Якорь display:contents,
-// чтобы раскладка шапки не менялась; попап абсолютно позиционирован
-// относительно .headerContent. Клик вне закрывает через общий хук.
-export const HeaderCell = ({
-    column, formField, docName, sortDir, filter, isOpen, onToggle, onClose, onSort, onApplyFilter,
-}: HeaderCellProps) => {
-    const anchorRef = useRef<HTMLDivElement>(null);
-    // Клик вне якоря закрывает попап. Доступ к ref — только в эффекте
-    // (не в рендере), как уже сделано в SelectField модалки.
-    useEffect(() => {
-        if (!isOpen) return;
-        const el = anchorRef.current;
-        if (!el) return;
-        const handler = (e: MouseEvent) => {
-            if (!el.contains(e.target as Node)) onClose();
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, [isOpen, onClose]);
-    const hasFilter = !!filter && (filter.cond != null || filter.checked != null);
-    return (
-        <div ref={anchorRef} className={tableStyles.headerPopupAnchor}>
-            <button type="button" className={tableStyles.headerFilterBtn} onClick={onToggle}
-                    title="Сортировка и фильтр">
-                <span className={tableStyles.headerFilterLabel}>{column.label || column.key}</span>
-                {sortDir && <span>{sortDir === "asc" ? " ▲" : " ▼"}</span>}
-                {hasFilter && <span className={tableStyles.filterMark}> ●</span>}
-            </button>
-            {isOpen && (
-                <FilterPopup
-                    docName={docName}
-                    column={column}
-                    formField={formField}
-                    sortDir={sortDir}
-                    filter={filter}
-                    onSort={onSort}
-                    onApplyFilter={onApplyFilter}
-                    onClose={onClose}
-                />
-            )}
-        </div>
-    );
-};
-
-const kindOf = (column: TableColumnConfig, formField?: FormField): ColumnKind => {
-    if (column.type === "status") return "status";
-    if (column.end_point) return "ref";
+/** Вид контрола выводится из данных: колонка грида (если поле в нём есть) + поле формы. */
+const kindOfField = (column: TableColumnConfig | undefined, formField?: FormField): ColumnKind => {
+    if (column?.type === "status") return "status";
+    if (column?.end_point ?? formField?.end_point) return "ref";
     if (formField && isDateField(formField)) return "date";
     return "text";
 };
 
-export const FilterPopup = ({
-    docName, column, formField, sortDir, filter, onSort, onApplyFilter, onClose,
-}: FilterPopupProps) => {
-    const kind = kindOf(column, formField);
-    const ops = kind === "text" || kind === "date" ? FULL_OPS : EQ_OPS;
+interface FilterEditorProps {
+    docName: string | undefined;
+    fieldKey: string;
+    column?: TableColumnConfig;
+    formField?: FormField;
+    sortDir: SortDir | null;
+    cond: ConditionFilter | null;
+    checked: Array<string | number> | null;
+    onSort: (dir: SortDir | null) => void;
+    onCond: (cond: ConditionFilter | null) => void;
+    onChecked: (values: Array<string | number> | null) => void;
+    onResetField: () => void;
+}
 
-    const [condOp, setCondOp] = useState<FilterOp>(filter?.cond?.op ?? "eq");
-    const [condValue, setCondValue] = useState(filter?.cond?.value ?? "");
-    const [condValue2, setCondValue2] = useState(filter?.cond?.value2 ?? "");
-    const [checked, setChecked] = useState<Array<string | number> | null>(filter?.checked ?? null);
+// Контролируемый редактор одного поля: всё состояние живёт у вызывающего
+// (окно фильтров коммитит всё одной кнопкой), здесь только черновик поиска
+// по галочкам. Монтируется заново на каждую закладку (key), поэтому
+// локального состояния фильтров не держит.
+export const FilterEditor = ({
+    docName, fieldKey, column, formField, sortDir, cond, checked,
+    onSort, onCond, onChecked, onResetField,
+}: FilterEditorProps) => {
+    const kind = kindOfField(column, formField);
+    const ops = kind === "text" || kind === "date" ? FULL_OPS : EQ_OPS;
     const [checkSearch, setCheckSearch] = useState("");
 
     // Значения галочек: статусы фиксированы, остальное — ?distinct=.
     // Имена ссылок — из общего кеша ["reference", end_point].
-    const {data: distinct} = useQuery({
-        queryKey: ["distinct", docName, column.key],
-        queryFn: () => tableApi(docName ?? "").getDistinct(column.key) as Promise<DistinctResponse>,
+    const endPoint = column?.end_point ?? formField?.end_point;
+    const {data: distinct, isLoading: distinctLoading} = useQuery({
+        queryKey: ["distinct", docName, fieldKey],
+        queryFn: () => tableApi(docName ?? "").getDistinct(fieldKey) as Promise<DistinctResponse>,
         enabled: !!docName && kind !== "status",
         staleTime: 60_000,
     });
-    const {data: refOptions} = useReferenceOptions(kind === "ref" ? column.end_point : undefined);
+    const {data: refOptions} = useReferenceOptions(kind === "ref" ? endPoint : undefined);
 
     const refNames = useMemo(() => {
         const map = new Map<string, string>();
@@ -156,12 +103,12 @@ export const FilterPopup = ({
     }, [allValues, checkSearch, refNames, kind]);
 
     const allChecked = checked !== null && checked.length === allValues.length && allValues.length > 0;
-    const someChecked = checked !== null && checked.length > 0 && !allChecked;
 
     const toggleValue = (v: string | number) => {
+        if (allValues.length === 0) return;
         const cur = checked ?? allValues;
         const s = String(v);
-        setChecked(
+        onChecked(
             cur.some(x => String(x) === s)
                 ? cur.filter(x => String(x) !== s)
                 : [...cur, v],
@@ -172,25 +119,42 @@ export const FilterPopup = ({
         onSort(sortDir === dir ? null : dir);
     };
 
-    const handleApply = () => {
-        const hasCond = condOp === "between"
-            ? condValue.trim() !== "" || condValue2.trim() !== ""
-            : condValue.trim() !== "";
-        const cond = hasCond
-            ? {op: condOp, value: condValue.trim(), ...(condOp === "between" ? {value2: condValue2.trim()} : {})}
-            : null;
-        if (!cond && checked === null) {
-            onApplyFilter(null);
+    const setCondValue = (value: string) => {
+        const op = cond?.op ?? "eq";
+        if (op === "between") {
+            const v2 = cond?.value2 ?? "";
+            if (value.trim() === "" && v2.trim() === "") onCond(null);
+            else onCond({op, value: value.trim(), value2: v2.trim()});
+        } else if (value.trim() === "") {
+            onCond(null);
         } else {
-            onApplyFilter({cond, checked});
+            onCond({op, value: value.trim()});
         }
-        onClose();
     };
 
-    const handleClear = () => {
-        onApplyFilter(null);
-        onClose();
+    const setCondValue2 = (value2: string) => {
+        const op = cond?.op ?? "between";
+        const v = cond?.value ?? "";
+        if (v.trim() === "" && value2.trim() === "") onCond(null);
+        else onCond({op, value: v.trim(), value2: value2.trim()});
     };
+
+    const setCondOp = (op: FilterOp) => {
+        const v = cond?.value ?? "";
+        const v2 = cond?.value2 ?? "";
+        if (op === "between") {
+            if (v.trim() === "" && v2.trim() === "") onCond(null);
+            else onCond({op, value: v.trim(), value2: v2.trim()});
+        } else if (v.trim() === "") {
+            onCond(null);
+        } else {
+            onCond({op, value: v.trim()});
+        }
+    };
+
+    const condOp: FilterOp = cond?.op ?? "eq";
+    const condValue = cond?.value ?? "";
+    const condValue2 = cond?.value2 ?? "";
 
     const renderValueInput = (value: string, setValue: (v: string) => void) => {
         if (kind === "ref") {
@@ -225,7 +189,7 @@ export const FilterPopup = ({
     };
 
     return (
-        <div className={styles.popup}>
+        <div className={styles.editor}>
             <div className={styles.section}>
                 <div className={styles.sectionTitle}>Сортировка</div>
                 <div className={styles.sortRow}>
@@ -268,25 +232,31 @@ export const FilterPopup = ({
                 <label className={styles.checkAll}>
                     <input type="checkbox"
                            ref={(el) => {
-                               if (el) el.indeterminate = someChecked;
+                               if (el) el.indeterminate = checked !== null && checked.length > 0 && !allChecked;
                            }}
                            checked={checked === null || allChecked}
-                           onChange={() => setChecked(allChecked || checked === null ? [] : null)}/>
+                           onChange={() => onChecked(allChecked || checked === null ? [] : null)}/>
                     (Выбрать все)
                 </label>
                 <div className={styles.checkList}>
-                    {visibleValues.map(v => {
-                        const s = String(v);
-                        const isOn = checked === null || checked.some(x => String(x) === s);
-                        return (
-                            <label key={s} className={styles.checkItem}>
-                                <input type="checkbox" checked={isOn} onChange={() => toggleValue(v)}/>
-                                {labelOf(v)}
-                            </label>
-                        );
-                    })}
-                    {visibleValues.length === 0 && (
-                        <div className={styles.emptyChecks}>Нет значений</div>
+                    {distinctLoading && kind !== "status" ? (
+                        <div className={styles.emptyChecks}>Загрузка значений…</div>
+                    ) : (
+                        <>
+                            {visibleValues.map(v => {
+                                const s = String(v);
+                                const isOn = checked === null || checked.some(x => String(x) === s);
+                                return (
+                                    <label key={s} className={styles.checkItem}>
+                                        <input type="checkbox" checked={isOn} onChange={() => toggleValue(v)}/>
+                                        {labelOf(v)}
+                                    </label>
+                                );
+                            })}
+                            {visibleValues.length === 0 && (
+                                <div className={styles.emptyChecks}>Нет значений</div>
+                            )}
+                        </>
                     )}
                 </div>
                 {distinct && distinct.truncated && (
@@ -296,14 +266,9 @@ export const FilterPopup = ({
                 )}
             </div>
 
-            <div className={styles.footer}>
-                <button type="button" onClick={handleClear} className={styles.clearBtn}>
-                    Сбросить
-                </button>
-                <button type="button" onClick={handleApply} className={styles.applyBtn}>
-                    Применить
-                </button>
-            </div>
+            <button type="button" onClick={onResetField} className={styles.resetFieldBtn}>
+                Сбросить поле
+            </button>
         </div>
     );
 };
