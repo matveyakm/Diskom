@@ -155,6 +155,28 @@ func TestParseDistinct(t *testing.T) {
 	}
 }
 
+func TestStripOwnColumn(t *testing.T) {
+	params := paramsOf(map[string]string{
+		"status":     "1",
+		"status__in": "1,2",
+		"note__like": "x",
+		"sort":       "id",
+		"expand":     "a:b",
+	})
+	got := stripOwnColumn(params, "status")
+	if _, found := got["status"]; found {
+		t.Fatal("stripOwnColumn: own exact key must go")
+	}
+	if _, found := got["status__in"]; found {
+		t.Fatal("stripOwnColumn: own suffixed key must go")
+	}
+	for _, keep := range []string{"note__like", "sort", "expand"} {
+		if _, found := got[keep]; !found {
+			t.Fatalf("stripOwnColumn: %q must stay", keep)
+		}
+	}
+}
+
 func TestHasEmptyIn(t *testing.T) {
 	yes, err := hasEmptyIn(paramsOf(map[string]string{"status__in": " , "}))
 	if err != nil || !yes {

@@ -185,6 +185,20 @@ func hasEmptyIn(params map[string][]string) (bool, error) {
 	return false, nil
 }
 
+// stripOwnColumn drops the distinct column's own keys from the params:
+// selecting from this list must not narrow it (otherwise picked values
+// would hide the rest). Everything else (sibling filters, search) stays.
+func stripOwnColumn(params map[string][]string, column string) map[string][]string {
+	out := make(map[string][]string, len(params))
+	for key, values := range params {
+		if op, ok := splitFilterKey(key); ok && op.column == column {
+			continue
+		}
+		out[key] = values
+	}
+	return out
+}
+
 // parseInValues splits a comma list, trims, drops empties.
 func parseInValues(raw string) ([]string, bool, error) {
 	parts := strings.Split(raw, ",")

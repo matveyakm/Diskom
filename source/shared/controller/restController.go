@@ -216,7 +216,7 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 		r.writeError(w, "Invalid distinct parameter: "+err.Error(), http.StatusBadRequest)
 		return
 	} else if ok {
-		r.getDistinct(w, column, like, limit)
+		r.getDistinct(w, req.URL.Query(), column, like, limit)
 		return
 	}
 
@@ -440,10 +440,32 @@ func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
 }
 
 // getDistinct serves ?distinct=: capped distinct column values for the
-// checkbox filter list (see filter.go). Row filters are ignored by design;
-// NULLs are excluded (no blanks box in v1).
-func (r *CRUDRepository[T]) getDistinct(w http.ResponseWriter, column, like string, limit int) {
+// checkbox filter list (see filter.go). Sibling column filters and search
+// narrow the list (so the second tab sees only what is left); the column's
+// own keys are stripped (picked values must not hide the rest). NULLs are
+// excluded (no blanks box in v1). Pagination/sorting are ignored by design.
+func (r *CRUDRepository[T]) getDistinct(w http.ResponseWriter, params map[string][]string, column, like string, limit int) {
+	sibling := stripOwnColumn(params, column)
+
 	filtered := r.db.Table(r.tableName).Where(column + " IS NOT NULL")
+	var err error
+	if filtered, err = applyFieldFilters(filtered, sibling); err != nil {
+		r.writeError(w, "Invalid filter parameter: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if fields, pattern, ok, serr := parseSearch(sibling); serr != nil {
+		r.writeError(w, "Invalid search parameter: "+serr.Error(), http.StatusBadRequest)
+		return
+	} else if ok {
+		filtered = applySearch(filtered, fields, pattern)
+	}
+	if empty, ierr := hasEmptyIn(sibling); ierr != nil {
+		r.writeError(w, "Invalid filter parameter: "+ierr.Error(), http.StatusBadRequest)
+		return
+	} else if empty {
+		r.writeJSONResponse(w, DistinctResponse{Data: []any{}, TotalDistinct: 0, Truncated: false}, http.StatusOK)
+		return
+	}
 	if like != "" {
 		filtered = filtered.Where("CAST("+column+" AS TEXT) ILIKE ?", "%"+escapeLike(like)+"%")
 	}
