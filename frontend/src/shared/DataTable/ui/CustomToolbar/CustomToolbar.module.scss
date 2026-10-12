@@ -16,6 +16,23 @@
   min-width: 100px;
 }
 
+.count {
+  margin-left: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.searchInput {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  min-width: 200px;
+}
+
 .actionsWrapper {
   display: flex;
   align-items: center;

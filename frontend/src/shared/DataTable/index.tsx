@@ -5,26 +5,51 @@ import CustomToolbar from "@/shared/DataTable/ui/CustomToolbar";
 import {useModal} from "@/shared/DataTable/hooks/useModal";
 import {useContextMenu} from "@/shared/DataTable/hooks/useContextMenu";
 import {useRowSelection} from "@/shared/DataTable/hooks/useRowSelection";
-import React, {useRef} from "react";
+import React, {useMemo, useRef, useState} from "react";
 import {useOnClickOutside} from "usehooks-ts";
 import TableModal from "@/shared/DataTable/ui/TableModal";
 import ContextMenu from "@/shared/DataTable/ui/ContextMenu";
 import Pagination from "./ui/Pagination";
 import { asElementRef } from "@/shared/utils/refUtils";
 import {DocumentsTableProps, TableRow} from "@/shared/DataTable/types";
+import type {HeaderFiltering} from "@/shared/DataTable/filters/types";
 
 const DataTable = <T extends TableRow = TableRow>({
-                       columns,
-                       rows,
-                       docName,
-                       fields,
-                       blocks,
-                       pageIndex,
-                       pageCount,
-                       onPageChange,
-                       tableMeta
-                   }: DocumentsTableProps<T>) => {
-    const {table} = useTable<T>({columns, rows, fields});
+                        columns,
+                        rows,
+                        docName,
+                        fields,
+                        blocks,
+                        pageIndex,
+                        pageCount,
+                        onPageChange,
+                        tableMeta,
+                        sort,
+                        columnFilters,
+                        searchValue,
+                        totalCount,
+                        hasActiveFilters,
+                        onSort,
+                        onColumnFilter,
+                        onSearchChange,
+                        onClearFilters,
+                    }: DocumentsTableProps<T>) => {
+    const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
+
+    const filtering = useMemo<HeaderFiltering | undefined>(() => {
+        if (!onSort || !onColumnFilter) return undefined;
+        return {
+            sort: sort ?? null,
+            filters: columnFilters ?? {},
+            openKey: openFilterKey,
+            docName,
+            onTogglePopup: setOpenFilterKey,
+            onSort,
+            onFilter: onColumnFilter,
+        };
+    }, [onSort, onColumnFilter, sort, columnFilters, openFilterKey, docName]);
+
+    const {table} = useTable<T>({columns, rows, fields, filtering});
     const {isOpen, data: selectedRow, mode, openForEdit, openForCreate, close} = useModal<T>();
     const {menu, openMenu, closeMenu} = useContextMenu<T>();
     const {activeRow, selectRow, clearSelection} = useRowSelection<T>();
@@ -52,6 +77,9 @@ const DataTable = <T extends TableRow = TableRow>({
                     onAdd={openForCreate}
                     onEdit={onEdit}
                     tableName={tableName}
+                    searchValue={searchValue}
+                    onSearchChange={onSearchChange}
+                    totalCount={totalCount}
                 />
                 <div className={styles.tableScroll}>
                     <table className={styles.table}>
@@ -81,7 +109,17 @@ const DataTable = <T extends TableRow = TableRow>({
                         {table.getRowModel().rows.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className={styles.emptyCell}>
-                                    Нет данных для отображения
+                                    {hasActiveFilters ? (
+                                        <>
+                                            <div>Ничего не найдено</div>
+                                            <button type="button" className={styles.resetFiltersBtn}
+                                                    onClick={onClearFilters}>
+                                                Сбросить фильтры
+                                            </button>
+                                        </>
+                                    ) : (
+                                        "Нет данных для отображения"
+                                    )}
                                 </td>
                             </tr>
                         ) : (

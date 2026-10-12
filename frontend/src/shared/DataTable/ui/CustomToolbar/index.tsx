@@ -11,14 +11,30 @@ type Props = {
     onEdit: () => void;
     selectedRow: TableRow | null;
     tableName?: string;
+    searchValue?: string;
+    totalCount?: number;
+    onSearchChange?: (value: string) => void;
 };
 
-const CustomToolbar = ({onAdd, onEdit, selectedRow, tableName}: Props) => {
+const CustomToolbar = ({onAdd, onEdit, selectedRow, tableName, searchValue, totalCount, onSearchChange}: Props) => {
     return (
         <div className={styles.toolbar}>
             <span className={styles.tableName}>
                 {tableName}
+                {totalCount != null && (
+                    <span className={styles.count}>Найдено: {totalCount}</span>
+                )}
             </span>
+
+            {onSearchChange && (
+                <input
+                    type="text"
+                    value={searchValue ?? ""}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    placeholder="Поиск…"
+                    className={styles.searchInput}
+                />
+            )}
 
             <div className={styles.actionsWrapper}>
                 <div className={`${styles.editNav} ${selectedRow ? styles.visible : ""}`}>

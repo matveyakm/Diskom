@@ -1,6 +1,4 @@
-import {useQuery} from "@tanstack/react-query";
-import {tableApi} from "@/shared/api/fetchTableData";
-import {fetchAllPages} from "@/shared/api/fetchAllPages";
+import {useReferenceOptions, ReferenceOption} from "@/shared/api/useReferenceOptions";
 import {FieldRowProps} from "./types";
 import styles from "./TableModal.module.scss";
 import {useEffect, useState, useRef, useCallback} from "react";
@@ -90,11 +88,6 @@ const DateField = ({field, value, isEditing, bare}: FieldRowProps) => {
     );
 };
 
-interface SelectOption {
-    id: string | number;
-    name: string;
-}
-
 // ReadonlyField shows the value as text (or a placeholder when empty) and
 // always submits it via a hidden input, so the backend stays the source
 // of truth (e.g. auto-generated document numbers).
@@ -121,21 +114,9 @@ const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
 
     const isRequired = field.required ?? false;
 
-    const {data: allOptions, isLoading, error: queryError} = useQuery({
-        queryKey: ["reference", field.end_point],
-        queryFn: () =>
-            fetchAllPages<SelectOption>(
-                (page, limit) =>
-                    tableApi(field.end_point!).getData({page, limit}) as Promise<{
-                        data: SelectOption[];
-                        pagination: {total_pages: number};
-                    }>,
-                100,
-            ),
-        enabled: !!field.end_point,
-    });
+    const {data: allOptions, isLoading, error: queryError} = useReferenceOptions(field.end_point);
 
-    const typedOptions: SelectOption[] = allOptions ?? [];
+    const typedOptions: ReferenceOption[] = allOptions ?? [];
 
     const filtered = !search.trim()
         ? typedOptions
@@ -153,7 +134,7 @@ const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
         if (match) setSearch(match.name);
     }, [typedOptions, selectedId, open]);
 
-    const handleSelect = useCallback((opt: SelectOption) => {
+    const handleSelect = useCallback((opt: ReferenceOption) => {
         setSelectedId(opt.id);
         setSearch(opt.name);
         setOpen(false);
