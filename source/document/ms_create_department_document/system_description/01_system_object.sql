@@ -233,7 +233,9 @@
             "step": 2,
             "method": "delete",
             "end_point": "department_data_ledger",
-            "filter": "id_document"
+            "map": [
+                {"id_document": "id"}
+            ]
         },
         {
             "step": 3,
