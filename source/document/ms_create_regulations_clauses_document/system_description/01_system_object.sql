@@ -238,7 +238,10 @@
             "step": 3,
             "method": "put",
             "end_point": "regulations_clauses_directory",
-            "filter": "id_regulations_clauses",
+            "filter": {"id": "id_regulations_clauses"},
+            "map": [
+                {"status": 0}
+            ],
             "fields": {
                 "status": 0
             }

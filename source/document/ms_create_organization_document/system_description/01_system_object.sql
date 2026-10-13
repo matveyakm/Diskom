@@ -238,7 +238,10 @@
             "step": 3,
             "method": "put",
             "end_point": "organization_directory",
-            "filter": "id_organization",
+            "filter": {"id": "id_organization"},
+            "map": [
+                {"status": 0}
+            ],
             "fields": {
                 "status": 0
             }

@@ -241,7 +241,10 @@
             "step": 3,
             "method": "put",
             "end_point": "department_directory",
-            "filter": "id_department",
+            "filter": {"id": "id_department"},
+            "map": [
+                {"status": 0}
+            ],
             "fields": {
                 "status": 0
             }

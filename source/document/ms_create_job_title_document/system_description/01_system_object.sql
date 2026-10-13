@@ -238,7 +238,10 @@
             "step": 3,
             "method": "put",
             "end_point": "job_title_directory",
-            "filter": "id_job_title",
+            "filter": {"id": "id_job_title"},
+            "map": [
+                {"status": 0}
+            ],
             "fields": {
                 "status": 0
             }

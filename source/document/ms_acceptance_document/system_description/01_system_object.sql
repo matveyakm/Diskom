@@ -418,7 +418,10 @@
             "step": 3,
             "method": "put",
             "end_point": "employee_directory",
-            "filter": "id_employee",
+            "filter": {"id": "id_employee"},
+            "map": [
+                {"status": 0}
+            ],
             "fields": {
                 "status": 0
             }

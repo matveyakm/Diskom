@@ -258,7 +258,10 @@
             "step": 3,
             "method": "put",
             "end_point": "counterparty_directory",
-            "filter": "id_counterparty",
+            "filter": {"id": "id_counterparty"},
+            "map": [
+                {"status": 0}
+            ],
             "fields": {
                 "status": 0
             }
