@@ -365,12 +365,14 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Получаем ID из URL или из тела запроса
+	// Получаем ID из URL или из тела запроса. Из тела — по сырому JSON,
+	// а не через интерфейс модели: модели объявляют GetID на указателе,
+	// и assertion на значении T молча не срабатывал (мимо — 400 даже при
+	// корректном id в теле). Sprintf ровняет числа и строки ("62" и 62).
 	id := req.URL.Query().Get("id")
 	if id == "" {
-		// Пробуем получить ID из структуры
-		idValue := r.getIDFromEntity(entity)
-		if idValue == nil {
+		idValue, present := rawBody["id"]
+		if !present || idValue == nil {
 			r.writeError(w, "Missing id parameter", http.StatusBadRequest)
 			return
 		}
@@ -596,16 +598,4 @@ func (r *CRUDRepository[T]) writeError(w http.ResponseWriter, message string, st
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
-}
-
-// Helper function to extract ID from entity
-func (r *CRUDRepository[T]) getIDFromEntity(entity T) interface{} {
-	type Identifiable interface {
-		GetID() int64
-	}
-
-	if identifiable, ok := any(entity).(Identifiable); ok {
-		return identifiable.GetID()
-	}
-	return nil
 }
