@@ -177,6 +177,44 @@ func TestStripOwnColumn(t *testing.T) {
 	}
 }
 
+func TestCountPredicates(t *testing.T) {
+	n, err := countPredicates(paramsOf(map[string]string{
+		"status": "1", "note__like": "x", "expand": "a:b", "page": "2",
+	}))
+	if err != nil || n != 2 {
+		t.Fatalf("countPredicates = %d,%v, want 2,nil", n, err)
+	}
+	n, err = countPredicates(paramsOf(map[string]string{"status": "  ", "foo__bar": "x"}))
+	if err != nil || n != 0 {
+		t.Fatalf("countPredicates blank/unknown = %d,%v, want 0,nil", n, err)
+	}
+	if _, err = countPredicates(paramsOf(map[string]string{
+		"note": strings.Repeat("x", 201),
+	})); err == nil {
+		t.Fatal("countPredicates overlong: want error")
+	}
+}
+
+func TestUpdateColumns(t *testing.T) {
+	got := updateColumns(map[string]any{
+		"id": 7, "status": 0, "note": "x", "dnumber": nil, "prefix": 0,
+	})
+	set := make(map[string]struct{}, len(got))
+	for _, c := range got {
+		set[c] = struct{}{}
+	}
+	for _, want := range []string{"status", "note", "prefix"} {
+		if _, found := set[want]; !found {
+			t.Fatalf("updateColumns: %q must be written (zero is a value)", want)
+		}
+	}
+	for _, drop := range []string{"id", "dnumber"} {
+		if _, found := set[drop]; found {
+			t.Fatalf("updateColumns: %q must be skipped (pk/null)", drop)
+		}
+	}
+}
+
 func TestHasEmptyIn(t *testing.T) {
 	yes, err := hasEmptyIn(paramsOf(map[string]string{"status__in": " , "}))
 	if err != nil || !yes {

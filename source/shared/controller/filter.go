@@ -199,6 +199,45 @@ func stripOwnColumn(params map[string][]string, column string) map[string][]stri
 	return out
 }
 
+// countPredicates counts recognized filter keys with non-blank values
+// (exact match and operator suffixes). Reserved words and
+// uninterpretable keys don't count. Zero means "no filter": the caller
+// (DELETE) refuses the request — mass-wipe guard.
+func countPredicates(params map[string][]string) (int, error) {
+	n := 0
+	for key, values := range params {
+		if _, ok := splitFilterKey(key); !ok {
+			continue
+		}
+		for _, v := range values {
+			if len(v) > maxFilterValueLen {
+				return 0, fmt.Errorf("filter value too long (max %d chars)", maxFilterValueLen)
+			}
+			if strings.TrimSpace(v) != "" {
+				n++
+				break
+			}
+		}
+	}
+	return n, nil
+}
+
+// updateColumns lists JSON body keys to write on Update: everything
+// present except the primary key and explicit nulls. Present-but-zero
+// values (e.g. status 0) ARE written — struct-only Updates silently
+// skipped them, which made any status→0 transition 404. Explicit nulls
+// stay skipped (a null must never wipe a column, e.g. dnumber).
+func updateColumns(body map[string]any) []string {
+	cols := make([]string, 0, len(body))
+	for key, value := range body {
+		if key == "id" || value == nil {
+			continue
+		}
+		cols = append(cols, key)
+	}
+	return cols
+}
+
 // parseInValues splits a comma list, trims, drops empties.
 func parseInValues(raw string) ([]string, bool, error) {
 	parts := strings.Split(raw, ",")

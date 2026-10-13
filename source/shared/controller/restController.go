@@ -3,6 +3,7 @@ package restController
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -344,12 +345,25 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 
 // Update handles PUT requests to update an existing record
 func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
-	var entity T
-	if err := json.NewDecoder(req.Body).Decode(&entity); err != nil {
+	bodyBytes, err := io.ReadAll(req.Body)
+	if err != nil {
 		r.writeError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
+
+	// Struct decode keeps Go types (numbers stay numbers for Postgres);
+	// map decode tracks which keys were actually sent.
+	var entity T
+	if err := json.Unmarshal(bodyBytes, &entity); err != nil {
+		r.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	var rawBody map[string]any
+	if err := json.Unmarshal(bodyBytes, &rawBody); err != nil {
+		r.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
 	// Получаем ID из URL или из тела запроса
 	id := req.URL.Query().Get("id")
@@ -370,7 +384,9 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	result := tx.Table(r.tableName).Where("id = ?", id).Updates(&entity)
+	// Пишем ровно присланные ключи (кроме id и null): присланный ноль
+	// (status 0) применяется, присланный null колонку не затирает.
+	result := tx.Table(r.tableName).Where("id = ?", id).Select(updateColumns(rawBody)).Updates(&entity)
 	if result.Error != nil {
 		tx.Rollback()
 		r.writeError(w, "Failed to update record: "+result.Error.Error(), http.StatusInternalServerError)
@@ -397,13 +413,77 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 	r.writeJSONResponse(w, updatedEntity, http.StatusOK)
 }
 
-// Delete handles DELETE requests to remove a record
+// Delete handles DELETE requests.
+//
+// Two shapes (same filter language as list queries, see filter.go):
+//   - ?id= — historical single delete, kept verbatim (400/404/204).
+//   - field filters (__suffixes, exact) and/or ?ids= — multi delete for
+//     pipeline steps (e.g. ledger rows by ?id_document=). At least one
+//     predicate is required: an unfiltered DELETE is refused with 400
+//     (mass-wipe guard). Zero matched rows is 204, not 404 — pipeline
+//     cleanup must be idempotent (e.g. deleting a never-conducted doc).
 func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
-	id := req.URL.Query().Get("id")
-	if id == "" {
-		r.writeError(w, "Missing id parameter", http.StatusBadRequest)
+	params := req.URL.Query()
+
+	if id := params.Get("id"); id != "" {
+		r.deleteByID(w, id)
 		return
 	}
+
+	// Гарда считается до транзакции (чистые функции, без БД).
+	inIDs := false
+	if idsRaw := params.Get("ids"); idsRaw != "" {
+		ids, err := parseIDs(idsRaw)
+		if err != nil {
+			r.writeError(w, "Invalid ids parameter: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		inIDs = len(ids) > 0
+	}
+	n, err := countPredicates(params)
+	if err != nil {
+		r.writeError(w, "Invalid filter parameter: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if n == 0 && !inIDs {
+		r.writeError(w, "Refusing unfiltered delete", http.StatusBadRequest)
+		return
+	}
+
+	// Используем транзакцию для согласованности
+	tx := r.db.Begin()
+	if tx.Error != nil {
+		r.writeError(w, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+
+	query := tx.Table(r.tableName)
+	if query, err = applyFieldFilters(query, params); err != nil {
+		tx.Rollback()
+		r.writeError(w, "Invalid filter parameter: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if inIDs {
+		ids, _ := parseIDs(params.Get("ids"))
+		query = query.Where("id IN ?", ids)
+	}
+	result := query.Delete(nil)
+	if result.Error != nil {
+		tx.Rollback()
+		r.writeError(w, "Failed to delete records: "+result.Error.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		r.writeError(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteByID is the historical ?id= single delete (400/404/204).
+func (r *CRUDRepository[T]) deleteByID(w http.ResponseWriter, id string) {
 
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
