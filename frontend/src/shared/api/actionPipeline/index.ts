@@ -1,10 +1,10 @@
 import { api } from "@/shared/api/AxiosClient";
 import { FormField } from "@/entities/document/types";
 import type { ProcessingStep } from "./effects";
-import { buildDeleteQuery, resolveValue } from "./effects";
+import { buildDeleteQuery, buildPutQuery, resolveValue } from "./effects";
 
 export type { PipelineEffect, PipelineEffectVerb, ProcessingStep } from "./effects";
-export { buildDeleteQuery, describePipelineEffects, formatPipelineEffect, resolveValue } from "./effects";
+export { buildDeleteQuery, buildPutQuery, describePipelineEffects, formatPipelineEffect, resolveFilterEntries, resolveValue } from "./effects";
 
 export interface ActionPipelineConfig {
     action: string;
@@ -122,7 +122,9 @@ const executeStep = async (
     const url = `/api/${step.end_point}`;
     const params: Record<string, string> = {};
 
-    if (step.filter && context[step.filter] !== undefined) {
+    // Legacy same-name query для GET/POST (PUT/DELETE строят свой через
+    // buildPutQuery/buildDeleteQuery). Объектная форма здесь не встречается.
+    if (typeof step.filter === "string" && step.filter && context[step.filter] !== undefined) {
         params[step.filter] = String(context[step.filter]);
     }
 
@@ -158,6 +160,20 @@ const executeStep = async (
             console.log(`[actionPipeline] DELETE ${delUrl}`);
             await api.delete(delUrl);
             console.log(`[actionPipeline] DELETE success`);
+        } else if (method === "put") {
+            // Query — только из filter (map у PUT строит ТЕЛО):
+            // объектная форма переименовывает ключ (?id=<ctx.id_employee>).
+            const putQuery = buildPutQuery(step, context);
+            if (putQuery === "" && step.filter && typeof step.filter === "object") {
+                // FK-чистка без цели (id_employee null у непроведённого):
+                // чистить нечего, идемпотентный пропуск, а не 400.
+                console.log(`[actionPipeline] Step skipped: object filter unresolvable for ${step.end_point}`);
+                return;
+            }
+            const body = buildBody(step, context);
+            console.log(`[actionPipeline] PUT ${url}${putQuery} body:`, JSON.stringify(body));
+            response = await api.put(`${url}${putQuery}`, body);
+            console.log(`[actionPipeline] PUT response:`, JSON.stringify(response));
         } else {
             const body = buildBody(step, context);
             console.log(`[actionPipeline] ${method.toUpperCase()} ${url}${queryString} body:`, JSON.stringify(body));

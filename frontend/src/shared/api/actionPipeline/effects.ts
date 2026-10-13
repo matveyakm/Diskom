@@ -19,7 +19,14 @@ export interface ProcessingStep {
     hide_in_preview?: boolean;
     map?: Record<string, unknown>[];
     fields?: Record<string, unknown>[];
-    filter?: string;
+    /**
+     * Идентификация строки для GET/PUT/DELETE. Строка — same-name
+     * (`"id"` → `?id=<ctx.id>`); объект — переименование
+     * (`{"id": "id_employee"}` → `?id=<ctx.id_employee>`) для случаев,
+     * когда нужного ключа в строке нет, а значение есть под другим именем.
+     * Нерезолвящиеся ключи пропускаются (см. build*Query).
+     */
+    filter?: string | Record<string, string>;
     FK?: Record<string, string>[];
     conditions?: Record<string, unknown>[];
 }
@@ -100,8 +107,7 @@ export const formatPipelineEffect = (effect: PipelineEffect): string => {
 // id в query давал бы 500 от Postgres или тихий no-op, а пустой результат
 // бэкенд честно отвергнет 400 (защита от массового сноса).
 // fields шага — литералы поверх (как в buildBody).
-// Fallback — старое поведение filter (filter==="id" → ?id=, иначе
-// ?<filter>=context[<filter>], если значение есть).
+// Без map — resolveFilterEntries (см. ниже).
 export const buildDeleteQuery = (
     step: ProcessingStep,
     context: Record<string, unknown>,
@@ -112,26 +118,14 @@ export const buildDeleteQuery = (
         if (value === undefined || value === null) return;
         params[key] = String(value);
     };
-    const hasOwn = (key: string): boolean =>
-        Object.prototype.hasOwnProperty.call(context, key);
 
-    if (Array.isArray(step.map)) {
-        for (const mapping of step.map) {
-            const [target, source] = Object.entries(mapping)[0];
-            if (typeof source === "string" && !hasOwn(source)) continue;
+    if (hasStepMap(step)) {
+        for (const [target, source] of mapEntries(step)) {
+            if (typeof source === "string" && !hasOwnKey(context, source)) continue;
             push(target, resolveValue(source, context));
         }
-    } else if (step.map && typeof step.map === "object") {
-        for (const [target, source] of Object.entries(step.map)) {
-            if (typeof source === "string" && !hasOwn(source)) continue;
-            push(target, resolveValue(source, context));
-        }
-    } else if (step.filter) {
-        if (step.filter === "id") {
-            push("id", context.id);
-        } else {
-            push(step.filter, context[step.filter]);
-        }
+    } else {
+        Object.assign(params, resolveFilterEntries(step.filter, context));
     }
 
     if (Array.isArray(step.fields)) {
@@ -145,6 +139,62 @@ export const buildDeleteQuery = (
         }
     }
 
+    return toQueryString(params);
+};
+
+// Чистое построение query для PUT-шага. Только filter (map у PUT строит
+// ТЕЛО, не query): строковая форма — same-name, объектная — переименование.
+// Нерезолвящиеся ключи пропускаются.
+export const buildPutQuery = (
+    step: ProcessingStep,
+    context: Record<string, unknown>,
+): string => toQueryString(resolveFilterEntries(step.filter, context));
+
+// filter → пары query. Пустой результат — нормально: вызывающий решает
+// (DELETE/PUT без query бэкенд отвергнет 400; шаг с объектным filter без
+// резолва движок пропускает как идемпотентный no-op чистки).
+export const resolveFilterEntries = (
+    filter: ProcessingStep["filter"],
+    context: Record<string, unknown>,
+): Record<string, string> => {
+    const params: Record<string, string> = {};
+    if (!filter) return params;
+    if (typeof filter === "string") {
+        if (filter === "id") {
+            if (context.id !== undefined && context.id !== null) params.id = String(context.id);
+        } else if (context[filter] !== undefined && context[filter] !== null) {
+            params[filter] = String(context[filter]);
+        }
+        return params;
+    }
+    for (const [queryKey, contextKey] of Object.entries(filter)) {
+        if (context[contextKey] !== undefined && context[contextKey] !== null) {
+            params[queryKey] = String(context[contextKey]);
+        }
+    }
+    return params;
+};
+
+const hasOwnKey = (context: Record<string, unknown>, key: string): boolean =>
+    Object.prototype.hasOwnProperty.call(context, key);
+
+const hasStepMap = (step: ProcessingStep): boolean =>
+    Array.isArray(step.map) || (!!step.map && typeof step.map === "object");
+
+const mapEntries = (step: ProcessingStep): Array<[string, unknown]> => {
+    if (Array.isArray(step.map)) {
+        return step.map.map(m => {
+            const [target, source] = Object.entries(m)[0];
+            return [target, source] as [string, unknown];
+        });
+    }
+    if (step.map && typeof step.map === "object") {
+        return Object.entries(step.map);
+    }
+    return [];
+};
+
+const toQueryString = (params: Record<string, string>): string => {
     const keys = Object.keys(params);
     return keys.length ? "?" + new URLSearchParams(params).toString() : "";
 };
