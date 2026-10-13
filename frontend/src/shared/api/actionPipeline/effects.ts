@@ -33,6 +33,28 @@ export interface PipelineEffect {
     conditional: boolean;
 }
 
+// Единственный резолвер "имя → значение из контекста, иначе литерал"
+// для тел POST/PUT и query DELETE. Главная мина (см. MEMORY): отсутствующий
+// ключ возвращает буквальную строку-имя — лечится полнотой контекста.
+export const resolveValue = (source: unknown, context: Record<string, unknown>): unknown => {
+    if (typeof source === "string") {
+        return Object.prototype.hasOwnProperty.call(context, source)
+            ? (context[source] ?? null)
+            : source;
+    }
+    if (source && typeof source === "object" && !Array.isArray(source)) {
+        const rec = source as Record<string, unknown>;
+        if (rec.CONCAT && Array.isArray(rec.CONCAT)) {
+            return rec.CONCAT.map((part: unknown) =>
+                typeof part === "string" && Object.prototype.hasOwnProperty.call(context, part)
+                    ? String(context[part] ?? "")
+                    : String(part ?? ""),
+            ).join("");
+        }
+    }
+    return source;
+};
+
 export const describePipelineEffects = (
     steps: ProcessingStep[] | null | undefined,
     resolveTitle: (endPoint: string) => string,
@@ -69,4 +91,60 @@ export const formatPipelineEffect = (effect: PipelineEffect): string => {
     const scope = effect.verb === "delete" ? "из" : "в";
     const tail = effect.conditional ? " (условно)" : "";
     return `${head} ${scope} «${effect.title}»${tail}`;
+};
+
+// Чистое построение query для DELETE-шага (и только для него).
+// Источник — map шага (target — ключ запроса, source — ключ контекста):
+// в отличие от тел POST/PUT, отсутствующий ключ контекста здесь НЕ
+// превращается в буквальную строку-имя, а пропускается — литерал вместо
+// id в query давал бы 500 от Postgres или тихий no-op, а пустой результат
+// бэкенд честно отвергнет 400 (защита от массового сноса).
+// fields шага — литералы поверх (как в buildBody).
+// Fallback — старое поведение filter (filter==="id" → ?id=, иначе
+// ?<filter>=context[<filter>], если значение есть).
+export const buildDeleteQuery = (
+    step: ProcessingStep,
+    context: Record<string, unknown>,
+): string => {
+    const params: Record<string, string> = {};
+
+    const push = (key: string, value: unknown) => {
+        if (value === undefined || value === null) return;
+        params[key] = String(value);
+    };
+    const hasOwn = (key: string): boolean =>
+        Object.prototype.hasOwnProperty.call(context, key);
+
+    if (Array.isArray(step.map)) {
+        for (const mapping of step.map) {
+            const [target, source] = Object.entries(mapping)[0];
+            if (typeof source === "string" && !hasOwn(source)) continue;
+            push(target, resolveValue(source, context));
+        }
+    } else if (step.map && typeof step.map === "object") {
+        for (const [target, source] of Object.entries(step.map)) {
+            if (typeof source === "string" && !hasOwn(source)) continue;
+            push(target, resolveValue(source, context));
+        }
+    } else if (step.filter) {
+        if (step.filter === "id") {
+            push("id", context.id);
+        } else {
+            push(step.filter, context[step.filter]);
+        }
+    }
+
+    if (Array.isArray(step.fields)) {
+        for (const f of step.fields) {
+            const [key, val] = Object.entries(f)[0];
+            push(key, val);
+        }
+    } else if (step.fields && typeof step.fields === "object") {
+        for (const [key, val] of Object.entries(step.fields)) {
+            push(key, val);
+        }
+    }
+
+    const keys = Object.keys(params);
+    return keys.length ? "?" + new URLSearchParams(params).toString() : "";
 };

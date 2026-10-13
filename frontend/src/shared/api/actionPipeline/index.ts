@@ -1,9 +1,10 @@
 import { api } from "@/shared/api/AxiosClient";
 import { FormField } from "@/entities/document/types";
 import type { ProcessingStep } from "./effects";
+import { buildDeleteQuery, resolveValue } from "./effects";
 
 export type { PipelineEffect, PipelineEffectVerb, ProcessingStep } from "./effects";
-export { describePipelineEffects, formatPipelineEffect } from "./effects";
+export { buildDeleteQuery, describePipelineEffects, formatPipelineEffect, resolveValue } from "./effects";
 
 export interface ActionPipelineConfig {
     action: string;
@@ -62,25 +63,6 @@ export const applyDefaults = (
     }
 
     return result;
-};
-
-const resolveValue = (source: unknown, context: Record<string, unknown>): unknown => {
-    if (typeof source === "string") {
-        return Object.prototype.hasOwnProperty.call(context, source)
-            ? (context[source] ?? null)
-            : source;
-    }
-    if (source && typeof source === "object" && !Array.isArray(source)) {
-        const rec = source as Record<string, unknown>;
-        if (rec.CONCAT && Array.isArray(rec.CONCAT)) {
-            return rec.CONCAT.map((part: unknown) =>
-                typeof part === "string" && Object.prototype.hasOwnProperty.call(context, part)
-                    ? String(context[part] ?? "")
-                    : String(part ?? ""),
-            ).join("");
-        }
-    }
-    return source;
 };
 
 const checkConditions = (
@@ -168,8 +150,11 @@ const executeStep = async (
                 }
             }
         } else if (method === "delete") {
-            const filterId = step.filter === "id" ? context.id : undefined;
-            const delUrl = filterId != null ? `${url}/${encodeURIComponent(String(filterId))}` : url;
+            // Никакого path-style /<id>: бэкенд его не маршрутизирует
+            // (падало в заглушку "/" с тихим 200). Только query;
+            // пустой query бэкенд отвергнет 400 — и это правильно.
+            const delQuery = buildDeleteQuery(step, context);
+            const delUrl = `${url}${delQuery}`;
             console.log(`[actionPipeline] DELETE ${delUrl}`);
             await api.delete(delUrl);
             console.log(`[actionPipeline] DELETE success`);
