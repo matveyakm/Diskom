@@ -1,0 +1,36 @@
+  postgres_ms_reasons_for_the_dcs_disagreement:
+    image: postgres:latest
+    container_name: postgres_reasons_for_the_dcs_disagreement
+    command: postgres -c listen_addresses=172.25.0.103 -c port=5434
+    restart: always
+    env_file:
+      - ./source/directory/ms_reasons_for_the_dcs_disagreement/parameters.env
+    volumes:
+      - postgres_ms_reasons_for_the_dcs_disagreement:/var/lib/postgresql
+      - ./source/directory/ms_reasons_for_the_dcs_disagreement/dbshell:/docker-entrypoint-initdb.d/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.103
+
+  api_ms_reasons_for_the_dcs_disagreement:
+    build:
+      context: .
+      dockerfile: ./Dockerfiles/ms_reasons_for_the_dcs_disagreement
+    container_name: api_ms_reasons_for_the_dcs_disagreement
+    restart: always
+    env_file:
+      - ./source/directory/ms_reasons_for_the_dcs_disagreement/parameters.env
+    networks:
+      vnet:
+        ipv4_address: 172.25.0.104
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/reasons_for_the_dcs_disagreement`)"
+      - "traefik.http.services.api_ms_reasons_for_the_dcs_disagreement.loadbalancer.server.port=8443"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.entrypoints=websecure"
+      - "traefik.http.routers.api_ms_reasons_for_the_dcs_disagreement.tls=true"

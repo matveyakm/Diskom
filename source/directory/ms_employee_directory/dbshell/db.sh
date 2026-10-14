@@ -18,7 +18,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
 	id_basis             smallint,
     status               smallint default 1,
 	prefix               smallint,
-	vk_id                bigint NOT NULL,
+	vk_id                text NOT NULL,
 	id_transaction       text,
 	UNIQUE (id, id_basis)
 	);

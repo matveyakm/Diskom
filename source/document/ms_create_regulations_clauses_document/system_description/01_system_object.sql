@@ -37,8 +37,7 @@
     'document.png',
     '{
       "columns": [
-        { "field": "id", "label": "", "hidden": true },
-        { "field": "status", "label": "", "hidden": false },
+        { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
         { "field": "note", "label": "Примечание", "hidden": false },
@@ -51,7 +50,7 @@
       "fields": [
         { "field": "id", "label": "", "hidden": true, "required": false },
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "label": "Номер", "hidden": false, "required": true, "default": "id" },
+        { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
         { "field": "name", "label": "Название", "hidden": false, "required": false, "default": "" },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false, "default": "" },
         { "field": "id_user", "label": "", "hidden": true, "required": false, "default": 1 },
@@ -73,9 +72,8 @@
                     {"dnumber":"dnumber"},
                     {"note":"note"},
                     {"status":1},
-                    {"id_basis":"id_basis"},
-                    {"id_user":"id_user"},
-                    {"prefix":"prefix"},
+                    {"id_user":1},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -114,7 +112,7 @@
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -133,6 +131,7 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action": "onAcceptance",
         "processing":
@@ -140,6 +139,7 @@
             {
                 "Step": 1,
                 "method": "get",
+                "hide_in_preview": true,
                 "end_point": "create_regulations_clauses_document",
                 "filter":"id",
                 "conditions":
@@ -160,6 +160,7 @@
             {
                 "Step": 2,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "document",
                 "filter":"id",
                 "map":
@@ -205,6 +206,7 @@
             {
                 "Step": 5,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "create_regulations_clauses_document",
                 "filter": "id",
                 "fields": {
@@ -213,12 +215,14 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action":"onDelete",
     "processing":[
         {
             "step": 1,
             "method": "get",
+            "hide_in_preview": true,
             "end_point": "create_regulations_clauses_document",
             "filter": "id"
         },
@@ -240,6 +244,7 @@
         {
             "step": 4,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "document",
             "filter": "id",
             "fields": {
@@ -249,6 +254,7 @@
         {
             "step": 5,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "create_regulations_clauses_document",
             "filter": "id",
             "fields": {

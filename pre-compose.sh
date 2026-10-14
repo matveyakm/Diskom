@@ -63,5 +63,9 @@ done
 echo "--- Собираю db.sh для system_object_directory ---"
 bash source/directory/ms_system_object_directory/build-db.sh
 
-# 4. Запуск Docker
+# 4. Сборка docker-compose.yaml из system_description/compose_part.yaml файлов
+echo "--- Собираю docker-compose.yaml ---"
+bash ./build-compose.sh
+
+# 5. Запуск Docker
 sudo docker compose up -d

@@ -26,7 +26,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     first_accusative     text,
     last_accusative      text,
     middle_accusative    text,
-    id_vk                bigint,
+    vk_id                text,
     id_transaction       text,
     UNIQUE (id_document, id_employee)
 	);
@@ -47,7 +47,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.first_accusative     IS 'Name in the accusative case';
   COMMENT ON COLUMN ${DB_TABLENAME}.last_accusative      IS 'Surname in the accusative case';
   COMMENT ON COLUMN ${DB_TABLENAME}.middle_accusative    IS 'Patronymic in the accusative case';
-  COMMENT ON COLUMN ${DB_TABLENAME}.id_vk                IS 'VK Id';
+  COMMENT ON COLUMN ${DB_TABLENAME}.vk_id                IS 'VK Id';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_transaction       IS 'Transaction Id';
 
 EOSQL

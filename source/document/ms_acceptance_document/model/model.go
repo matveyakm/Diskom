@@ -22,7 +22,7 @@ type Object struct {
 	FirstAccusative  string    `gorm:"column:first_accusative" json:"first_accusative"`
 	LastAccusative   string    `gorm:"column:last_accusative" json:"last_accusative"`
 	MiddleAccusative string    `gorm:"column:middle_accusative" json:"middle_accusative"`
-	VkId             int64     `gorm:"column:vk_id" json:"vk_id"`
+	VkId             string    `gorm:"column:vk_id" json:"vk_id"`
 	TransactionId    string    `gorm:"column:id_transaction" json:"transaction_id"`
 }
 
