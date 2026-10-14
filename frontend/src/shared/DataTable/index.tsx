@@ -5,25 +5,41 @@ import CustomToolbar from "@/shared/DataTable/ui/CustomToolbar";
 import {useModal} from "@/shared/DataTable/hooks/useModal";
 import {useContextMenu} from "@/shared/DataTable/hooks/useContextMenu";
 import {useRowSelection} from "@/shared/DataTable/hooks/useRowSelection";
-import React, {useRef} from "react";
+import React, {useMemo, useRef, useState} from "react";
 import {useOnClickOutside} from "usehooks-ts";
 import TableModal from "@/shared/DataTable/ui/TableModal";
 import ContextMenu from "@/shared/DataTable/ui/ContextMenu";
 import Pagination from "./ui/Pagination";
 import { asElementRef } from "@/shared/utils/refUtils";
 import {DocumentsTableProps, TableRow} from "@/shared/DataTable/types";
+import {FiltersModal} from "@/shared/DataTable/ui/FiltersModal";
 
 const DataTable = <T extends TableRow = TableRow>({
-                       columns,
-                       rows,
-                       docName,
-                       fields,
-                       blocks,
-                       pageIndex,
-                       pageCount,
-                       onPageChange,
-                       tableMeta
-                   }: DocumentsTableProps<T>) => {
+                        columns,
+                        rows,
+                        docName,
+                        fields,
+                        blocks,
+                        pageIndex,
+                        pageCount,
+                        onPageChange,
+                        tableMeta,
+                        sort,
+                        columnFilters,
+                        totalCount,
+                        hasActiveFilters,
+                        onApplyFilters,
+                        onClearFilters,
+                    }: DocumentsTableProps<T>) => {
+    const [filtersOpen, setFiltersOpen] = useState(false);
+
+    const activeFilterCount = useMemo(
+        () => Object.values(columnFilters ?? {}).filter(
+            s => s && (s.cond != null || s.checked != null),
+        ).length,
+        [columnFilters]
+    );
+
     const {table} = useTable<T>({columns, rows, fields});
     const {isOpen, data: selectedRow, mode, openForEdit, openForCreate, close} = useModal<T>();
     const {menu, openMenu, closeMenu} = useContextMenu<T>();
@@ -52,6 +68,9 @@ const DataTable = <T extends TableRow = TableRow>({
                     onAdd={openForCreate}
                     onEdit={onEdit}
                     tableName={tableName}
+                    totalCount={totalCount}
+                    activeFilterCount={activeFilterCount}
+                    onOpenFilters={onApplyFilters ? () => setFiltersOpen(true) : undefined}
                 />
                 <div className={styles.tableScroll}>
                     <table className={styles.table}>
@@ -81,7 +100,17 @@ const DataTable = <T extends TableRow = TableRow>({
                         {table.getRowModel().rows.length === 0 ? (
                             <tr>
                                 <td colSpan={columns.length} className={styles.emptyCell}>
-                                    Нет данных для отображения
+                                    {hasActiveFilters ? (
+                                        <>
+                                            <div>Ничего не найдено</div>
+                                            <button type="button" className={styles.resetFiltersBtn}
+                                                    onClick={onClearFilters}>
+                                                Сбросить фильтры
+                                            </button>
+                                        </>
+                                    ) : (
+                                        "Нет данных для отображения"
+                                    )}
                                 </td>
                             </tr>
                         ) : (
@@ -137,6 +166,18 @@ const DataTable = <T extends TableRow = TableRow>({
                     blocks={blocks}
                     mode={mode}
                     tableMeta={tableMeta}
+                />
+            )}
+
+            {filtersOpen && onApplyFilters && (
+                <FiltersModal
+                    docName={docName}
+                    columns={columns}
+                    formFields={fields ?? []}
+                    sort={sort ?? null}
+                    filters={columnFilters ?? {}}
+                    onApply={onApplyFilters}
+                    onClose={() => setFiltersOpen(false)}
                 />
             )}
 

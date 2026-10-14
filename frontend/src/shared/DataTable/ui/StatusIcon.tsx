@@ -2,11 +2,12 @@ import SavedIcon from "@/assets/icons/status_saved.svg?react";
 import ConductedIcon from "@/assets/icons/status_conducted.svg?react";
 import DeletedIcon from "@/assets/icons/status_deleted.svg?react";
 import styles from "@/shared/DataTable/DataTable.module.scss";
+import {STATUS_LABELS} from "@/shared/DataTable/ui/statusMeta";
 
 const STATUS_META: Record<number, { label: string; Icon: typeof SavedIcon; className: string }> = {
-    1: {label: "Сохранён", Icon: SavedIcon, className: styles.statusSaved},
-    2: {label: "Проведён", Icon: ConductedIcon, className: styles.statusConducted},
-    0: {label: "Удалён", Icon: DeletedIcon, className: styles.statusDeleted},
+    1: {label: STATUS_LABELS[1], Icon: SavedIcon, className: styles.statusSaved},
+    2: {label: STATUS_LABELS[2], Icon: ConductedIcon, className: styles.statusConducted},
+    0: {label: STATUS_LABELS[0], Icon: DeletedIcon, className: styles.statusDeleted},
 };
 
 // Иконка статуса вместо голой цифры. Неизвестное/пустое значение —

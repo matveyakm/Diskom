@@ -109,3 +109,10 @@ export interface PaginatedResponse<T> extends Record<string, unknown> {
     data: T[];
     pagination: PaginationMeta;
 }
+
+/** Ответ ?distinct=: значения для списка галочек Excel-фильтра. */
+export interface DistinctResponse {
+    data: Array<string | number | boolean | null>;
+    total_distinct: number;
+    truncated: boolean;
+}

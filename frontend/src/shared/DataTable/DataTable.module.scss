@@ -165,3 +165,20 @@
   background: var(--background);
   box-shadow: var(--shadow);
 }
+
+.emptyCell {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--text-secondary);
+}
+
+.resetFiltersBtn {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}

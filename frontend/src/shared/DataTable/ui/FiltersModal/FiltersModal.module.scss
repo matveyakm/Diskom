@@ -1,0 +1,136 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: oklch(0 0 0 / 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.window {
+    background: var(--background);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    width: 640px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.closeX {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+}
+
+.tabs {
+    width: 200px;
+    min-width: 200px;
+    border-right: 1px solid var(--border-subtle);
+    overflow-y: auto;
+    padding: 8px;
+    scrollbar-width: thin;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.tab:hover {
+    background: var(--hover);
+}
+
+.tabActive {
+    background: var(--hover);
+    font-weight: 600;
+}
+
+.tabLabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tabDot {
+    color: var(--accent, #3498db);
+}
+
+.pane {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 16px 20px;
+    scrollbar-width: thin;
+}
+
+.noFields {
+    color: var(--text-secondary);
+    padding: 16px 0;
+}
+
+.footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.clearBtn,
+.applyBtn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.clearBtn {
+    background: transparent;
+    border-color: var(--border-default);
+    color: var(--text-primary);
+}
+
+.applyBtn {
+    background: var(--primary);
+    color: var(--primary-text);
+    border-color: var(--primary);
+}
