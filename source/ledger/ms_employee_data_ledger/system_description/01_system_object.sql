@@ -48,7 +48,7 @@
         { "field": "first_accusative", "label": "Имя (вин. падеж)"},
         { "field": "last_accusative", "label": "Фамилия (вин. падеж)"},
         { "field": "middle_accusative", "label": "Отчество (вин. падеж)"},
-        { "field": "id_vk", "label": "ID VK"},
+        { "field": "vk_id", "label": "ID VK"},
         { "field": "id_employee", "label": "ID сотрудника"}
       ]
     }',

@@ -37,8 +37,7 @@
     'document.png',
     '{
       "columns": [
-        { "field": "status", "label": ""},
-        { "field": "id", "label": "Код" },
+        { "field": "status", "label": "", "type": "status"},
         { "field": "ddate", "label": "Дата"},
         { "field": "dnumber", "label": "Номер"},
         { "field": "note", "label": "Примечание"},
@@ -52,7 +51,7 @@
       "fields": [
         { "field": "id", "label": "Код", "hidden": true, "required": false },
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "label": "Номер", "hidden": false, "required": true, "default": "id" },
+        { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false },
         { "field": "id_employee", "label": "Сотрудник", "hidden": false, "required": false, "type": "select", "end_point": "employee_directory" },
         { "field": "id_organization", "label": "Комитет", "hidden": false, "required": false, "type": "select", "end_point": "organization_directory" },
@@ -78,7 +77,7 @@
                     {"note":"note"},
                     {"status":1},
                     {"id_user":1},
-                    {"prefix":"prefix"},
+                    {"prefix":0},
                     {"id_transaction":"id_transaction"}
                 ],
                 "FK":
@@ -89,7 +88,7 @@
             {
                 "Step": 2,
                 "method": "post",
-                "end_point": "appointment_document",
+                "end_point": "dismissal_document",
                 "fields":
                 [
                     {"status": 1}

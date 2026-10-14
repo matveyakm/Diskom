@@ -5,10 +5,18 @@ import styles from "./TablePage.module.scss";
 import DataTable from "@/shared/DataTable";
 import useMenuData from "@/shared/api/fetchMenuData";
 import {useTableData} from "@/shared/api/fetchTableData";
-import {parseFormFields, parseTableColumns} from "@/shared/api/fetchMenuData/utils";
+import {parseFormBlocks, parseFormFields, parseTableColumns} from "@/shared/api/fetchMenuData/utils";
+import {buildListParams} from "@/shared/DataTable/filters/queryParams";
+import type {ColumnSort, TableColumnFilters} from "@/shared/DataTable/filters/types";
 
 const TablePage = () => {
     const {docName} = useParams();
+    // Другая таблица — новый экземпляр со чистым состоянием
+    // (страница, сортировка, фильтры, поиск сбрасываются сами).
+    return <TableView key={docName ?? "none"} docName={docName}/>;
+};
+
+const TableView = ({docName}: { docName: string | undefined }) => {
     const {data: menuData} = useMenuData();
 
     const tableMeta = useMemo(
@@ -30,18 +38,59 @@ const TablePage = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
 
-    const {data: tableResponse, isLoading, isError, refetch} = useTableData(docName ?? "", page, PAGE_SIZE);
-
-    const tableRowsResponse = tableResponse?.data ?? [];
-    const pagination = tableResponse?.pagination;
+    // Excel-фильтры: сортировка одна на таблицу, условия/галочки — по колонкам.
+    // Окно фильтров коммитит всё одной кнопкой. Любое изменение сбрасывает на страницу 1.
+    const [sort, setSort] = useState<ColumnSort | null>(null);
+    const [columnFilters, setColumnFilters] = useState<TableColumnFilters>({});
 
     const columns = useMemo(
         () => parseTableColumns(tableMeta?.table_columns),
         [tableMeta?.table_columns]
     );
 
+    // Reference expansion: columns carrying end_point ask the backend
+    // to resolve ids into human-readable names (see shared/controller/expand.go).
+    const expand = useMemo(
+        () => columns
+            .filter((c) => c.end_point)
+            .map((c) => `${c.key}:${c.end_point}`)
+            .join(",") || undefined,
+        [columns]
+    );
+
+    const extraParams = useMemo(
+        () => buildListParams({sort, filters: columnFilters}),
+        [sort, columnFilters]
+    );
+
+    const hasActiveFilters =
+        sort !== null ||
+        Object.values(columnFilters).some(s => s && (s.cond != null || s.checked != null));
+
+    const handleApplyFilters = (nextSort: ColumnSort | null, nextFilters: TableColumnFilters) => {
+        setSort(nextSort);
+        setColumnFilters(nextFilters);
+        setPage(1);
+    };
+
+    const handleClearFilters = () => {
+        setSort(null);
+        setColumnFilters({});
+        setPage(1);
+    };
+
+    const {data: tableResponse, isLoading, isError, refetch} = useTableData(docName ?? "", page, PAGE_SIZE, expand, extraParams);
+
+    const tableRowsResponse = tableResponse?.data ?? [];
+    const pagination = tableResponse?.pagination;
+
     const formFields = useMemo(
         () => parseFormFields(tableMeta?.item_fields),
+        [tableMeta?.item_fields]
+    );
+
+    const formBlocks = useMemo(
+        () => parseFormBlocks(tableMeta?.item_fields),
         [tableMeta?.item_fields]
     );
 
@@ -81,11 +130,17 @@ const TablePage = () => {
                 rows={tableRowsResponse}
                 docName={docName}
                 fields={formFields}
+                blocks={formBlocks}
                 pageIndex={(pagination?.current_page ?? 1) - 1}
                 pageCount={pagination?.total_pages ?? 1}
                 totalCount={pagination?.total_count ?? 0}
                 onPageChange={(p) => setPage(p + 1)}
                 tableMeta={tableMeta}
+                sort={sort}
+                columnFilters={columnFilters}
+                hasActiveFilters={hasActiveFilters}
+                onApplyFilters={handleApplyFilters}
+                onClearFilters={handleClearFilters}
             />
         </div>
     );

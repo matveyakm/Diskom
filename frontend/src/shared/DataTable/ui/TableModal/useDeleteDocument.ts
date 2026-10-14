@@ -43,7 +43,8 @@ export const useDeleteDocument = <T extends TableRow = TableRow>({
     return useMutation({
         mutationFn: deleteRowMutation,
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ["tableData", docName]});
+            // См. комментарий в useSaveDocument: удаление через пайплайн трогает чужие таблицы.
+            queryClient.invalidateQueries({queryKey: ["tableData"]});
             queryClient.invalidateQueries({queryKey: ["reference"]});
             onSuccess?.();
         },

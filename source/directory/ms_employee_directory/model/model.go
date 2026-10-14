@@ -8,7 +8,7 @@ type Object struct {
 	Description   string `gorm:"column:description" json:"description"`
 	IdBasis       int16  `gorm:"column:id_basis" json:"id_basis"`
 	Status        int16  `gorm:"column:status;default:1" json:"status"`
-	VkId          int64  `gorm:"column:vk_id" json:"vk_id"`
+	VkId          string `gorm:"column:vk_id" json:"vk_id"`
 	IdTransaction string `gorm:"column:id_transaction" json:"id_transaction"`
 }
 

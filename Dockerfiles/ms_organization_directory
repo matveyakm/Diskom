@@ -73,8 +73,12 @@ COPY ./source/report/ms_job_report/ ./report/ms_job_report/
 COPY ./source/shared/ ./shared/
 
 WORKDIR /app/directory/ms_organization_directory
-# Собираем бинарный файл
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o main .
+# Собираем бинарный файл.
+# Ретраи + общий кеш модулей: при параллельной сборке всех сервисов
+# proxy.golang.org иногда отдает unexpected EOF, а cache-mount позволяет
+# переиспользовать уже скачанные модули между сборками.
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    sh -c 'for i in 1 2 3 4 5; do CGO_ENABLED=0 GOOS=linux go build -v -o main . && break; echo "go build failed (attempt $i), retrying..."; sleep $((i * 5)); done; test -f ./main'
 
 # Финальный минимальный образ (Distroless или Alpine)
 #FROM alpine:latest

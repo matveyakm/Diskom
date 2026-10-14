@@ -10,8 +10,6 @@ type UseAcceptDocumentProps<T extends TableRow = TableRow> = {
     selectedRow: T | null;
     fields: FormField[];
     tableMeta?: MenuItem;
-    onSuccess?: () => void;
-    onError?: () => void;
 };
 
 export const useAcceptDocument = <T extends TableRow = TableRow>({
@@ -19,17 +17,18 @@ export const useAcceptDocument = <T extends TableRow = TableRow>({
     selectedRow,
     fields,
     tableMeta,
-    onSuccess,
-    onError,
 }: UseAcceptDocumentProps<T>) => {
     const queryClient = useQueryClient();
 
-    const acceptRowMutation = async (): Promise<void> => {
+    // Accepts either the opened row (toolbar "Провести") or an explicitly
+    // passed one ("Сохранить и провести" right after creation).
+    const acceptRowMutation = async (rowOverride?: T | null): Promise<void> => {
+        const row = rowOverride ?? selectedRow;
         const pipelineConfig = tableMeta?.on_acceptance;
 
         if (!pipelineConfig) {
-            if (!selectedRow) throw new Error("Нет данных для проведения");
-            const id = selectedRow.id;
+            if (!row) throw new Error("Нет данных для проведения");
+            const id = row.id;
             if (!id) throw new Error("Не удалось найти ID записи");
             await tableApi(docName).update({id, status: 2});
             return;
@@ -40,7 +39,7 @@ export const useAcceptDocument = <T extends TableRow = TableRow>({
 
         await processAction(
             "onAcceptance",
-            {...selectedRow, id: selectedRow?.id} as Record<string, unknown>,
+            {...row, id: row?.id} as Record<string, unknown>,
             pipelineConfig,
             fields,
             tableMeta?.id,
@@ -50,12 +49,9 @@ export const useAcceptDocument = <T extends TableRow = TableRow>({
     return useMutation({
         mutationFn: acceptRowMutation,
         onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: ["tableData", docName]});
+            // См. комментарий в useSaveDocument: проведение трогает чужие таблицы.
+            queryClient.invalidateQueries({queryKey: ["tableData"]});
             queryClient.invalidateQueries({queryKey: ["reference"]});
-            onSuccess?.();
-        },
-        onError: () => {
-            onError?.();
         },
     });
 };

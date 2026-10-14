@@ -20,7 +20,7 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/consts/align"
 	"github.com/johnfercher/maroto/v2/pkg/consts/fontstyle"
 	"github.com/johnfercher/maroto/v2/pkg/core"
-	"github.com/johnfercher/maroto/v2/pkg/core/entity"
+	"github.com/johnfercher/maroto/v2/pkg/fontrepository"
 	"github.com/johnfercher/maroto/v2/pkg/props"
 )
 
@@ -42,10 +42,14 @@ type MrtService struct {
 func New(cfg Config) *MrtService {
 	marotoCfgBuilder := config.NewBuilder()
 
-	marotoCfgBuilder.WithCustomFonts([]*entity.CustomFont{
-		{Family: "Arial", Style: fontstyle.Normal, Bytes: arialRegular},
-		{Family: "Arial", Style: fontstyle.Bold, Bytes: arialBold},
-	})
+	customFonts, err := fontrepository.New().
+		AddUTF8FontFromBytes("Arial", fontstyle.Normal, arialRegular).
+		AddUTF8FontFromBytes("Arial", fontstyle.Bold, arialBold).
+		Load()
+	if err != nil {
+		log.Fatalf("load custom fonts: %v", err)
+	}
+	marotoCfgBuilder.WithCustomFonts(customFonts)
 
 	marotoCfgBuilder.WithDefaultFont(&props.Font{
 		Family: "Arial",
