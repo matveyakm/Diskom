@@ -7,12 +7,14 @@ export const parseTableColumns = (rawColumnsStr: string | undefined) => {
         const rawJson = JSON.parse(rawColumnsStr) as { columns: RawColumnItem[] };
 
         if (rawJson && Array.isArray(rawJson.columns)) {
-            return rawJson.columns.filter((c) => c.field !== "status").map((c) => ({
-                key: c.field,
-                label: c.label,
-                type: "text",
-                end_point: c.end_point,
-            })) as TableColumnConfig[];
+            return rawJson.columns
+                .filter((c) => c.field !== "status" || c.type === "status")
+                .map((c) => ({
+                    key: c.field,
+                    label: c.label,
+                    type: c.type === "status" ? "status" : "text",
+                    end_point: c.end_point,
+                })) as TableColumnConfig[];
         }
         return [];
     } catch (e) {

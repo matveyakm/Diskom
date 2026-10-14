@@ -3,6 +3,7 @@ import {ColumnDef, getCoreRowModel, useReactTable} from "@tanstack/react-table";
 import {TableRow, TableColumnConfig} from "@/shared/DataTable/types";
 import {FormField} from "@/entities/document/types";
 import {isDateField, formatDateForDisplay} from "@/shared/DataTable/dateUtils";
+import {StatusIcon} from "@/shared/DataTable/ui/StatusIcon";
 
 interface UseTableProps<T extends TableRow = TableRow> {
     columns: TableColumnConfig[];
@@ -26,6 +27,7 @@ export const useTable = <T extends TableRow = TableRow>({columns, rows, fields}:
                 accessorKey: columnKey,
                 header: col.label || columnKey,
                 cell: ({getValue, row}) => {
+                    if (col.type === "status") return <StatusIcon value={getValue()}/>;
                     // Prefer backend-resolved display name (see ?expand=),
                     // fall back to the raw value when absent.
                     const resolved = row.original[`${String(columnKey)}_name`];
