@@ -209,11 +209,37 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 	// Query builder
 	query := r.db.Table(r.tableName)
 
-	// Apply filters if needed (you can extend this)
-	if filter := req.URL.Query().Get("filter"); filter != "" {
-		// Example: ?filter=status:active
-		// You can implement more sophisticated filtering here
-		query = r.applyFilters(query, req)
+	// Distinct column values for the checkbox filter list. Describes the
+	// column, so row filters/pagination/sorting are ignored by design.
+	params := req.URL.Query()
+	if column, like, limit, ok, err := parseDistinct(params); err != nil {
+		r.writeError(w, "Invalid distinct parameter: "+err.Error(), http.StatusBadRequest)
+		return
+	} else if ok {
+		r.getDistinct(w, req.URL.Query(), column, like, limit)
+		return
+	}
+
+	// Excel-style column filters: exact match + __suffix operators.
+	// The legacy ?filter= flag is accepted but no longer required
+	// (kept as a reserved word for old clients).
+	filtered, ferr := applyFieldFilters(query, params)
+	if ferr != nil {
+		r.writeError(w, "Invalid filter parameter: "+ferr.Error(), http.StatusBadRequest)
+		return
+	}
+	query = filtered
+
+	// "Match nothing": any __in present but empty (all checkboxes cleared).
+	if empty, ierr := hasEmptyIn(params); ierr != nil {
+		r.writeError(w, "Invalid filter parameter: "+ierr.Error(), http.StatusBadRequest)
+		return
+	} else if empty {
+		r.writeJSONResponse(w, PaginatedResponse{
+			Data:       []T{},
+			Pagination: Pagination{Limit: paginationParams.Limit, Offset: paginationParams.Offset},
+		}, http.StatusOK)
+		return
 	}
 
 	// Batch fetch by primary keys: ?ids=1,2,3 (see expand.go).
@@ -233,10 +259,25 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 		query = query.Where("id IN ?", ids)
 	}
 
+	// Global substring search across local columns (?q=&q_fields=).
+	if fields, pattern, ok, serr := parseSearch(params); serr != nil {
+		r.writeError(w, "Invalid search parameter: "+serr.Error(), http.StatusBadRequest)
+		return
+	} else if ok {
+		query = applySearch(query, fields, pattern)
+	}
+
 	// Get total count for pagination metadata
 	var totalCount int64
 	if err := query.Count(&totalCount).Error; err != nil {
 		r.writeError(w, "Failed to count records", http.StatusInternalServerError)
+		return
+	}
+
+	// Ordering: validated ?sort=&order=, historical default keeps history.
+	orderClause, oerr := parseSortOrder(params)
+	if oerr != nil {
+		r.writeError(w, "Invalid sort parameter: "+oerr.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -245,7 +286,7 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 	err := query.
 		Offset(paginationParams.Offset).
 		Limit(paginationParams.Limit).
-		Order("id DESC"). // Default ordering, can be customized
+		Order(orderClause).
 		Find(&entities).Error
 
 	if err != nil {
@@ -398,20 +439,67 @@ func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// applyFilters applies query filters from request parameters
-func (r *CRUDRepository[T]) applyFilters(query *gorm.DB, req *http.Request) *gorm.DB {
-	// Example filter format: ?status=active&category=books
-	filters := req.URL.Query()
-	for key, values := range filters {
-		// Skip pagination and other reserved parameters
-		if key == "id" || key == "limit" || key == "offset" || key == "page" || key == "size" || key == "filter" {
-			continue
-		}
-		if len(values) > 0 && values[0] != "" {
-			query = query.Where(key+" = ?", values[0])
-		}
+// getDistinct serves ?distinct=: capped distinct column values for the
+// checkbox filter list (see filter.go). Sibling column filters and search
+// narrow the list (so the second tab sees only what is left); the column's
+// own keys are stripped (picked values must not hide the rest). NULLs are
+// excluded (no blanks box in v1). Pagination/sorting are ignored by design.
+func (r *CRUDRepository[T]) getDistinct(w http.ResponseWriter, params map[string][]string, column, like string, limit int) {
+	sibling := stripOwnColumn(params, column)
+
+	filtered := r.db.Table(r.tableName).Where(column + " IS NOT NULL")
+	var err error
+	if filtered, err = applyFieldFilters(filtered, sibling); err != nil {
+		r.writeError(w, "Invalid filter parameter: "+err.Error(), http.StatusBadRequest)
+		return
 	}
-	return query
+	if fields, pattern, ok, serr := parseSearch(sibling); serr != nil {
+		r.writeError(w, "Invalid search parameter: "+serr.Error(), http.StatusBadRequest)
+		return
+	} else if ok {
+		filtered = applySearch(filtered, fields, pattern)
+	}
+	if empty, ierr := hasEmptyIn(sibling); ierr != nil {
+		r.writeError(w, "Invalid filter parameter: "+ierr.Error(), http.StatusBadRequest)
+		return
+	} else if empty {
+		r.writeJSONResponse(w, DistinctResponse{Data: []any{}, TotalDistinct: 0, Truncated: false}, http.StatusOK)
+		return
+	}
+	if like != "" {
+		filtered = filtered.Where("CAST("+column+" AS TEXT) ILIKE ?", "%"+escapeLike(like)+"%")
+	}
+
+	var rows []map[string]any
+	valuesQuery := filtered.Session(&gorm.Session{}).
+		Select("DISTINCT " + column).
+		Order(column + " ASC").
+		Limit(limit + 1)
+	if err := valuesQuery.Find(&rows).Error; err != nil {
+		r.writeError(w, "Failed to retrieve distinct values: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	truncated := len(rows) > limit
+	if truncated {
+		rows = rows[:limit]
+	}
+	vals := make([]any, 0, len(rows))
+	for _, row := range rows {
+		vals = append(vals, row[column])
+	}
+
+	var total int64
+	countQuery := filtered.Session(&gorm.Session{}).Select("COUNT(DISTINCT " + column + ")")
+	if err := countQuery.Scan(&total).Error; err != nil {
+		r.writeError(w, "Failed to count distinct values: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	r.writeJSONResponse(w, DistinctResponse{
+		Data:          vals,
+		TotalDistinct: total,
+		Truncated:     truncated,
+	}, http.StatusOK)
 }
 
 // Helper function to write JSON response

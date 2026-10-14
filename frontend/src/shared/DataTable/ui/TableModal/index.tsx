@@ -1,4 +1,6 @@
 import {useMemo, useState} from "react";
+import type {ReactNode} from "react";
+import {useQueryClient} from "@tanstack/react-query";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
 import {FormField} from "@/entities/document/types";
@@ -6,7 +8,9 @@ import {resolveBlockRenderer} from "./blocks/blockRegistry";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
-import {parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
+import {describePipelineEffects, formatPipelineEffect, parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
+import type {MenuItem} from "@/shared/api/fetchMenuData/types";
+import type {PipelineEffect} from "@/shared/api/actionPipeline";
 import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
@@ -19,9 +23,40 @@ import Delete from "@/assets/icons/delete.svg?react";
 import Check from "@/assets/icons/check.svg?react";
 
 type DialogState =
-    | { type: "confirm"; title: string; message: string; onConfirm: () => void }
-    | { type: "alert"; title: string; message: string }
+    | { type: "confirm"; title: string; message: ReactNode; onConfirm: () => void }
+    | { type: "alert"; title: string; message: ReactNode }
     | null;
+
+// Превью последствий пайплайна: выводится из конфига (поведение — в данных).
+// Имена сущностей — из кеша menuData (table_title → name → сырой end_point,
+// fail-open, новых запросов нет). Пустой конфиг → пустой список, вызывающий
+// показывает плоский текст как раньше.
+const usePipelinePreview = (rawConfig: string | null | undefined) => {
+    const queryClient = useQueryClient();
+    return useMemo(() => {
+        const steps = parseActionConfig(rawConfig);
+        if (!steps?.length) return [];
+        const menuData = queryClient.getQueryData<MenuItem[]>(["menuData"]);
+        return describePipelineEffects(steps, (endPoint) => {
+            const item = menuData?.find(i => i.ref === endPoint);
+            return item?.table_title || item?.name || endPoint;
+        });
+    }, [queryClient, rawConfig]);
+};
+
+const pipelineMessage = (question: string, consequences: string, effects: PipelineEffect[]): ReactNode =>
+    effects.length === 0
+        ? question
+        : (
+            <>
+                <div>{question} {consequences}</div>
+                <ul>
+                    {effects.map((e, i) => (
+                        <li key={`${e.endPoint}-${i}`}>{formatPipelineEffect(e)}</li>
+                    ))}
+                </ul>
+            </>
+        );
 
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
@@ -57,6 +92,15 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         [visibleFields, groupedNames],
     );
 
+    const acceptanceEffects = usePipelinePreview(tableMeta?.on_acceptance);
+    const deleteEffects = usePipelinePreview(tableMeta?.on_delete);
+    const acceptanceMessage = pipelineMessage(
+        "Провести документ?", "Последствия проведения:", acceptanceEffects,
+    );
+    const deleteMessage = pipelineMessage(
+        "Вы уверены, что хотите удалить эту запись?", "Последствия удаления:", deleteEffects,
+    );
+
     const renderField = (field: FormField) => (
         <div
             key={field.field}
@@ -71,11 +115,11 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         </div>
     );
 
-    const showConfirm = (message: string, onConfirm: () => void) => {
+    const showConfirm = (message: ReactNode, onConfirm: () => void) => {
         setDialog({type: "confirm", title: "Подтверждение", message, onConfirm});
     };
 
-    const showAlert = (message: string) => {
+    const showAlert = (message: ReactNode) => {
         setDialog({type: "alert", title: "Ошибка", message});
     };
 
@@ -99,7 +143,9 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         visibleFields, mode, selectedRow,
         onSave: (payload, action) => {
             if (action === "saveAccept") {
-                void handleSaveAndAccept(payload);
+                showConfirm(acceptanceMessage, () => {
+                    void handleSaveAndAccept(payload);
+                });
             } else {
                 handleSave(payload);
             }
@@ -155,13 +201,13 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     };
 
     const handleDelete = () => {
-        showConfirm("Вы уверены, что хотите удалить эту запись?", () => {
+        showConfirm(deleteMessage, () => {
             deleteRow();
         });
     };
 
     const handleAccept = () => {
-        showConfirm("Провести документ?", () => {
+        showConfirm(acceptanceMessage, () => {
             acceptRow(undefined, {
                 onSuccess: () => onClose(),
                 onError: (err) => showAlert(`Не удалось провести документ (${describeActionError(err)}).`),

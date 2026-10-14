@@ -1,10 +1,11 @@
 import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 import styles from "./ConfirmDialog.module.scss";
 
 interface ConfirmDialogProps {
     open: boolean;
     title: string;
-    message: string;
+    message: ReactNode;
     confirmText?: string;
     cancelText?: string;
     hideCancel?: boolean;
@@ -28,7 +29,7 @@ export const ConfirmDialog = ({
         <div className={styles.overlay} onClick={hideCancel ? undefined : onCancel}>
             <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
                 <h3 className={styles.title}>{title}</h3>
-                <p className={styles.message}>{message}</p>
+                <div className={styles.message}>{message}</div>
                 <div className={styles.actions}>
                     {!hideCancel && (
                         <button className={styles.cancelBtn} onClick={onCancel}>
