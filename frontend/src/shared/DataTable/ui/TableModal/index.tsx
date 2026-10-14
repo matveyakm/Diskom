@@ -1,10 +1,16 @@
-import {useRef, useState} from "react";
+import {useMemo, useState} from "react";
+import type {ReactNode} from "react";
+import {useQueryClient} from "@tanstack/react-query";
 import styles from "./TableModal.module.scss";
 import {TableModalProps} from "./types";
+import {FormField} from "@/entities/document/types";
+import {resolveBlockRenderer} from "./blocks/blockRegistry";
 import {getRowValue} from "./utils";
 import {useDocumentForm} from "./useDocumentForm";
 import {useSaveDocument} from "./useSaveDocument";
-import {parseActionConfig} from "@/shared/api/actionPipeline";
+import {describePipelineEffects, formatPipelineEffect, parseActionConfig, describeActionError} from "@/shared/api/actionPipeline";
+import type {MenuItem} from "@/shared/api/fetchMenuData/types";
+import type {PipelineEffect} from "@/shared/api/actionPipeline";
 import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
@@ -17,22 +23,103 @@ import Delete from "@/assets/icons/delete.svg?react";
 import Check from "@/assets/icons/check.svg?react";
 
 type DialogState =
-    | { type: "confirm"; title: string; message: string; onConfirm: () => void }
-    | { type: "alert"; title: string; message: string }
+    | { type: "confirm"; title: string; message: ReactNode; onConfirm: () => void }
+    | { type: "alert"; title: string; message: ReactNode }
     | null;
 
-const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, mode, tableMeta}: TableModalProps<T>) => {
+// Превью последствий пайплайна: выводится из конфига (поведение — в данных).
+// Имена сущностей — из кеша menuData (table_title → name → сырой end_point,
+// fail-open, новых запросов нет). Пустой конфиг → пустой список, вызывающий
+// показывает плоский текст как раньше.
+const usePipelinePreview = (rawConfig: string | null | undefined) => {
+    const queryClient = useQueryClient();
+    return useMemo(() => {
+        const steps = parseActionConfig(rawConfig);
+        if (!steps?.length) return [];
+        const menuData = queryClient.getQueryData<MenuItem[]>(["menuData"]);
+        return describePipelineEffects(steps, (endPoint) => {
+            const item = menuData?.find(i => i.ref === endPoint);
+            return item?.table_title || item?.name || endPoint;
+        });
+    }, [queryClient, rawConfig]);
+};
+
+const pipelineMessage = (question: string, consequences: string, effects: PipelineEffect[]): ReactNode =>
+    effects.length === 0
+        ? question
+        : (
+            <>
+                <div>{question} {consequences}</div>
+                <ul>
+                    {effects.map((e, i) => (
+                        <li key={`${e.endPoint}-${i}`}>{formatPipelineEffect(e)}</li>
+                    ))}
+                </ul>
+            </>
+        );
+
+const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
-    const formRef = useRef<HTMLFormElement>(null);
 
     const visibleFields = fields.filter(f => !f.hidden);
     const itemName = tableMeta?.item_title;
 
-    const showConfirm = (message: string, onConfirm: () => void) => {
+    // Группировка для отображения. Вся логика (валидация, сбор payload,
+    // дефолты, пайплайны) по-прежнему работает с плоским visibleFields выше —
+    // блоки меняют только раскладку.
+    const visibleByName = useMemo(() => new Map(visibleFields.map(f => [f.field, f])), [visibleFields]);
+    const visibleBlocks = useMemo(
+        () => (blocks ?? [])
+            .map(b => {
+                const fields = b.fields.filter(name => visibleByName.has(name));
+                const rows = b.rows
+                    ?.map(r => ({...r, fields: r.fields.filter(name => visibleByName.has(name))}))
+                    .filter(r => r.fields.length > 0);
+                return {...b, fields, rows: rows && rows.length > 0 ? rows : undefined};
+            })
+            .filter(b => {
+                if (b.fields.length === 0) return false;
+                if (b.tag && !resolveBlockRenderer(b.tag)) {
+                    console.warn(`[form] блок "${b.title}": неизвестный тег "${b.tag}", обычный рендер`);
+                }
+                return true;
+            }),
+        [blocks, visibleByName],
+    );
+    const groupedNames = useMemo(() => new Set(visibleBlocks.flatMap(b => b.fields)), [visibleBlocks]);
+    const ungroupedFields = useMemo(
+        () => visibleFields.filter(f => !groupedNames.has(f.field)),
+        [visibleFields, groupedNames],
+    );
+
+    const acceptanceEffects = usePipelinePreview(tableMeta?.on_acceptance);
+    const deleteEffects = usePipelinePreview(tableMeta?.on_delete);
+    const acceptanceMessage = pipelineMessage(
+        "Провести документ?", "Последствия проведения:", acceptanceEffects,
+    );
+    const deleteMessage = pipelineMessage(
+        "Вы уверены, что хотите удалить эту запись?", "Последствия удаления:", deleteEffects,
+    );
+
+    const renderField = (field: FormField) => (
+        <div
+            key={field.field}
+            className={`${styles.fieldWrapper} ${styles.viewMode} ${errors[field.field] ? styles.fieldError : ""}`}
+        >
+            <FieldRow
+                field={field}
+                value={getRowValue(selectedRow, field.field)}
+                isEditing={isEditing}
+                error={errors[field.field]}
+            />
+        </div>
+    );
+
+    const showConfirm = (message: ReactNode, onConfirm: () => void) => {
         setDialog({type: "confirm", title: "Подтверждение", message, onConfirm});
     };
 
-    const showAlert = (message: string) => {
+    const showAlert = (message: ReactNode) => {
         setDialog({type: "alert", title: "Ошибка", message});
     };
 
@@ -56,7 +143,9 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         visibleFields, mode, selectedRow,
         onSave: (payload, action) => {
             if (action === "saveAccept") {
-                void handleSaveAndAccept(payload);
+                showConfirm(acceptanceMessage, () => {
+                    void handleSaveAndAccept(payload);
+                });
             } else {
                 handleSave(payload);
             }
@@ -94,8 +183,8 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         } as unknown as T;
         try {
             await acceptRowAsync(rowForAccept);
-        } catch {
-            showAlert("Документ сохранён, но провести не удалось. Проверьте данные и проведите позже.");
+        } catch (err) {
+            showAlert(`Документ сохранён, но провести не удалось (${describeActionError(err)}). Проверьте данные и проведите позже.`);
             return;
         }
         setErrors({});
@@ -112,25 +201,21 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     };
 
     const handleDelete = () => {
-        showConfirm("Вы уверены, что хотите удалить эту запись?", () => {
+        showConfirm(deleteMessage, () => {
             deleteRow();
         });
     };
 
     const handleAccept = () => {
-        showConfirm("Провести документ?", () => {
+        showConfirm(acceptanceMessage, () => {
             acceptRow(undefined, {
                 onSuccess: () => onClose(),
-                onError: () => showAlert("Не удалось провести документ."),
+                onError: (err) => showAlert(`Не удалось провести документ (${describeActionError(err)}).`),
             });
         });
     };
 
     const isBusy = isPending || isAccepting;
-
-    const handleSaveAcceptClick = () => {
-        formRef.current?.requestSubmit();
-    };
 
     // Кнопка "Провести" — только если проведение сконфигурировано:
     // иначе клик уходил во fallback и молча ставил status=2 где попало.
@@ -183,21 +268,33 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                 )}
 
                 <div className={styles.content}>
-                    <form ref={formRef} id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
+                    <form id="modal-form" className={styles.formContainer} onSubmit={handleSubmit}>
                         <div className={styles.fieldsStack}>
-                            {visibleFields.map(field => (
-                                <div
-                                    key={field.field}
-                                    className={`${styles.fieldWrapper} ${styles.viewMode} ${errors[field.field] ? styles.fieldError : ""}`}
-                                >
-                                    <FieldRow
-                                        field={field}
-                                        value={getRowValue(selectedRow, field.field)}
-                                        isEditing={isEditing}
-                                        error={errors[field.field]}
-                                    />
-                                </div>
-                            ))}
+                            {ungroupedFields.map(renderField)}
+                            {visibleBlocks.map((block, blockIdx) => {
+                                const Renderer = resolveBlockRenderer(block.tag);
+                                const blockKey = block.id ?? `${block.title}-${blockIdx}`;
+                                if (!Renderer) {
+                                    return (
+                                        <section key={blockKey} className={styles.blockSection}>
+                                            <h4 className={styles.blockTitle}>{block.title}</h4>
+                                            {block.fields.map(name => renderField(visibleByName.get(name)!))}
+                                        </section>
+                                    );
+                                }
+                                return (
+                                    <section key={blockKey} className={styles.blockSection}>
+                                        <h4 className={styles.blockTitle}>{block.title}</h4>
+                                        <Renderer
+                                            block={block}
+                                            fields={block.fields.map(name => visibleByName.get(name)!)}
+                                            getValue={name => getRowValue(selectedRow, name)}
+                                            isEditing={isEditing}
+                                            errors={errors}
+                                        />
+                                    </section>
+                                );
+                            })}
                         </div>
 
                         {isEditing && (
@@ -210,7 +307,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                                     {isPending ? "Сохранение..." : "Сохранить"}
                                 </button>
                                 {showSaveAccept && (
-                                    <button type="button" data-action="saveAccept" onClick={handleSaveAcceptClick} className={styles.saveBtn}
+                                    <button type="submit" data-action="saveAccept" className={styles.saveBtn}
                                             disabled={isBusy}>
                                         {isAccepting ? "Проведение..." : isPending ? "Сохранение..." : "Сохранить и провести"}
                                     </button>

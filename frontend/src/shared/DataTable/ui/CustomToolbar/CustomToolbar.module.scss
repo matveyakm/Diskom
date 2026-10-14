@@ -16,6 +16,55 @@
   min-width: 100px;
 }
 
+.count {
+  margin-left: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.filterButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all .15s ease;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+  }
+
+  &:hover {
+    background: var(--hover);
+    border-color: var(--border-subtle);
+  }
+
+  &:active {
+    transform: scale(.97);
+  }
+}
+
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .actionsWrapper {
   display: flex;
   align-items: center;

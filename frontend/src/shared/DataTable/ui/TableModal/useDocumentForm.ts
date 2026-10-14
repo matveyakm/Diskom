@@ -29,6 +29,13 @@ export const useDocumentForm = <T extends TableRow = TableRow>({
         const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
         const action: SubmitAction = submitter?.dataset?.action === "saveAccept" ? "saveAccept" : "save";
         const formData = new FormData(e.currentTarget);
+        // Ловит кастомные рендереры блоков, забывшие name= у инпутов:
+        // такое поле молча сохранилось бы как null.
+        for (const field of visibleFields) {
+            if (!formData.has(field.field)) {
+                console.error(`[form] поле "${field.field}" отсутствует в форме — значение не сохранится`);
+            }
+        }
         const result = validateAndCollect(formData, visibleFields, mode, selectedRow);
         setErrors(result.errors);
         if (!result.payload) return;

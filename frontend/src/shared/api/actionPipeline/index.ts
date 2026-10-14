@@ -1,17 +1,9 @@
 import { api } from "@/shared/api/AxiosClient";
 import { FormField } from "@/entities/document/types";
+import type { ProcessingStep } from "./effects";
 
-export interface ProcessingStep {
-    Step?: number;
-    step?: number;
-    method?: string;
-    end_point: string;
-    map?: Record<string, unknown>[];
-    fields?: Record<string, unknown>[];
-    filter?: string;
-    FK?: Record<string, string>[];
-    conditions?: Record<string, unknown>[];
-}
+export type { PipelineEffect, PipelineEffectVerb, ProcessingStep } from "./effects";
+export { describePipelineEffects, formatPipelineEffect } from "./effects";
 
 export interface ActionPipelineConfig {
     action: string;
@@ -26,6 +18,18 @@ export const parseActionConfig = (raw: string | Record<string, unknown> | null |
     } catch {
         return null;
     }
+};
+
+// Человекочитаемая причина падения шага для алертов: тело ответа бэка
+// (там обычно точная ошибка вида Failed to ...), иначе message.
+export const describeActionError = (err: unknown): string => {
+    const data = (err as { response?: { data?: unknown } })?.response?.data;
+    if (data !== undefined && data !== null) {
+        const text = typeof data === "string" ? data : JSON.stringify(data);
+        return text.length > 200 ? text.slice(0, 200) + "…" : text;
+    }
+    if (err instanceof Error && err.message) return err.message;
+    return String(err ?? "неизвестная ошибка");
 };
 
 export const applyDefaults = (
