@@ -37,7 +37,7 @@
     'document.png',
     '{
       "columns": [
-        { "field": "status", "label": "", "hidden": false },
+        { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
         { "field": "note", "label": "Примечание", "hidden": false },
@@ -140,6 +140,7 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action": "onAcceptance",
         "processing":
@@ -147,6 +148,7 @@
             {
                 "Step": 1,
                 "method": "get",
+                "hide_in_preview": true,
                 "end_point": "create_counterparty_document",
                 "filter":"id",
                 "conditions":
@@ -167,6 +169,7 @@
             {
                 "Step": 2,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "document",
                 "filter":"id",
                 "map":
@@ -223,6 +226,7 @@
             {
                 "Step": 5,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "create_counterparty_document",
                 "filter": "id",
                 "fields": {
@@ -231,12 +235,14 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action":"onDelete",
     "processing":[
         {
             "step": 1,
             "method": "get",
+            "hide_in_preview": true,
             "end_point": "create_counterparty_document",
             "filter": "id"
         },
@@ -258,6 +264,7 @@
         {
             "step": 4,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "document",
             "filter": "id",
             "fields": {
@@ -267,6 +274,7 @@
         {
             "step": 5,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "create_counterparty_document",
             "filter": "id",
             "fields": {

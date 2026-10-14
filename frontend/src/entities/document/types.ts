@@ -12,5 +12,25 @@ export interface FormField {
 export interface RawColumnItem {
     field: string;
     label: string;
+    type?: string;
     end_point?: string;
+}
+
+export interface FormBlockRow {
+    label: string;
+    fields: string[];
+}
+
+export interface FormBlock {
+    id?: string;
+    title: string;
+    tag?: string;
+    fields: string[];
+    columns?: string[];
+    rows?: FormBlockRow[];
+}
+
+export interface RawFormItem {
+    fields: FormField[];
+    blocks?: FormBlock[];
 }

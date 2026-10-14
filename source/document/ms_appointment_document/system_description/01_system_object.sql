@@ -37,7 +37,7 @@
     'document.png',
     '{
       "columns": [
-        { "field": "status", "label": ""},
+        { "field": "status", "label": "", "type": "status"},
         { "field": "ddate", "label": "Дата"},
         { "field": "dnumber", "label": "Номер"},
         { "field": "note", "label": "Примечание"},
@@ -134,6 +134,7 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action": "onAcceptance",
         "processing":
@@ -141,6 +142,7 @@
             {
                 "Step": 1,
                 "method": "get",
+                "hide_in_preview": true,
                 "end_point": "appointment_document",
                 "filter":"id",
                 "conditions":
@@ -151,6 +153,7 @@
             {
                 "Step": 2,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "document",
                 "filter":"id",
                 "map":
@@ -184,6 +187,7 @@
             {
                 "Step": 4,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "appointment_document",
                 "filter": "id",
                 "fields": {
@@ -192,12 +196,14 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action":"onDelete",
     "processing":[
         {
             "step": 1,
             "method": "get",
+            "hide_in_preview": true,
             "end_point": "appointment_document",
             "filter": "id"
         },
@@ -210,6 +216,7 @@
         {
             "step": 4,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "document",
             "filter": "id",
             "fields": {
@@ -219,6 +226,7 @@
         {
             "step": 5,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "appointment_document",
             "filter": "id",
             "fields": {

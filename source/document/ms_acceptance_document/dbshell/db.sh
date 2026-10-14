@@ -29,7 +29,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     first_accusative     text,
     last_accusative      text,
     middle_accusative    text,
-    vk_id                bigint,
+    vk_id                text,
     id_transaction       text,
     UNIQUE (id, id_basis)
 	);

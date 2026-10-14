@@ -1,12 +1,18 @@
 import {api} from "@/shared/api/AxiosClient";
 import {useQuery} from "@tanstack/react-query";
-import type {PaginatedResponse} from "@/shared/api/fetchTableData/types";
+import type {DistinctResponse, PaginatedResponse} from "@/shared/api/fetchTableData/types";
 import {DirectoryItem, DocumentItem} from "@/shared/api/fetchTableData/types";
 
 interface GetDataParams {
     page?: number;
     limit?: number;
     expand?: string;
+    /**
+     * Плоские query-параметры списочных фильтров (sort/order/q/поле__суффикс/...).
+     * Пустая строка — значимое значение (пустой __in = "совпадений нет"),
+     * поэтому пробрасывается как есть; пропускается только undefined.
+     */
+    extra?: Record<string, string | undefined>;
 }
 
 export const tableApi = (tableName: string) => {
@@ -18,8 +24,17 @@ export const tableApi = (tableName: string) => {
             if (params?.page) queryParams.page = String(params.page);
             if (params?.limit) queryParams.limit = String(params.limit);
             if (params?.expand) queryParams.expand = params.expand;
+            if (params?.extra) {
+                for (const [k, v] of Object.entries(params.extra)) {
+                    if (v !== undefined) queryParams[k] = v;
+                }
+            }
 
             return await api.get<PaginatedResponse<DirectoryItem | DocumentItem>>(url, {params: queryParams});
+        },
+
+        getDistinct: async (column: string, extra?: Record<string, string>): Promise<DistinctResponse> => {
+            return await api.get<DistinctResponse>(url, {params: {distinct: column, ...extra}});
         },
 
         getById: async (id: number | string) => {
@@ -48,10 +63,10 @@ export const tableApi = (tableName: string) => {
     };
 };
 
-export const useTableData = (docName: string, page = 1, limit = 50, expand?: string) => {
+export const useTableData = (docName: string, page = 1, limit = 50, expand?: string, extra?: Record<string, string | undefined>) => {
     return useQuery({
-        queryKey: ["tableData", docName, page, limit, expand ?? ""],
-        queryFn: () => tableApi(docName).getData({page, limit, expand}),
+        queryKey: ["tableData", docName, page, limit, expand ?? "", extra ?? {}],
+        queryFn: () => tableApi(docName).getData({page, limit, expand, extra}),
         enabled: !!docName,
     });
 };
