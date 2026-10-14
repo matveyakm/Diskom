@@ -38,7 +38,7 @@
     '{
       "columns": [
         { "field": "id", "label": "", "hidden": true},
-        { "field": "status", "label": "", "hidden": false},
+        { "field": "status", "label": "", "type": "status", "hidden": false},
         { "field": "dnumber", "label": "Код", "hidden": false},
         { "field": "name", "label": "ФИО", "hidden": false},
         { "field": "description", "label": "Описание", "hidden": false}

@@ -37,8 +37,7 @@
     'document.png',
     '{
       "columns": [
-        { "field": "id", "label": "", "hidden": true },
-        { "field": "status", "label": "", "hidden": false },
+        { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
         { "field": "note", "label": "Примечание", "hidden": false },
@@ -49,27 +48,184 @@
     }',
     'Журнал документов приёмки сотрудника',
     'Документ приём сотрудника',
-    '{
+    ''{
+  "fields": [
+    {
+      "field": "id",
+      "label": "",
+      "hidden": true,
+      "required": false
+    },
+    {
+      "field": "ddate",
+      "label": "Дата",
+      "hidden": false,
+      "required": true,
+      "default": "now()"
+    },
+    {
+      "field": "dnumber",
+      "readonly": true,
+      "label": "Номер",
+      "hidden": false,
+      "required": true
+    },
+    {
+      "field": "note",
+      "label": "Примечание",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "last_name",
+      "label": "Фамилия",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "first_name",
+      "label": "Имя",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "middle_name",
+      "label": "Отчество",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "last_genitive",
+      "label": "Фамилия(Р)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "first_genitive",
+      "label": "Имя(Р)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "middle_genitive",
+      "label": "Отчество(Р)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "last_accusative",
+      "label": "Фамилия(В)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "first_accusative",
+      "label": "Имя(В)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "middle_accusative",
+      "label": "Отчество(В)",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "vk_id",
+      "label": "IdVk",
+      "hidden": false,
+      "required": false,
+      "default": ""
+    },
+    {
+      "field": "id_user",
+      "label": "",
+      "hidden": true,
+      "required": false,
+      "default": 1
+    },
+    {
+      "field": "id_basis",
+      "label": "",
+      "hidden": true,
+      "required": false,
+      "default": 0
+    },
+    {
+      "field": "prefix",
+      "label": "",
+      "hidden": true,
+      "required": false,
+      "default": 0
+    }
+  ],
+  "blocks": [
+    {
+      "id": "fio",
+      "title": "Персональные данные",
       "fields": [
-        { "field": "id", "label": "", "hidden": true, "required": false },
-        { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
-        { "field": "dnumber", "label": "Номер", "hidden": false, "required": true, "default": "id" },
-        { "field": "note", "label": "Примечание", "hidden": false, "required": false, "default": "" },
-        { "field": "last_name", "label": "Фамилия", "hidden": false, "required": false, "default": "" },
-        { "field": "first_name", "label": "Имя", "hidden": false, "required": false, "default": "" },
-        { "field": "middle_name", "label": "Отчество", "hidden": false, "required": false, "default": "" },
-        { "field": "last_genitive", "label": "Фамилия(Р)", "hidden": false, "required": false, "default": "" },
-        { "field": "first_genitive", "label": "Имя(Р)", "hidden": false, "required": false, "default": "" },
-        { "field": "middle_genitive", "label": "Отчество(Р)", "hidden": false, "required": false, "default": "" },
-        { "field": "last_accusative", "label": "Фамилия(В)", "hidden": false, "required": false, "default": "" },
-        { "field": "first_accusative", "label": "Имя(В)", "hidden": false, "required": false, "default": "" },
-        { "field": "middle_accusative", "label": "Отчество(В)", "hidden": false, "required": false, "default": "" },
-        { "field": "id_vk", "label": "IdVk", "hidden": false, "required": false, "default": 0 },
-        { "field": "id_user", "label": "", "hidden": true, "required": false, "default": 1 },
-        { "field": "id_basis", "label": "", "hidden": true, "required": false, "default": 0 },
-        { "field": "prefix", "label": "", "hidden": true, "required": false, "default": 0 }
+        "last_name",
+        "first_name",
+        "middle_name",
+        "last_genitive",
+        "first_genitive",
+        "middle_genitive",
+        "last_accusative",
+        "first_accusative",
+        "middle_accusative"
+      ],
+      "tag": "declension-table",
+      "columns": [
+        "Ф",
+        "И",
+        "О"
+      ],
+      "rows": [
+        {
+          "label": "Именительный",
+          "fields": [
+            "last_name",
+            "first_name",
+            "middle_name"
+          ]
+        },
+        {
+          "label": "Родительный",
+          "fields": [
+            "last_genitive",
+            "first_genitive",
+            "middle_genitive"
+          ]
+        },
+        {
+          "label": "Винительный",
+          "fields": [
+            "last_accusative",
+            "first_accusative",
+            "middle_accusative"
+          ]
+        }
       ]
-    }',
+    },
+    {
+      "id": "contacts",
+      "title": "Реквизиты",
+      "fields": [
+        "vk_id"
+      ]
+    }
+  ]
+}',
     '{
         "action": "onSaveNew",
         "processing":
@@ -142,6 +298,7 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action": "onAcceptance",
         "processing":
@@ -149,6 +306,7 @@
             {
                 "Step": 1,
                 "method": "get",
+                "hide_in_preview": true,
                 "end_point": "acceptance_document",
                 "filter":"id",
                 "conditions":
@@ -161,7 +319,7 @@
                     {"ddate":"ddate"},
                     {"dnumber":"dnumber"},
                     {"note":"note"},
-                    {"id_vk":"id_vk"},
+                    {"vk_id":"vk_id"},
                     {"prefix":"prefix"},
                     {"id_transaction":"id_transaction"}
                 ]
@@ -169,6 +327,7 @@
             {
                 "Step": 2,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "document",
                 "filter":"id",
                 "map":
@@ -219,7 +378,7 @@
                     {"first_accusative": "first_accusative"},
                     {"last_accusative":  "last_accusative"},
                     {"middle_accusative":"middle_accusative"},
-                    {"id_vk":            "id_vk"},
+                    {"vk_id":            "vk_id"},
                     {"prefix":           "prefix"},
                     {"id_transaction":   "id_transaction"}
                 ]
@@ -227,6 +386,7 @@
             {
                 "Step": 5,
                 "method": "put",
+                "hide_in_preview": true,
                 "end_point": "acceptance_document",
                 "filter": "id",
                 "fields": {
@@ -235,12 +395,14 @@
             }
         ]
     }',
+    -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
     '{
     "action":"onDelete",
     "processing":[
         {
             "step": 1,
             "method": "get",
+            "hide_in_preview": true,
             "end_point": "acceptance_document",
             "filter": "id"
         },
@@ -262,6 +424,7 @@
         {
             "step": 4,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "document",
             "filter": "id",
             "fields": {
@@ -271,6 +434,7 @@
         {
             "step": 5,
             "method": "put",
+            "hide_in_preview": true,
             "end_point": "acceptance_document",
             "filter": "id",
             "fields": {

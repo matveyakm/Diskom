@@ -164,6 +164,49 @@
   gap: 16px;
 }
 
+.blockSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.blockTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.blockTable th,
+.blockTable td {
+  border: 1px solid var(--border-subtle);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.blockTable thead th {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.blockTable tbody th {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .fieldWrapper {
   display: flex;
   flex-direction: column;
