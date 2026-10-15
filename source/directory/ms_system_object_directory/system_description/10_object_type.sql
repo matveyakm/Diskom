@@ -1,0 +1,30 @@
+  insert into ${DB_TABLENAME}
+  (
+    id,
+    name,
+    description
+  ) values (
+    1,
+    'Справочники',
+    1,
+    0,
+    '',
+    0,
+    TRUE,
+    0,
+    '#',
+    1,
+    'dictionary.png',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    ''
+  );
