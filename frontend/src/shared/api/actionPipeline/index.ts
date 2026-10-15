@@ -202,16 +202,16 @@ const executeStep = async (
 export const processAction = async (
     actionName: string,
     item: Record<string, unknown>,
-    pipelineConfigStr: string | null | undefined,
+    pipelineConfig: string | Record<string, unknown> | null | undefined,
     fields: FormField[],
     systemObjectId?: number | null,
 ): Promise<Record<string, unknown>> => {
     console.log(`[actionPipeline] ===== ${actionName} =====`);
     console.log(`[actionPipeline] item:`, JSON.stringify(item));
     console.log(`[actionPipeline] systemObjectId:`, systemObjectId);
-    console.log(`[actionPipeline] config:`, pipelineConfigStr);
+    console.log(`[actionPipeline] config:`, JSON.stringify(pipelineConfig));
 
-    const steps = parseActionConfig(pipelineConfigStr);
+    const steps = parseActionConfig(pipelineConfig);
     if (!steps?.length) {
         console.log(`[actionPipeline] No steps, skipping pipeline`);
         return item;

@@ -6,7 +6,10 @@ export interface TableColumnConfig {
     key: string;
     label: string;
     type: "text" | "status";
+    /** @deprecated legacy JSON blobs; prefer editor_ref */
     end_point?: string;
+    /** New shape: reference target (system_object link path). */
+    editor_ref?: string;
 }
 
 export interface TableRow {

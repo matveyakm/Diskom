@@ -1,3 +1,6 @@
+// WindowManager: facade (single responsibility: orchestrate one catalog
+// window — config, data, pipeline, view). Parsing lives in configParser,
+// step execution in PipelineEngine (transport injected), rendering in views.
 class WindowManager {
   constructor(options = {}) {
     this.jsonColumns = options.table_columns;
@@ -13,22 +16,15 @@ class WindowManager {
     this.systemObjectGroupId = Number(options.id_group) || null;
 
     this.processing = {
-      onSaveNew: this.parseActionConfig(options.on_save_new),
-      onSaveEdit: this.parseActionConfig(options.on_save_edit),
-      onAcceptance: this.parseActionConfig(options.on_acceptance),
-      onDelete: this.parseActionConfig(options.on_delete),
+      onSaveNew: parseActionConfig(options.on_save_new),
+      onSaveEdit: parseActionConfig(options.on_save_edit),
+      onAcceptance: parseActionConfig(options.on_acceptance),
+      onDelete: parseActionConfig(options.on_delete),
     };
-  }
-
-  parseActionConfig(raw) {
-    if (!raw || raw === "") return null;
-    try {
-      const config = typeof raw === "string" ? JSON.parse(raw) : raw;
-      return Array.isArray(config.processing) ? config.processing : null;
-    } catch (e) {
-      console.error("WindowManager: ошибка парсинга конфига:", e);
-      return null;
-    }
+    this.engine = new PipelineEngine(
+      (endPoint, keys) =>
+        new ApiService({ ref: "/api/" + endPoint, keys, useCache: false }),
+    );
   }
 
   // ─── Defaults ─────────────────────────────────────────────────────────────
@@ -70,15 +66,9 @@ class WindowManager {
   // ─── Подготовка данных ────────────────────────────────────────────────────
 
   prepareColumns() {
-    try {
-      this.columns = JSON.parse(this.jsonColumns).columns;
-      const rawFields = this.jsonItemFields;
-      this.itemFields = rawFields === "" ? [] : JSON.parse(rawFields).fields;
-    } catch (e) {
-      console.error("prepareColumns error:", e);
-      this.columns = [];
-      this.itemFields = [];
-    }
+    const parsed = parseColumnsConfig(this.jsonColumns, this.jsonItemFields);
+    this.columns = parsed.columns;
+    this.itemFields = parsed.itemFields;
   }
 
   async prepareData() {
@@ -87,151 +77,17 @@ class WindowManager {
     this.tableData = res.data;
   }
 
-  // ─── Движок обработки ─────────────────────────────────────────────────────
+  // ─── Движок обработки (делегировано PipelineEngine) ───────────────────────
 
-  async processAction(actionName, item) {
-    const steps = this.processing[actionName];
-    if (!steps?.length) {
-      console.warn(`WindowManager: нет конфига для "${actionName}"`);
-      return item;
-    }
-
-    // Применяем простые defaults (now(), литералы) до начала шагов
-    const context = {
-      ...this.applyDefaults(item),
-      id_system_object: this.systemObjectId,
+  processAction(actionName, item) {
+    const scoped = {
+      ...item,
+      id_system_object: item.id_system_object ?? this.systemObjectId ?? null,
     };
-
-    const sorted = [...steps].sort(
-      (a, b) => (a.Step ?? a.step ?? 0) - (b.Step ?? b.step ?? 0),
+    return this.engine.processAction(actionName, scoped, this.processing[actionName], (obj, ctx) =>
+      this.applyDefaults(obj, ctx),
     );
-
-    for (const step of sorted) {
-      const num = step.Step ?? step.step;
-      console.log(
-        `[${actionName}] Step ${num}: ${step.method?.toUpperCase()} /api/${step.end_point}`,
-      );
-      try {
-        await this.executeStep(step, context);
-
-        // После каждого шага повторно применяем defaults:
-        // это нужно для field-reference defaults (например, "default": "id")
-        // которые resolveются только ПОСЛЕ того как FK вернул id из ответа
-        const updated = this.applyDefaults(context, context);
-        Object.assign(context, updated);
-      } catch (err) {
-        console.error(`[${actionName}] Step ${num} failed:`, err);
-        throw err;
-      }
-    }
-
-    return context;
   }
-
-  async executeStep(step, context) {
-    const method = (step.method || "get").toLowerCase();
-
-    if (!this.checkConditions(step.conditions, context)) {
-      console.log(`Step skipped: conditions not met`);
-      return;
-    }
-
-    const keys = {};
-    if (step.filter && context[step.filter] !== undefined) {
-      keys[step.filter] = context[step.filter];
-    }
-
-    const api = new ApiService({
-      ref: "/api/" + step.end_point,
-      keys,
-      useCache: false,
-    });
-
-    let response;
-
-    if (method === "get") {
-      response = await api.getResponse();
-      const data = response?.data ?? response;
-      if (data) {
-        const record = Array.isArray(data) ? data[0] : data;
-        if (record) Object.assign(context, record);
-      }
-    } else if (method === "delete") {
-      const filterId = step.filter === "id" ? context.id : null;
-      response = await api.deleteResponse(filterId);
-    } else {
-      const body = this.buildBody(step, context);
-      if (method === "post") response = await api.postResponse(body);
-      if (method === "put") response = await api.putResponse(body);
-    }
-
-    const responseData = response?.data ?? response;
-    if (step.FK && Array.isArray(step.FK) && responseData) {
-      step.FK.forEach((fkMap) => {
-        const [ctxField, respField] = Object.entries(fkMap)[0];
-        if (responseData[respField] !== undefined) {
-          context[ctxField] = responseData[respField];
-          console.log(`FK: context.${ctxField} = ${responseData[respField]}`);
-        }
-      });
-    }
-  }
-
-  buildBody(step, context) {
-    const body = {};
-
-    if (Array.isArray(step.map)) {
-      step.map.forEach((mapping) => {
-        const [target, source] = Object.entries(mapping)[0];
-        body[target] = this.resolveValue(source, context);
-      });
-    } else if (step.map && typeof step.map === "object") {
-      Object.entries(step.map).forEach(([target, source]) => {
-        body[target] = this.resolveValue(source, context);
-      });
-    } else {
-      Object.assign(body, context);
-    }
-
-    if (Array.isArray(step.fields)) {
-      step.fields.forEach((f) => {
-        const [key, val] = Object.entries(f)[0];
-        body[key] = val;
-      });
-    } else if (step.fields && typeof step.fields === "object") {
-      Object.assign(body, step.fields);
-    }
-
-    return body;
-  }
-
-  resolveValue(source, context) {
-    if (typeof source === "string") {
-      return Object.prototype.hasOwnProperty.call(context, source)
-        ? (context[source] ?? null)
-        : source;
-    }
-    if (source && typeof source === "object" && source.CONCAT) {
-      return source.CONCAT.map((part) =>
-        typeof part === "string" &&
-        Object.prototype.hasOwnProperty.call(context, part)
-          ? (context[part] ?? "")
-          : String(part ?? ""),
-      ).join("");
-    }
-    return source;
-  }
-
-  checkConditions(conditions, context) {
-    if (!conditions?.length) return true;
-    return conditions.every((cond) => {
-      const [key, expected] = Object.entries(cond)[0];
-      // eslint-disable-next-line eqeqeq
-      return context[key] == expected;
-    });
-  }
-
-  // ─── Хэш ─────────────────────────────────────────────────────────────────
 
   hashCode(obj) {
     const str = typeof obj === "string" ? obj : JSON.stringify(obj);
@@ -266,7 +122,7 @@ class WindowManager {
     await this.refreshWindow();
   }
 
-  // ─── Жизненный цикл окна ─────────────────────────────────────────────────
+  // ─── Жизненный цикл окна ──────────────────────────────────────────────────
 
   async openWindow() {
     this.prepareColumns();

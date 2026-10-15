@@ -20,6 +20,8 @@ export interface ProcessingStep {
     map?: Record<string, unknown>[];
     fields?: Record<string, unknown>[];
     filter?: string;
+    /** New shape: ordered filter list (engine uses filter; first entry mirrors it). */
+    filters?: string[];
     FK?: Record<string, string>[];
     conditions?: Record<string, unknown>[];
 }

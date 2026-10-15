@@ -2,7 +2,7 @@ import {useMemo, useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import styles from "./FilterEditor.module.scss";
 import {TableColumnConfig} from "@/shared/DataTable/types";
-import {FormField} from "@/entities/document/types";
+import {FormField, resolveRefEndpoint} from "@/entities/document/types";
 import {isDateField} from "@/shared/DataTable/dateUtils";
 import {STATUS_OPTIONS} from "@/shared/DataTable/ui/statusMeta";
 import {tableApi} from "@/shared/api/fetchTableData";
@@ -29,7 +29,7 @@ const EQ_OPS: FilterOp[] = ["eq", "ne"];
 /** Вид контрола выводится из данных: колонка грида (если поле в нём есть) + поле формы. */
 const kindOfField = (column: TableColumnConfig | undefined, formField?: FormField): ColumnKind => {
     if (column?.type === "status") return "status";
-    if (column?.end_point ?? formField?.end_point) return "ref";
+    if (resolveRefEndpoint(column) ?? resolveRefEndpoint(formField)) return "ref";
     if (formField && isDateField(formField)) return "date";
     return "text";
 };
@@ -68,7 +68,7 @@ export const FilterEditor = ({
     // Значения галочек: статусы фиксированы, остальное — ?distinct=,
     // суженный фильтрами соседних закладок (свой столбец бэкенд вычитает сам).
     // Имена ссылок — из общего кеша ["reference", end_point].
-    const endPoint = column?.end_point ?? formField?.end_point;
+    const endPoint = resolveRefEndpoint(column) ?? resolveRefEndpoint(formField);
     const {data: distinct, isLoading: distinctLoading} = useQuery({
         queryKey: ["distinct", docName, fieldKey, siblingParams],
         queryFn: () => tableApi(docName ?? "").getDistinct(fieldKey, siblingParams) as Promise<DistinctResponse>,

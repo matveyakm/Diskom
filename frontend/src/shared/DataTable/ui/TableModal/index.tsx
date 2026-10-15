@@ -31,7 +31,7 @@ type DialogState =
 // Имена сущностей — из кеша menuData (table_title → name → сырой end_point,
 // fail-open, новых запросов нет). Пустой конфиг → пустой список, вызывающий
 // показывает плоский текст как раньше.
-const usePipelinePreview = (rawConfig: string | null | undefined) => {
+const usePipelinePreview = (rawConfig: string | Record<string, unknown> | null | undefined) => {
     const queryClient = useQueryClient();
     return useMemo(() => {
         const steps = parseActionConfig(rawConfig);

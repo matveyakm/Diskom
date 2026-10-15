@@ -1,10 +1,10 @@
 import {FormBlock, FormBlockRow, FormField, RawColumnItem, RawFormItem} from "@/entities/document/types";
 import {TableColumnConfig} from "@/shared/DataTable/types";
 
-export const parseTableColumns = (rawColumnsStr: string | undefined) => {
-    if (!rawColumnsStr) return [];
+export const parseTableColumns = (rawColumns: string | { columns: RawColumnItem[] } | undefined) => {
+    if (!rawColumns) return [];
     try {
-        const rawJson = JSON.parse(rawColumnsStr) as { columns: RawColumnItem[] };
+        const rawJson = (typeof rawColumns === "string" ? JSON.parse(rawColumns) : rawColumns) as { columns: RawColumnItem[] };
 
         if (rawJson && Array.isArray(rawJson.columns)) {
             return rawJson.columns
@@ -14,6 +14,7 @@ export const parseTableColumns = (rawColumnsStr: string | undefined) => {
                     label: c.label,
                     type: c.type === "status" ? "status" : "text",
                     end_point: c.end_point,
+                    editor_ref: (c as RawColumnItem & { editor_ref?: string }).editor_ref,
                 })) as TableColumnConfig[];
         }
         return [];
@@ -23,10 +24,10 @@ export const parseTableColumns = (rawColumnsStr: string | undefined) => {
     }
 };
 
-export const parseFormFields = (rawFieldsStr: string | undefined): FormField[] => {
-    if (!rawFieldsStr) return [];
+export const parseFormFields = (rawFields: string | { fields: FormField[] } | undefined): FormField[] => {
+    if (!rawFields) return [];
     try {
-        const rawJson = JSON.parse(rawFieldsStr) as { fields: FormField[] };
+        const rawJson = (typeof rawFields === "string" ? JSON.parse(rawFields) : rawFields) as { fields: FormField[] };
 
         if (rawJson && Array.isArray(rawJson.fields)) {
             return rawJson.fields;
@@ -40,11 +41,11 @@ export const parseFormFields = (rawFieldsStr: string | undefined): FormField[] =
 
 // Блоки формы (опциональный слой поверх плоских fields).
 // Битые блоки отбрасываются по одному, форма при этом живёт.
-export const parseFormBlocks = (rawFieldsStr: string | undefined): FormBlock[] => {
-    if (!rawFieldsStr) return [];
+export const parseFormBlocks = (rawFields: string | RawFormItem | undefined): FormBlock[] => {
+    if (!rawFields) return [];
     let rawJson: RawFormItem;
     try {
-        rawJson = JSON.parse(rawFieldsStr) as RawFormItem;
+        rawJson = (typeof rawFields === "string" ? JSON.parse(rawFields) : rawFields) as RawFormItem;
     } catch (e) {
         console.error("Критическая ошибка при JSON.parse(item_fields.blocks):", e);
         return [];

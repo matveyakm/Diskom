@@ -183,6 +183,50 @@ html {
     font-weight: 400;
 }
 
+/* Кнопки открытых окон */
+.taskbar-windows {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 12px;
+    overflow-x: auto;
+}
+
+.taskbar-window-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 200px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.taskbar-window-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.taskbar-window-btn.minimized {
+    opacity: 0.55;
+    border-bottom-color: transparent;
+}
+
+.taskbar-window-icon {
+    font-size: 14px;
+}
+
+.taskbar-window-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .menu-list .menu-list {
     position: absolute;
     left: 100%;

@@ -1,4 +1,4 @@
-import { FormField } from "@/entities/document/types";
+import { FormField, isReferenceField } from "@/entities/document/types";
 import { TableRow } from "@/shared/DataTable/types";
 import { isDateField } from "./utils";
 
@@ -39,7 +39,7 @@ export const collectFormData = (
             continue;
         }
         typedFields[field.field] =
-            field.type === "select" && field.end_point
+            isReferenceField(field)
                 ? coerceSelectValue(String(value))
                 : String(value);
     }

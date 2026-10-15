@@ -1,0 +1,4 @@
+SKIPPED 10_object_type.sql: content duplicates 01_group_directories.sql
+('Справочники' group row) and declares 3 columns for 23 values, so it cannot
+run against either the old or the new schema. No relational output generated.
+If a real object_type seed is needed, add it to db.sh.base seeds instead.

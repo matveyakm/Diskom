@@ -1,4 +1,5 @@
 import {useReferenceOptions, ReferenceOption} from "@/shared/api/useReferenceOptions";
+import {isReferenceField, resolveRefEndpoint} from "@/entities/document/types";
 import {FieldRowProps} from "./types";
 import styles from "./TableModal.module.scss";
 import {useEffect, useState, useRef, useCallback, useMemo} from "react";
@@ -15,7 +16,7 @@ export const FieldRow = ({field, value, isEditing, error, bare}: FieldRowProps) 
         return <ReadonlyField field={field} value={value} isEditing={isEditing} error={error} bare={bare}/>;
     }
 
-    if (field.type === "select" && field.end_point) {
+    if (isReferenceField(field)) {
         return <SelectField field={field} value={value} isEditing={isEditing} error={error} bare={bare}/>;
     }
 
@@ -114,7 +115,7 @@ const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
 
     const isRequired = field.required ?? false;
 
-    const {data: allOptions, isLoading, error: queryError} = useReferenceOptions(field.end_point);
+    const {data: allOptions, isLoading, error: queryError} = useReferenceOptions(resolveRefEndpoint(field));
 
     const typedOptions = useMemo<ReferenceOption[]>(() => allOptions ?? [], [allOptions]);
 
