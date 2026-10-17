@@ -26,18 +26,18 @@ tab0 AS (
   INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции по реквизитам сотрудников',NULL,(SELECT id FROM frm_list),0,TRUE RETURNING id),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_genitive'),'Имя (род. падеж)',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_genitive'),'Фамилия (род. падеж)',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_genitive'),'Отчество (род. падеж)',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_accusative'),'Имя (вин. падеж)',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия (вин. падеж)',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество (вин. падеж)',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='vk_id'),'ID VK',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'ID сотрудника',TRUE,FALSE,NULL,NULL,'' RETURNING id),
+  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_genitive'),'Имя (род. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_genitive'),'Фамилия (род. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_genitive'),'Отчество (род. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_accusative'),'Имя (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='vk_id'),'ID VK',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'ID сотрудника',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
   -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
 SELECT (SELECT id FROM so) AS system_object_id;

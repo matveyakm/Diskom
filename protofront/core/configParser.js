@@ -23,5 +23,6 @@ function parseColumnsConfig(jsonColumns, jsonItemFields) {
   return {
     columns: parseBlob(jsonColumns)?.columns ?? [],
     itemFields: parseBlob(jsonItemFields)?.fields ?? [],
+    itemBlocks: parseBlob(jsonItemFields)?.blocks ?? [],
   };
 }

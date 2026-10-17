@@ -43,11 +43,12 @@ class MenuManager {
 
   renderLevel(items, parentUl, parentId = 0, parentLevel = -1) {
     const nextLevel = parentLevel + 1;
-    const children = items.filter(
-      (item) =>
-        item.level === nextLevel &&
-        (item.id_group === parentId || item.id_group === 0),
-    );
+    const children = items.filter((item) => {
+      if (item.level !== nextLevel) return false;
+      // New shape: roots carry id_group NULL (old: 0). Normalize once.
+      const groupId = item.id_group ?? 0;
+      return groupId === parentId;
+    });
     children.forEach((child) => {
       const li = this.createMenuItem(child, items, child.id, nextLevel);
       parentUl.appendChild(li);

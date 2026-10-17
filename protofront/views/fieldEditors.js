@@ -3,10 +3,10 @@
 class FieldEditorFactory {
   constructor() {
     this.builders = new Map();
-    this.register("textarea", (col) => this.buildTextarea(col));
-    this.register("reference", (col) => this.buildReference(col));
-    this.register("date", (col) => this.buildDate(col));
-    this.register("default", (col) => this.buildInput(col));
+    this.register("textarea", (col, group) => this.buildTextarea(col, group));
+    this.register("reference", (col, group) => this.buildReference(col, group));
+    this.register("date", (col, group) => this.buildDate(col, group));
+    this.register("default", (col, group) => this.buildInput(col, group));
   }
 
   register(kind, builder) {

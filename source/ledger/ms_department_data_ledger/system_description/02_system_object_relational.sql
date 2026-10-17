@@ -17,9 +17,9 @@ tab0 AS (
   INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции по реквизитам отдела',NULL,(SELECT id FROM frm_list),0,TRUE RETURNING id),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'Наименование',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,NULL,NULL,'' RETURNING id),
+  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'Наименование',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
   -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
 SELECT (SELECT id FROM so) AS system_object_id;

@@ -13,6 +13,7 @@ class HttpClient {
       const response = await fetch(url, {
         method,
         signal: controller.signal,
+        cache: "no-store",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",

@@ -8,6 +8,7 @@ class WindowManager {
     this.ref = options.ref;
     this.columns = null;
     this.itemFields = null;
+    this.itemBlocks = null;
     this.tableData = null;
     this.itemTitle = options.item_title;
     this.jsonItemFields = options.item_fields;
@@ -69,6 +70,7 @@ class WindowManager {
     const parsed = parseColumnsConfig(this.jsonColumns, this.jsonItemFields);
     this.columns = parsed.columns;
     this.itemFields = parsed.itemFields;
+    this.itemBlocks = parsed.itemBlocks;
   }
 
   async prepareData() {
@@ -136,6 +138,7 @@ class WindowManager {
       columns: this.columns,
       itemTitle: this.itemTitle,
       itemFields: this.itemFields,
+      itemBlocks: this.itemBlocks,
       systemObjectId: this.systemObjectId,
       systemObjectGroupId: this.systemObjectGroupId,
       onSave: async (item) => {

@@ -201,6 +201,40 @@ const windowStyles = `
     padding: 20px;
   }
 
+  .item-form-tab-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .item-form-tabs {
+    display: flex;
+    gap: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    padding-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .item-form-tab {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px 6px 0 0;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .item-form-tab.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  .item-form-pane.hidden {
+    display: none;
+  }
+
   .form-group {
     margin-bottom: 16px;
   }

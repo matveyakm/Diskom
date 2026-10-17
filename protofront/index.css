@@ -248,14 +248,15 @@ html {
 .menu-item.open > .menu-list {
     display: block;
     animation: fadeInRight 0.2s ease;
-    @keyframes fadeInRight {
-        from {
-            opacity: 0;
-            transform: translateX(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
+}
+
+@keyframes fadeInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
     }
 }

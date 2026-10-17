@@ -17,6 +17,7 @@ class DesktopWindow {
     this.currentFormData = {};
     this.itemTitle = options.itemTitle || "Элемент справочника";
     this.itemFields = options.itemFields || options.columns || [];
+    this.itemBlocks = options.itemBlocks || [];
     this.systemObjectId = options.systemObjectId || null;
     this.systemObjectGroupId = options.systemObjectGroupId || null;
     this.frame = new WindowFrame({ title: this.title });
@@ -83,8 +84,10 @@ class DesktopWindow {
   }
 
   initItemWindow() {
+    const self = this;
     this.itemWindow = new ItemForm({
       fields: this.itemFields,
+      blocks: this.itemBlocks,
       itemTitle: this.itemTitle,
       onSave: async (newItem) => {
         this.data.push(newItem);
@@ -117,7 +120,14 @@ class DesktopWindow {
         }
         this.refreshData();
       },
-      parentWindow: this,
+      parentWindow: {
+        // Adapter: ItemForm needs a mount point + z-order bump.
+        // `element` is live-read so the modal follows re-renders.
+        get element() {
+          return self.element;
+        },
+        bringToFront: () => self.frame.bringToFront(),
+      },
       systemObjectGroupId: this.systemObjectGroupId,
     });
   }

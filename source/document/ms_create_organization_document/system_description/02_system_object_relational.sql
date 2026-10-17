@@ -26,20 +26,20 @@ tab1 AS (
   INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов создание организации/структуры',NULL,(SELECT id FROM frm_list),1,TRUE RETURNING id),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL,NULL,'now()'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'Название',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_user'),'',FALSE,FALSE,NULL,NULL,'1'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_basis'),'',FALSE,FALSE,NULL,NULL,'0'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='prefix'),'',FALSE,FALSE,NULL,NULL,'0'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL,NULL,'now()'
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'Название',TRUE,FALSE,NULL,NULL,'' RETURNING id),
+  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'Название',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_user'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'1'
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_basis'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0'
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='prefix'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0'
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'Название',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
   -- wf onSaveNew step 1: post document filter=None hidden=FALSE
   --   TODO map: target={"ddate": "ddate"} -> map_set(+item target_field, send_value)
   --   TODO map: target={"dnumber": "dnumber"} -> map_set(+item target_field, send_value)

@@ -12,7 +12,27 @@ class ItemForm {
     this.editingId = null;
     this.editingItem = null;
     this.itemTitle = options.itemTitle || "Элемент справочника";
+    this.blocks = options.blocks || []; // [{id,tag,title,fields:[name]}]
     this.selectInstances = {}; // Хранилище для select компонентов
+  }
+
+  // Group fields into tab definitions: blocks when present, otherwise one
+  // implicit tab containing all non-hidden fields (legacy flat behaviour).
+  buildTabDefinitions() {
+    if (this.blocks.length) {
+      return this.blocks.map((b) => ({
+        id: `tab-${b.id}`,
+        title: b.title,
+        fields: this.fields.filter((f) => b.fields.includes(f.field)),
+      }));
+    }
+    return [
+      {
+        id: "tab-all",
+        title: this.itemTitle,
+        fields: this.fields.filter((f) => f.field !== "id" && !f.hidden),
+      },
+    ];
   }
 
   // Create form modal
@@ -35,17 +55,62 @@ class ItemForm {
     form.id = "data-form";
 
     // Create form fields via the editor factory (new kinds register
-    // there instead of extending this if/else chain).
+    // there instead of extending this if/else chain), grouped by tabs.
     const factory = new FieldEditorFactory();
-    this.fields.forEach((col) => {
-      if (col.field !== "id" && !col.hidden) {
-        const { group, refConfig } = factory.build(col);
-        if (refConfig) {
-          this.selectInstances[col.field] = refConfig;
-        }
-        modalBody.appendChild(group);
-      }
-    });
+    const tabs = this.buildTabDefinitions();
+    const active = tabs.findIndex((t) => t.fields.length > 0);
+
+    if (this.blocks.length > 1) {
+      const tabBar = document.createElement("div");
+      tabBar.className = "item-form-tabs";
+      const panes = document.createElement("div");
+      tabs.forEach((tab, index) => {
+        if (!tab.fields.length) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "item-form-tab" + (index === active ? " active" : "");
+        btn.textContent = tab.title;
+        btn.dataset.tabId = tab.id;
+        tabBar.appendChild(btn);
+
+        const pane = document.createElement("div");
+        pane.className = "item-form-pane" + (index === active ? "" : " hidden");
+        pane.dataset.paneId = tab.id;
+        tab.fields.forEach((col) => {
+          const { group, refConfig } = factory.build(col);
+          if (refConfig) {
+            this.selectInstances[col.field] = refConfig;
+          }
+          pane.appendChild(group);
+        });
+        panes.appendChild(pane);
+      });
+      tabBar.addEventListener("click", (e) => {
+        const btn = e.target.closest(".item-form-tab");
+        if (!btn) return;
+        tabBar
+          .querySelectorAll(".item-form-tab")
+          .forEach((b) => b.classList.toggle("active", b === btn));
+        panes
+          .querySelectorAll(".item-form-pane")
+          .forEach((p) => p.classList.toggle("hidden", p.dataset.paneId !== btn.dataset.tabId));
+      });
+      const body = document.createElement("div");
+      body.className = "item-form-tab-container";
+      body.appendChild(tabBar);
+      body.appendChild(panes);
+      modalBody.appendChild(body);
+    } else {
+      tabs.forEach((tab) => {
+        tab.fields.forEach((col) => {
+          const { group, refConfig } = factory.build(col);
+          if (refConfig) {
+            this.selectInstances[col.field] = refConfig;
+          }
+          modalBody.appendChild(group);
+        });
+      });
+    }
 
     const modalFooter = document.createElement("div");
     modalFooter.className = "window-modal-footer";

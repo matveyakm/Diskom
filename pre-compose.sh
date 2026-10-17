@@ -1,7 +1,10 @@
 #!/bin/bash
 clear
-sudo docker compose stop
-sudo docker compose down --volumes --rmi local
+# Runtime: podman (rootless). The docker 20.10 daemon on this host cannot run
+# BuildKit (h2c 404), while podman/buildah handles RUN --mount=type=cache
+# natively — no builder bootstrapping needed. No sudo required.
+podman-compose stop
+podman-compose down --volumes
 
 # 1. Список модулей (путь и имя модуля через двоеточие)
 # Можно легко добавлять новые или комментировать ненужные
@@ -30,7 +33,6 @@ MODULES=(
     "source/ledger/ms_job_title_data_ledger:ms_job_title_data_ledger"
     "source/ledger/ms_organization_data_ledger:ms_organization_data_ledger"
     "source/report/ms_job_report:ms_job_report"
-    ""
 )
 
 cd ./source/shared/
@@ -41,6 +43,8 @@ cd - > /dev/null # Возвращаемся обратно в корень
 
 # 2. Цикл обработки
 for ENTRY in "${MODULES[@]}"; do
+    # Пропускаем пустые записи, чтобы не чистить/инитить корень репо
+    [ -z "$ENTRY" ] && continue
 
     # Разделяем путь и название
     DIR="${ENTRY%%:*}"
@@ -67,5 +71,5 @@ bash source/directory/ms_system_object_directory/build-db.sh
 echo "--- Собираю docker-compose.yaml ---"
 bash ./build-compose.sh
 
-# 5. Запуск Docker
-sudo docker compose up -d
+# 5. Запуск под podman
+podman-compose up -d --build

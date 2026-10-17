@@ -25,18 +25,18 @@ tab1 AS (
   INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Справочник студентов',NULL,(SELECT id FROM frm_list),1,TRUE RETURNING id),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Код',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'ФИО',TRUE,TRUE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='description'),'Описание',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,TRUE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,TRUE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Код',TRUE,FALSE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'ФИО',TRUE,TRUE,NULL,NULL,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='description'),'Описание',TRUE,FALSE,NULL,NULL,'' RETURNING id),
+  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Код',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'ФИО',TRUE,TRUE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='description'),'Описание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,TRUE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,TRUE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Код',TRUE,FALSE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'ФИО',TRUE,TRUE,NULL::bigint,NULL::bigint,''
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='description'),'Описание',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
   -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
 SELECT (SELECT id FROM so) AS system_object_id;

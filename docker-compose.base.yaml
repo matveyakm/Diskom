@@ -15,7 +15,9 @@ services:
       - "8443:443"
 
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Podman (rootless): Traefik reads containers via the podman API socket.
+      # Requires: systemctl --user enable podman.socket + loginctl enable-linger.
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock:ro
       - ./certs:/certs:ro
       - ./dynamic:/dynamic:ro
 
@@ -95,48 +97,48 @@ services:
       vnet:
         ipv4_address: 172.25.0.7 # Assign a static IP within your subnet
 
-  # frontend-js:
-  #   build:
-  #     context: ./protofront
-  #     dockerfile: Dockerfile
-  #   container_name: frontend-js
-  #   restart: unless-stopped
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.docker.network=disciplinary-committee_vnet"
-  #     - "traefik.http.routers.frontend-js.rule=Host(`discom.spbgu.90.188.89.63.nip.io`) || Host('discom.spbgu.localhost`)"
-  #     - "traefik.http.routers.frontend-js.entrypoints=websecure"
-  #     - "traefik.http.services.frontend-js.loadbalancer.server.port=80"
-  #     - "traefik.http.routers.frontend-js.priority=1000"
-  #   networks:
-  #     vnet:
-  #       ipv4_address: 172.25.0.8 # Assign a static IP within your subnet
-
-  frontend-app:
-    image: node:20-alpine
-    container_name: frontend-app
-    working_dir: /app
-    stdin_open: true
-    tty: true
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
-    command: >
-      sh -c "
-        if [ ! -d node_modules ] || [ ! -f node_modules/.npm-ready ];
-        then npm install && touch node_modules/.npm-ready;
-        fi;
-        npm run dev -- --host 0.0.0.0
-      "
+  frontend-js:
+    build:
+      context: ./protofront
+      dockerfile: Dockerfile
+    container_name: frontend-js
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend-app.rule=Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)"
-      - "traefik.http.routers.frontend-app.entrypoints=websecure"
-      - "traefik.http.routers.frontend-app.tls=true"
-      - "traefik.http.services.frontend-app.loadbalancer.server.port=5173"
+      - "traefik.docker.network=disciplinary-committee_vnet"
+      - "traefik.http.routers.frontend-js.rule=Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)"
+      - "traefik.http.routers.frontend-js.entrypoints=websecure"
+      - "traefik.http.routers.frontend-js.tls=true"
+      - "traefik.http.services.frontend-js.loadbalancer.server.port=80"
     networks:
       vnet:
-        ipv4_address: 172.25.0.9
+        ipv4_address: 172.25.0.8 # Assign a static IP within your subnet
+
+  # frontend-app:
+  #   image: node:20-alpine
+  #   container_name: frontend-app
+  #   working_dir: /app
+  #   stdin_open: true
+  #   tty: true
+  #   volumes:
+  #     - ./frontend:/app
+  #     - frontend_node_modules:/app/node_modules
+  #   command: >
+  #     sh -c "
+  #       if [ ! -d node_modules ] || [ ! -f node_modules/.npm-ready ];
+  #       then npm install && touch node_modules/.npm-ready;
+  #       fi;
+  #       npm run dev -- --host 0.0.0.0
+  #     "
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.frontend-app.rule=Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)"
+  #     - "traefik.http.routers.frontend-app.entrypoints=websecure"
+  #     - "traefik.http.routers.frontend-app.tls=true"
+  #     - "traefik.http.services.frontend-app.loadbalancer.server.port=5173"
+  #   networks:
+  #     vnet:
+  #       ipv4_address: 172.25.0.9
 
   # ---  Microservices ---
 
