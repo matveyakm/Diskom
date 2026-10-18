@@ -7,6 +7,9 @@ WITH so AS (
   SELECT 'Отчет по приёму сотрудников','Отчет по приёму сотрудников',(SELECT id FROM object_type WHERE name='Document'),(SELECT id FROM object_status WHERE name='Saved'),1,FALSE,(SELECT id FROM system_object WHERE name='Отчеты'),(SELECT id FROM object_link WHERE path='job_report'),3,(SELECT id FROM object_icon WHERE path='report.png'),'ЭТР-',0 RETURNING id),
 fld AS (SELECT NULL::bigint AS id, NULL::text AS name WHERE FALSE),
 frm_list AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Отчет по приёму сотрудников',(SELECT id FROM form_type WHERE name='List_Documents') RETURNING id)
-  -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
+  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Отчет по приёму сотрудников',(SELECT id FROM form_type WHERE name='List_Documents') RETURNING id),
+priv AS (
+  INSERT INTO privilege(system_object, privilege_type, output_order)
+  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  WHERE pt.name IN ('open_list','open_item') RETURNING id)
 SELECT (SELECT id FROM so) AS system_object_id;

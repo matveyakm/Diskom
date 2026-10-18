@@ -46,16 +46,33 @@ ft AS (
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'' RETURNING id)
-  -- wf onSaveNew step 1: post document filter=None hidden=FALSE
-  --   TODO map: target={"ddate": "ddate"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"dnumber": "dnumber"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"note": "note"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"status": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_user": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"prefix": 0} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_transaction": "id_transaction"} -> map_set(+item target_field, send_value)
-  --   TODO FK outputs: {"id": "id"} (runtime ids)
-  -- wf onSaveNew step 2: post dismissal_document filter=None hidden=FALSE
-  -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'' RETURNING id),
+m_sn1 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
+m_sn1_i AS (
+  INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
+  SELECT (SELECT id FROM m_sn1), v.t, v.s, v.o FROM (VALUES
+    ('ddate','ddate',0),
+    ('dnumber','dnumber',1),
+    ('note','note',2),
+    ('status','1',3),
+    ('id_user','1',4),
+    ('prefix','0',5),
+    ('id_transaction','id_transaction',6)) AS v(t,s,o)
+  RETURNING map_set),
+fk_sn1 AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
+fk_sn1_i AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT (SELECT id FROM fk_sn1), v.c, v.r, v.o FROM (VALUES
+    ('id','id',0)) AS v(c,r,o)
+  RETURNING fk_set),
+wp_sn1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveNew step 1', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveNew'), (SELECT id FROM method_type WHERE name='post'),
+    1, 'document', NULL, FALSE, '[]', (SELECT id FROM m_sn1), (SELECT id FROM fk_sn1), '[]' RETURNING id),
+wp_sn2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveNew step 2', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveNew'), (SELECT id FROM method_type WHERE name='post'),
+    2, 'dismissal_document', NULL, FALSE, '[]', NULL, NULL, '[{"status": 1}]' RETURNING id),
+priv AS (
+  INSERT INTO privilege(system_object, privilege_type, output_order)
+  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  WHERE pt.name IN ('open_list','open_item') RETURNING id)
 SELECT (SELECT id FROM so) AS system_object_id;

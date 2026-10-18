@@ -38,6 +38,9 @@ ft AS (
   UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='vk_id'),'ID VK',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'ID сотрудника',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
-  -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'ID сотрудника',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id),
+priv AS (
+  INSERT INTO privilege(system_object, privilege_type, output_order)
+  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  WHERE pt.name IN ('open_list','open_item') RETURNING id)
 SELECT (SELECT id FROM so) AS system_object_id;

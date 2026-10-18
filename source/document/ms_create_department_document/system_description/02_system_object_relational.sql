@@ -39,78 +39,152 @@ ft AS (
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'Название',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
-  -- wf onSaveNew step 1: post document filter=None hidden=FALSE
-  --   TODO map: target={"ddate": "ddate"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"dnumber": "dnumber"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"note": "note"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"status": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_user": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"prefix": 0} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_transaction": "id_transaction"} -> map_set(+item target_field, send_value)
-  --   TODO FK outputs: {"id": "id"} (runtime ids)
-  -- wf onSaveNew step 2: post create_department_document filter=None hidden=FALSE
-  -- wf onSaveEdit step 1: put document filter=id hidden=FALSE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  --   TODO map: target={"ddate": "ddate"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"dnumber": "dnumber"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"name": "name"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"note": "note"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"status": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_user": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"prefix": 0} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_transaction": "id_transaction"} -> map_set(+item target_field, send_value)
-  --   TODO FK outputs: {"id": "id"} (runtime ids)
-  --   TODO condition: {"status": 1}
-  -- wf onSaveEdit step 2: put create_department_document filter=None hidden=FALSE
-  -- wf onAcceptance step 1: get create_department_document filter=id hidden=TRUE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  --   TODO FK outputs: {"id": "id"} (runtime ids)
-  --   TODO FK outputs: {"ddate": "ddate"} (runtime ids)
-  --   TODO FK outputs: {"dnumber": "dnumber"} (runtime ids)
-  --   TODO FK outputs: {"name": "name"} (runtime ids)
-  --   TODO FK outputs: {"note": "note"} (runtime ids)
-  --   TODO FK outputs: {"prefix": "prefix"} (runtime ids)
-  --   TODO FK outputs: {"id_transaction": "id_transaction"} (runtime ids)
-  --   TODO condition: {"status": 1}
-  -- wf onAcceptance step 2: put document filter=id hidden=TRUE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  --   TODO map: target={"ddate": "ddate"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"dnumber": "dnumber"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"note": "note"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"status": 2} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_user": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"prefix": "prefix"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_transaction": "id_transaction"} -> map_set(+item target_field, send_value)
-  -- wf onAcceptance step 3: post department_directory filter=None hidden=FALSE
-  --   TODO map: target={"description": "note"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"prefix": "prefix"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"status": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_basis": "id"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"name": "name"} -> map_set(+item target_field, send_value)
-  --   TODO FK outputs: {"id_department": "id"} (runtime ids)
-  -- wf onAcceptance step 4: post department_data_ledger filter=None hidden=FALSE
-  --   TODO map: target={"balance": 1} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_document": "id"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"ddate": "ddate"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_department": "id_department"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_organization": "id_organization"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_employee": "id_employee"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"job_title": "job_title"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"name": "name"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"prefix": "prefix"} -> map_set(+item target_field, send_value)
-  --   TODO map: target={"id_transaction": "id_transaction"} -> map_set(+item target_field, send_value)
-  -- wf onAcceptance step 5: put create_department_document filter=id hidden=TRUE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  -- wf onDelete step 1: get create_department_document filter=id hidden=TRUE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  -- wf onDelete step 2: delete department_data_ledger filter=id_document hidden=FALSE
-  --   TODO filter_set: create set + item(filter_type 'id_document') and reference from workflow_process
-  -- wf onDelete step 3: put department_directory filter=id_department hidden=FALSE
-  --   TODO filter_set: create set + item(filter_type 'id_department') and reference from workflow_process
-  -- wf onDelete step 4: put document filter=id hidden=TRUE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  -- wf onDelete step 5: put create_department_document filter=id hidden=TRUE
-  --   TODO filter_set: create set + item(filter_type 'id') and reference from workflow_process
-  -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'Название',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id),
+flt_id AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
+flt_id_i AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
+  SELECT (SELECT id FROM flt_id), (SELECT id FROM filter_type WHERE name='id'), 0 RETURNING filter_set),
+flt_id_document AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
+flt_id_document_i AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
+  SELECT (SELECT id FROM flt_id_document), (SELECT id FROM filter_type WHERE name='id_document'), 0 RETURNING filter_set),
+flt_id_department AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
+flt_id_department_i AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
+  SELECT (SELECT id FROM flt_id_department), (SELECT id FROM filter_type WHERE name='id_department'), 0 RETURNING filter_set),
+m_sn1 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
+m_sn1_i AS (
+  INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
+  SELECT (SELECT id FROM m_sn1), v.t, v.s, v.o FROM (VALUES
+    ('ddate','ddate',0),
+    ('dnumber','dnumber',1),
+    ('note','note',2),
+    ('status','1',3),
+    ('id_user','1',4),
+    ('prefix','0',5),
+    ('id_transaction','id_transaction',6)) AS v(t,s,o)
+  RETURNING map_set),
+fk_sn1 AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
+fk_sn1_i AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT (SELECT id FROM fk_sn1), v.c, v.r, v.o FROM (VALUES
+    ('id','id',0)) AS v(c,r,o)
+  RETURNING fk_set),
+wp_sn1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveNew step 1', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveNew'), (SELECT id FROM method_type WHERE name='post'),
+    1, 'document', NULL, FALSE, '[]', (SELECT id FROM m_sn1), (SELECT id FROM fk_sn1), '[]' RETURNING id),
+wp_sn2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveNew step 2', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveNew'), (SELECT id FROM method_type WHERE name='post'),
+    2, 'create_department_document', NULL, FALSE, '[]', NULL, NULL, '[{"status": 1}]' RETURNING id),
+m_se1 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
+m_se1_i AS (
+  INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
+  SELECT (SELECT id FROM m_se1), v.t, v.s, v.o FROM (VALUES
+    ('ddate','ddate',0),
+    ('dnumber','dnumber',1),
+    ('name','name',2),
+    ('note','note',3),
+    ('status','1',4),
+    ('id_user','1',5),
+    ('prefix','0',6),
+    ('id_transaction','id_transaction',7)) AS v(t,s,o)
+  RETURNING map_set),
+fk_se1 AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
+fk_se1_i AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT (SELECT id FROM fk_se1), v.c, v.r, v.o FROM (VALUES
+    ('id','id',0)) AS v(c,r,o)
+  RETURNING fk_set),
+wp_se1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveEdit step 1', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveEdit'), (SELECT id FROM method_type WHERE name='put'),
+    1, 'document', (SELECT id FROM flt_id), FALSE, '[{"status": 1}]', (SELECT id FROM m_se1), (SELECT id FROM fk_se1), '[]' RETURNING id),
+wp_se2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveEdit step 2', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveEdit'), (SELECT id FROM method_type WHERE name='put'),
+    2, 'create_department_document', NULL, FALSE, '[]', NULL, NULL, '[{"status": 1}]' RETURNING id),
+fk_ac1 AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
+fk_ac1_i AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT (SELECT id FROM fk_ac1), v.c, v.r, v.o FROM (VALUES
+    ('id','id',0),
+    ('ddate','ddate',1),
+    ('dnumber','dnumber',2),
+    ('name','name',3),
+    ('note','note',4),
+    ('prefix','prefix',5),
+    ('id_transaction','id_transaction',6)) AS v(c,r,o)
+  RETURNING fk_set),
+m_ac2 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
+m_ac2_i AS (
+  INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
+  SELECT (SELECT id FROM m_ac2), v.t, v.s, v.o FROM (VALUES
+    ('ddate','ddate',0),
+    ('dnumber','dnumber',1),
+    ('note','note',2),
+    ('status','2',3),
+    ('id_user','1',4),
+    ('prefix','prefix',5),
+    ('id_transaction','id_transaction',6)) AS v(t,s,o)
+  RETURNING map_set),
+m_ac3 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
+m_ac3_i AS (
+  INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
+  SELECT (SELECT id FROM m_ac3), v.t, v.s, v.o FROM (VALUES
+    ('description','note',0),
+    ('prefix','prefix',1),
+    ('status','1',2),
+    ('id_basis','id',3),
+    ('name','name',4)) AS v(t,s,o)
+  RETURNING map_set),
+fk_ac3 AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
+fk_ac3_i AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT (SELECT id FROM fk_ac3), v.c, v.r, v.o FROM (VALUES
+    ('id_department','id',0)) AS v(c,r,o)
+  RETURNING fk_set),
+m_ac4 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
+m_ac4_i AS (
+  INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
+  SELECT (SELECT id FROM m_ac4), v.t, v.s, v.o FROM (VALUES
+    ('balance','1',0),
+    ('id_document','id',1),
+    ('ddate','ddate',2),
+    ('id_department','id_department',3),
+    ('id_organization','id_organization',4),
+    ('id_employee','id_employee',5),
+    ('job_title','job_title',6),
+    ('name','name',7),
+    ('prefix','prefix',8),
+    ('id_transaction','id_transaction',9)) AS v(t,s,o)
+  RETURNING map_set),
+wp_ac1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onAcceptance step 1', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onAcceptance'), (SELECT id FROM method_type WHERE name='get'),
+    1, 'create_department_document', (SELECT id FROM flt_id), TRUE, '[{"status": 1}]', NULL, (SELECT id FROM fk_ac1), '[]' RETURNING id),
+wp_ac2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onAcceptance step 2', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onAcceptance'), (SELECT id FROM method_type WHERE name='put'),
+    2, 'document', (SELECT id FROM flt_id), TRUE, '[]', (SELECT id FROM m_ac2), NULL, '[]' RETURNING id),
+wp_ac3 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onAcceptance step 3', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onAcceptance'), (SELECT id FROM method_type WHERE name='post'),
+    3, 'department_directory', NULL, FALSE, '[]', (SELECT id FROM m_ac3), (SELECT id FROM fk_ac3), '[]' RETURNING id),
+wp_ac4 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onAcceptance step 4', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onAcceptance'), (SELECT id FROM method_type WHERE name='post'),
+    4, 'department_data_ledger', NULL, FALSE, '[]', (SELECT id FROM m_ac4), NULL, '[]' RETURNING id),
+wp_ac5 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onAcceptance step 5', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onAcceptance'), (SELECT id FROM method_type WHERE name='put'),
+    5, 'create_department_document', (SELECT id FROM flt_id), TRUE, '[]', NULL, NULL, '{"status": 2}' RETURNING id),
+wp_de1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onDelete step 1', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onDelete'), (SELECT id FROM method_type WHERE name='get'),
+    1, 'create_department_document', (SELECT id FROM flt_id), TRUE, '[]', NULL, NULL, '[]' RETURNING id),
+wp_de2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onDelete step 2', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onDelete'), (SELECT id FROM method_type WHERE name='delete'),
+    2, 'department_data_ledger', (SELECT id FROM flt_id_document), FALSE, '[]', NULL, NULL, '[]' RETURNING id),
+wp_de3 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onDelete step 3', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onDelete'), (SELECT id FROM method_type WHERE name='put'),
+    3, 'department_directory', (SELECT id FROM flt_id_department), FALSE, '[]', NULL, NULL, '{"status": 0}' RETURNING id),
+wp_de4 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onDelete step 4', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onDelete'), (SELECT id FROM method_type WHERE name='put'),
+    4, 'document', (SELECT id FROM flt_id), TRUE, '[]', NULL, NULL, '{"status": 0}' RETURNING id),
+wp_de5 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onDelete step 5', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onDelete'), (SELECT id FROM method_type WHERE name='put'),
+    5, 'create_department_document', (SELECT id FROM flt_id), TRUE, '[]', NULL, NULL, '{"status": 0}' RETURNING id),
+priv AS (
+  INSERT INTO privilege(system_object, privilege_type, output_order)
+  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  WHERE pt.name IN ('open_list','open_item') RETURNING id)
 SELECT (SELECT id FROM so) AS system_object_id;

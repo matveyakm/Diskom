@@ -28,6 +28,9 @@ ft AS (
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id'),'',FALSE,TRUE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Код',TRUE,FALSE,NULL::bigint,NULL::bigint,''
   UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='name'),'Наименование',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='description'),'Описание',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
-  -- TODO privilege_set: items ['open_list', 'open_item'] (needs privilege_types seeds: open_list,open_item,create,edit,delete,accept,create_related_documents)
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='description'),'Описание',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id),
+priv AS (
+  INSERT INTO privilege(system_object, privilege_type, output_order)
+  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  WHERE pt.name IN ('open_list','open_item') RETURNING id)
 SELECT (SELECT id FROM so) AS system_object_id;

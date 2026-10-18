@@ -51,6 +51,17 @@ collect_inserts() {
 
 }
 
+# Late inserts (03_*related*.sql): executed after every entity exists, so
+# cross-object references (e.g. related documents) can be resolved by id.
+collect_late() {
+  for dir in "$SOURCE_DIR"/directory/ms_*/ "$SOURCE_DIR"/document/ms_*/ \
+             "$SOURCE_DIR"/ledger/ms_*/ "$SOURCE_DIR"/report/ms_*/; do
+    for f in "$dir"/system_description/03_*related*.sql; do
+      [ -f "$f" ] && echo "$f"
+    done
+  done
+}
+
 {
   # Header (up to marker)
   awk '1; /--SYSTEM_OBJECT_INSERTS_START/ { exit }' "$DBSHELL_DIR/db.sh.base"
@@ -62,6 +73,13 @@ collect_inserts() {
     first=false
     cat "$src"
   done < <(collect_inserts)
+
+  # Late inserts, after every entity exists
+  while IFS= read -r src; do
+    [ -f "$src" ] || continue
+    echo ""
+    cat "$src"
+  done < <(collect_late)
 
   # Footer (from marker onward)
   awk '/--SYSTEM_OBJECT_INSERTS_START/,0' "$DBSHELL_DIR/db.sh.base" | tail -n +2
