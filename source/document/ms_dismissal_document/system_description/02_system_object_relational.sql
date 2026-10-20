@@ -7,50 +7,79 @@ WITH so AS (
   SELECT 'Снятие с должности','Снятие с должности',(SELECT id FROM object_type WHERE name='Document'),(SELECT id FROM object_status WHERE name='Saved'),1,FALSE,(SELECT id FROM system_object WHERE name='Документы'),(SELECT id FROM object_link WHERE path='dismissal_document'),3,(SELECT id FROM object_icon WHERE path='document.png'),'СН-',0 RETURNING id),
 fld AS (
   INSERT INTO object_fields(system_object,name,object_type)
-  SELECT (SELECT id FROM so),'id',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'ddate',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'dnumber',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'note',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_employee',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_organization',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_department',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_job_title',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'justification',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_user',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_basis',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'status',(SELECT id FROM object_type WHERE name='Text') RETURNING id,name),
+  SELECT so.id, v.name, ot.id
+  FROM so, (VALUES
+    (1,'id'),
+    (2,'ddate'),
+    (3,'dnumber'),
+    (4,'note'),
+    (5,'id_employee'),
+    (6,'id_organization'),
+    (7,'id_department'),
+    (8,'id_job_title'),
+    (9,'justification'),
+    (10,'id_user'),
+    (11,'id_basis'),
+    (12,'status')) AS v(ord,name), object_type ot
+  WHERE ot.name='Text'
+  ORDER BY v.ord
+  RETURNING id,name),
 frm_list AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Журнал документов снятия с должности',(SELECT id FROM form_type WHERE name='List_Documents') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Журнал документов снятия с должности',fty.id FROM so, form_type fty WHERE fty.name='List_Documents' RETURNING id),
 frm_item AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Документ снятия с должности',(SELECT id FROM form_type WHERE name='Edit_Document') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Документ снятия с должности',fty.id FROM so, form_type fty WHERE fty.name='Edit_Document' RETURNING id),
 tab0 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'main','Документ снятия с должности',NULL,(SELECT id FROM frm_item),0,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'main','Документ снятия с должности',NULL,frm_item.id,0,TRUE FROM frm_item RETURNING id),
 tab1 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов снятия с должности',NULL,(SELECT id FROM frm_list),1,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов снятия с должности',NULL,frm_list.id,1,TRUE FROM frm_list RETURNING id),
+tabs AS (SELECT 'tab0' AS name, id FROM tab0 UNION ALL SELECT 'tab1' AS name, id FROM tab1),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default",readonly)
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'Код',FALSE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'Сотрудник',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='employee_directory'),'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_organization'),'Комитет',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='organization_directory'),'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='justification'),'Обоснование',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_user'),'IdUser',FALSE,FALSE,NULL::bigint,NULL::bigint,'1',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_basis'),'IdBasis',FALSE,FALSE,NULL::bigint,NULL::bigint,'0',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'',FALSE RETURNING id),
+  SELECT t.id, f.id, v.label, v.visible, v.required, fet.id, ros.id, v.dflt, v.readonly
+  FROM (VALUES
+    (1,'tab0','id','Код',FALSE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (2,'tab0','ddate','Дата',TRUE,TRUE,NULL::text,NULL::text,'now()',FALSE),
+    (3,'tab0','dnumber','Номер',TRUE,TRUE,NULL::text,NULL::text,'',TRUE),
+    (4,'tab0','note','Примечание',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (5,'tab0','id_employee','Сотрудник',TRUE,FALSE,'dropdown','employee_directory','',FALSE),
+    (6,'tab0','id_organization','Комитет',TRUE,FALSE,'dropdown','organization_directory','',FALSE),
+    (7,'tab0','id_department','Отдел',TRUE,FALSE,'dropdown','department_directory','',FALSE),
+    (8,'tab0','id_job_title','Должность',TRUE,FALSE,'dropdown','job_title_directory','',FALSE),
+    (9,'tab0','justification','Обоснование',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (10,'tab0','id_user','IdUser',FALSE,FALSE,NULL::text,NULL::text,'1',FALSE),
+    (11,'tab0','id_basis','IdBasis',FALSE,FALSE,NULL::text,NULL::text,'0',FALSE),
+    (12,'tab0','status','',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (13,'tab1','status','',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (14,'tab1','ddate','Дата',TRUE,TRUE,NULL::text,NULL::text,'now()',FALSE),
+    (15,'tab1','dnumber','Номер',TRUE,TRUE,NULL::text,NULL::text,'',TRUE),
+    (16,'tab1','note','Примечание',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (17,'tab1','id_department','Отдел',TRUE,FALSE,'dropdown','department_directory','',FALSE),
+    (18,'tab1','id_job_title','Должность',TRUE,FALSE,'dropdown','job_title_directory','',FALSE)) AS v(ord,tab,fname,label,visible,required,editor,eref,dflt,readonly)
+  JOIN tabs t ON t.name = v.tab
+  JOIN fld f ON f.name = v.fname
+  LEFT JOIN field_editor_type fet ON fet.name = v.editor
+  LEFT JOIN object_link olr ON olr.path = v.eref
+  LEFT JOIN system_object ros ON ros.object_link = olr.id
+  ORDER BY v.ord
+  RETURNING id),
+ev AS (
+  SELECT
+    (SELECT id FROM events_type WHERE name='onSaveNew')    AS save_new,
+    (SELECT id FROM events_type WHERE name='onSaveEdit')   AS save_edit,
+    (SELECT id FROM events_type WHERE name='onAcceptance') AS acceptance,
+    (SELECT id FROM events_type WHERE name='onDelete')     AS delete_ev
+),
+mt AS (
+  SELECT
+    (SELECT id FROM method_type WHERE name='post')   AS post,
+    (SELECT id FROM method_type WHERE name='put')    AS put,
+    (SELECT id FROM method_type WHERE name='get')    AS get,
+    (SELECT id FROM method_type WHERE name='delete') AS delete_m
+),
 m_sn1 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
 m_sn1_i AS (
   INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
-  SELECT (SELECT id FROM m_sn1), v.t, v.s, v.o FROM (VALUES
+  SELECT m_sn1.id, v.t, v.s, v.o FROM m_sn1, (VALUES
     ('ddate','ddate',0),
     ('dnumber','dnumber',1),
     ('note','note',2),
@@ -58,21 +87,23 @@ m_sn1_i AS (
     ('id_user','1',4),
     ('prefix','0',5),
     ('id_transaction','id_transaction',6)) AS v(t,s,o)
+  ORDER BY v.o
   RETURNING map_set),
 fk_sn1 AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
 fk_sn1_i AS (
   INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
-  SELECT (SELECT id FROM fk_sn1), v.c, v.r, v.o FROM (VALUES
+  SELECT fk_sn1.id, v.c, v.r, v.o FROM fk_sn1, (VALUES
     ('id','id',0)) AS v(c,r,o)
+  ORDER BY v.o
   RETURNING fk_set),
-wp_sn1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
-  SELECT 'onSaveNew step 1', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveNew'), (SELECT id FROM method_type WHERE name='post'),
-    1, 'document', NULL, FALSE, '[]', (SELECT id FROM m_sn1), (SELECT id FROM fk_sn1), '[]' RETURNING id),
-wp_sn2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
-  SELECT 'onSaveNew step 2', (SELECT id FROM frm_item), (SELECT id FROM events_type WHERE name='onSaveNew'), (SELECT id FROM method_type WHERE name='post'),
-    2, 'dismissal_document', NULL, FALSE, '[]', NULL, NULL, '[{"status": 1}]' RETURNING id),
+wp_sn1 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveNew step 1', frm_item.id, ev.save_new, mt.post, 1, 'document', NULL, FALSE, '[]', m_sn1.id, fk_sn1.id, '[]' FROM frm_item, ev, mt, m_sn1, fk_sn1 RETURNING id),
+wp_sn2 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set, fields)
+  SELECT 'onSaveNew step 2', frm_item.id, ev.save_new, mt.post, 2, 'dismissal_document', NULL, FALSE, '[]', NULL, NULL, '[{"status": 1}]' FROM frm_item, ev, mt RETURNING id),
 priv AS (
   INSERT INTO privilege(system_object, privilege_type, output_order)
-  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  SELECT so.id, pt.id, pt.id FROM so, privilege_types pt
   WHERE pt.name IN ('open_list','open_item') RETURNING id)
-SELECT (SELECT id FROM so) AS system_object_id;
+SELECT so.id AS system_object_id FROM so;

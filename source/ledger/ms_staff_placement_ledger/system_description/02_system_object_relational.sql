@@ -7,30 +7,45 @@ WITH so AS (
   SELECT 'Транзакции изменеия штатного расписания','Транзакции изменеия штатного расписания',(SELECT id FROM object_type WHERE name='Ledger'),(SELECT id FROM object_status WHERE name='Saved'),1,FALSE,(SELECT id FROM system_object WHERE name='Регистры данных'),(SELECT id FROM object_link WHERE path='staff_placement_ledger'),2,(SELECT id FROM object_icon WHERE path='document.png'),'ЭТР-',0 RETURNING id),
 fld AS (
   INSERT INTO object_fields(system_object,name,object_type)
-  SELECT (SELECT id FROM so),'balance',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_document',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'ddate',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_employee',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_organization',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_department',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_position',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'justification',(SELECT id FROM object_type WHERE name='Text') RETURNING id,name),
+  SELECT so.id, v.name, ot.id
+  FROM so, (VALUES
+    (1,'balance'),
+    (2,'id_document'),
+    (3,'ddate'),
+    (4,'id_employee'),
+    (5,'id_organization'),
+    (6,'id_department'),
+    (7,'id_position'),
+    (8,'justification')) AS v(ord,name), object_type ot
+  WHERE ot.name='Text'
+  ORDER BY v.ord
+  RETURNING id,name),
 frm_list AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Транзакции изменеия штатного расписания',(SELECT id FROM form_type WHERE name='List_Lager') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Транзакции изменеия штатного расписания',fty.id FROM so, form_type fty WHERE fty.name='List_Lager' RETURNING id),
 tab0 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции изменеия штатного расписания',NULL,(SELECT id FROM frm_list),0,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции изменеия штатного расписания',NULL,frm_list.id,0,TRUE FROM frm_list RETURNING id),
+tabs AS (SELECT 'tab0' AS name, id FROM tab0),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='balance'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'Сотрудник',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_organization'),'Организация',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_position'),'Должность',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='justification'),'Обоснование',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id),
+  SELECT t.id, f.id, v.label, v.visible, v.required, fet.id, ros.id, v.dflt
+  FROM (VALUES
+    (1,'tab0','balance','',TRUE,FALSE,NULL::text,NULL::text,''),
+    (2,'tab0','id_document','Документ',TRUE,FALSE,NULL::text,NULL::text,''),
+    (3,'tab0','ddate','Дата',TRUE,FALSE,NULL::text,NULL::text,''),
+    (4,'tab0','id_employee','Сотрудник',TRUE,FALSE,NULL::text,NULL::text,''),
+    (5,'tab0','id_organization','Организация',TRUE,FALSE,NULL::text,NULL::text,''),
+    (6,'tab0','id_department','Отдел',TRUE,FALSE,NULL::text,NULL::text,''),
+    (7,'tab0','id_position','Должность',TRUE,FALSE,NULL::text,NULL::text,''),
+    (8,'tab0','justification','Обоснование',TRUE,FALSE,NULL::text,NULL::text,'')) AS v(ord,tab,fname,label,visible,required,editor,eref,dflt)
+  JOIN tabs t ON t.name = v.tab
+  JOIN fld f ON f.name = v.fname
+  LEFT JOIN field_editor_type fet ON fet.name = v.editor
+  LEFT JOIN object_link olr ON olr.path = v.eref
+  LEFT JOIN system_object ros ON ros.object_link = olr.id
+  ORDER BY v.ord
+  RETURNING id),
 priv AS (
   INSERT INTO privilege(system_object, privilege_type, output_order)
-  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  SELECT so.id, pt.id, pt.id FROM so, privilege_types pt
   WHERE pt.name IN ('open_list','open_item') RETURNING id)
-SELECT (SELECT id FROM so) AS system_object_id;
+SELECT so.id AS system_object_id FROM so;

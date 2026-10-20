@@ -7,65 +7,79 @@ WITH so AS (
   SELECT 'Приём сотрудника','Приём сотрудника',(SELECT id FROM object_type WHERE name='Document'),(SELECT id FROM object_status WHERE name='Saved'),1,FALSE,(SELECT id FROM system_object WHERE name='Документы'),(SELECT id FROM object_link WHERE path='acceptance_document'),1,(SELECT id FROM object_icon WHERE path='document.png'),'ПР-',0 RETURNING id),
 fld AS (
   INSERT INTO object_fields(system_object,name,object_type)
-  SELECT (SELECT id FROM so),'id',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'ddate',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'dnumber',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'note',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'last_name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'first_name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'middle_name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'last_genitive',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'first_genitive',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'middle_genitive',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'last_accusative',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'first_accusative',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'middle_accusative',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'vk_id',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_user',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_basis',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'prefix',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'status',(SELECT id FROM object_type WHERE name='Text') RETURNING id,name),
+  SELECT so.id, v.name, ot.id
+  FROM so, (VALUES
+    (1,'id'),
+    (2,'ddate'),
+    (3,'dnumber'),
+    (4,'note'),
+    (5,'last_name'),
+    (6,'first_name'),
+    (7,'middle_name'),
+    (8,'last_genitive'),
+    (9,'first_genitive'),
+    (10,'middle_genitive'),
+    (11,'last_accusative'),
+    (12,'first_accusative'),
+    (13,'middle_accusative'),
+    (14,'vk_id'),
+    (15,'id_user'),
+    (16,'id_basis'),
+    (17,'prefix'),
+    (18,'status')) AS v(ord,name), object_type ot
+  WHERE ot.name='Text'
+  ORDER BY v.ord
+  RETURNING id,name),
 frm_list AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Журнал документов приёмки сотрудника',(SELECT id FROM form_type WHERE name='List_Documents') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Журнал документов приёмки сотрудника',fty.id FROM so, form_type fty WHERE fty.name='List_Documents' RETURNING id),
 frm_item AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Документ приём сотрудника',(SELECT id FROM form_type WHERE name='Edit_Document') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Документ приём сотрудника',fty.id FROM so, form_type fty WHERE fty.name='Edit_Document' RETURNING id),
 tab0 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'fio','ФИО','declension-table',(SELECT id FROM frm_item),0,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'fio','ФИО','declension-table',frm_item.id,0,TRUE FROM frm_item RETURNING id),
 tab4 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'fior','ФИО(Р)','declension-table',(SELECT id FROM frm_item),1,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'fior','ФИО(Р)','declension-table',frm_item.id,1,TRUE FROM frm_item RETURNING id),
 tab5 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'fiov','ФИО(В)','declension-table',(SELECT id FROM frm_item),2,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'fiov','ФИО(В)','declension-table',frm_item.id,2,TRUE FROM frm_item RETURNING id),
 tab1 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'contacts','Реквизиты',NULL,(SELECT id FROM frm_item),3,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'contacts','Реквизиты',NULL,frm_item.id,3,TRUE FROM frm_item RETURNING id),
 tab2 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'main','Основной',NULL,(SELECT id FROM frm_item),4,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'main','Основной',NULL,frm_item.id,4,TRUE FROM frm_item RETURNING id),
 tab3 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов приёмки сотрудника',NULL,(SELECT id FROM frm_list),5,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов приёмки сотрудника',NULL,frm_list.id,5,TRUE FROM frm_list RETURNING id),
+tabs AS (SELECT 'tab0' AS name, id FROM tab0 UNION ALL SELECT 'tab4' AS name, id FROM tab4 UNION ALL SELECT 'tab5' AS name, id FROM tab5 UNION ALL SELECT 'tab1' AS name, id FROM tab1 UNION ALL SELECT 'tab2' AS name, id FROM tab2 UNION ALL SELECT 'tab3' AS name, id FROM tab3),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default",readonly)
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='last_genitive'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='first_genitive'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='middle_genitive'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='first_accusative'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='vk_id'),'IdVk',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id_user'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'1',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id_basis'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='prefix'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE RETURNING id)
-,
+  SELECT t.id, f.id, v.label, v.visible, v.required, fet.id, ros.id, v.dflt, v.readonly
+  FROM (VALUES
+    (1,'tab0','last_name','Фамилия',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (2,'tab0','first_name','Имя',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (3,'tab0','middle_name','Отчество',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (4,'tab4','last_genitive','Фамилия',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (5,'tab4','first_genitive','Имя',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (6,'tab4','middle_genitive','Отчество',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (7,'tab5','last_accusative','Фамилия',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (8,'tab5','first_accusative','Имя',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (9,'tab5','middle_accusative','Отчество',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (10,'tab1','vk_id','IdVk',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (11,'tab2','id','',FALSE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (12,'tab2','ddate','Дата',TRUE,TRUE,NULL::text,NULL::text,'now()',FALSE),
+    (13,'tab2','dnumber','Номер',TRUE,TRUE,NULL::text,NULL::text,'',TRUE),
+    (14,'tab2','note','Примечание',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (15,'tab2','id_user','',FALSE,FALSE,NULL::text,NULL::text,'1',FALSE),
+    (16,'tab2','id_basis','',FALSE,FALSE,NULL::text,NULL::text,'0',FALSE),
+    (17,'tab2','prefix','',FALSE,FALSE,NULL::text,NULL::text,'0',FALSE),
+    (18,'tab2','status','',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (19,'tab3','status','',TRUE,FALSE,NULL::text,NULL::text,'',FALSE),
+    (20,'tab3','ddate','Дата',TRUE,TRUE,NULL::text,NULL::text,'now()',FALSE),
+    (21,'tab3','dnumber','Номер',TRUE,TRUE,NULL::text,NULL::text,'',TRUE),
+    (22,'tab3','note','Примечание',TRUE,FALSE,NULL::text,NULL::text,'',FALSE)) AS v(ord,tab,fname,label,visible,required,editor,eref,dflt,readonly)
+  JOIN tabs t ON t.name = v.tab
+  JOIN fld f ON f.name = v.fname
+  LEFT JOIN field_editor_type fet ON fet.name = v.editor
+  LEFT JOIN object_link olr ON olr.path = v.eref
+  LEFT JOIN system_object ros ON ros.object_link = olr.id
+  ORDER BY v.ord
+  RETURNING id),
 ev AS (
   SELECT
     (SELECT id FROM events_type WHERE name='onSaveNew')    AS save_new,
@@ -80,46 +94,50 @@ mt AS (
     (SELECT id FROM method_type WHERE name='get')    AS get,
     (SELECT id FROM method_type WHERE name='delete') AS delete_m
 ),
--- filter sets
 flt_id AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
-flt_id_item AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
-  SELECT (SELECT id FROM flt_id), (SELECT id FROM filter_type WHERE name='id'), 0 RETURNING filter_set),
+flt_id_item AS (
+  INSERT INTO filter_set_item(filter_set, filter_type, output_order)
+  SELECT flt_id.id, fty.id, 0 FROM flt_id, filter_type fty WHERE fty.name='id' RETURNING filter_set),
 flt_doc AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
-flt_doc_item AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
-  SELECT (SELECT id FROM flt_doc), (SELECT id FROM filter_type WHERE name='id_document'), 0 RETURNING filter_set),
+flt_doc_item AS (
+  INSERT INTO filter_set_item(filter_set, filter_type, output_order)
+  SELECT flt_doc.id, fty.id, 0 FROM flt_doc, filter_type fty WHERE fty.name='id_document' RETURNING filter_set),
 flt_emp AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
-flt_emp_item AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
-  SELECT (SELECT id FROM flt_emp), (SELECT id FROM filter_type WHERE name='id_employee'), 0 RETURNING filter_set),
--- map sets
+flt_emp_item AS (
+  INSERT INTO filter_set_item(filter_set, filter_type, output_order)
+  SELECT flt_emp.id, fty.id, 0 FROM flt_emp, filter_type fty WHERE fty.name='id_employee' RETURNING filter_set),
 m_save AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
 m_save_item AS (
   INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
-  SELECT (SELECT id FROM m_save), v.t, v.s, v.o FROM (VALUES
+  SELECT m_save.id, v.t, v.s, v.o FROM m_save, (VALUES
     ('ddate','ddate',0),('dnumber','dnumber',1),('note','note',2),
     ('status','1',3),('id_user','1',4),('prefix','0',5),
     ('id_transaction','id_transaction',6)) AS v(t,s,o)
+  ORDER BY v.o
   RETURNING map_set),
 m_accept2 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
 m_accept2_item AS (
   INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
-  SELECT (SELECT id FROM m_accept2), v.t, v.s, v.o FROM (VALUES
+  SELECT m_accept2.id, v.t, v.s, v.o FROM m_accept2, (VALUES
     ('ddate','ddate',0),('dnumber','dnumber',1),('note','note',2),
     ('status','2',3),('id_user','1',4),('prefix','prefix',5),
     ('id_transaction','id_transaction',6)) AS v(t,s,o)
+  ORDER BY v.o
   RETURNING map_set),
 m_accept3 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
 m_accept3_item AS (
   INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
-  SELECT (SELECT id FROM m_accept3), v.t, v.s, v.o FROM (VALUES
+  SELECT m_accept3.id, v.t, v.s, v.o FROM m_accept3, (VALUES
     ('description','note',0),('prefix','prefix',1),('status','1',2),
     ('id_basis','id',3),
     ('name','{"CONCAT":["last_name"," ","first_name"," ","middle_name"]}',4),
     ('vk_id','vk_id',5)) AS v(t,s,o)
+  ORDER BY v.o
   RETURNING map_set),
 m_accept4 AS (INSERT INTO map_set DEFAULT VALUES RETURNING id),
 m_accept4_item AS (
   INSERT INTO map_set_item(map_set, target_field, send_value, output_order)
-  SELECT (SELECT id FROM m_accept4), v.t, v.s, v.o FROM (VALUES
+  SELECT m_accept4.id, v.t, v.s, v.o FROM m_accept4, (VALUES
     ('balance','1',0),('id_document','id',1),('ddate','ddate',2),
     ('id_employee','id_employee',3),('first_name','first_name',4),
     ('last_name','last_name',5),('middle_name','middle_name',6),
@@ -127,70 +145,68 @@ m_accept4_item AS (
     ('middle_genitive','middle_genitive',9),('first_accusative','first_accusative',10),
     ('last_accusative','last_accusative',11),('middle_accusative','middle_accusative',12),
     ('vk_id','vk_id',13),('prefix','prefix',14),('id_transaction','id_transaction',15)) AS v(t,s,o)
+  ORDER BY v.o
   RETURNING map_set),
--- fk sets (step response -> context for the next step)
 fk_save AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
-fk_save_item AS (INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
-  SELECT (SELECT id FROM fk_save), 'id', 'id', 0 RETURNING fk_set),
+fk_save_item AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT fk_save.id, 'id', 'id', 0 FROM fk_save RETURNING fk_set),
 fk_acc AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
 fk_acc_item AS (
   INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
-  SELECT (SELECT id FROM fk_acc), v.c, v.r, v.o FROM (VALUES
+  SELECT fk_acc.id, v.c, v.r, v.o FROM fk_acc, (VALUES
     ('id','id',0),('ddate','ddate',1),('dnumber','dnumber',2),('note','note',3),
     ('vk_id','vk_id',4),('prefix','prefix',5),('id_transaction','id_transaction',6)) AS v(c,r,o)
+  ORDER BY v.o
   RETURNING fk_set),
 fk_emp AS (INSERT INTO fk_set DEFAULT VALUES RETURNING id),
-fk_emp_item AS (INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
-  SELECT (SELECT id FROM fk_emp), 'id_employee', 'id', 0 RETURNING fk_set),
--- workflow: onSaveNew
-wp_sn1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set)
-  SELECT 'onSaveNew step 1', (SELECT id FROM frm_item), (SELECT save_new FROM ev), (SELECT post FROM mt),
-    1, 'document', NULL, FALSE, '[]', (SELECT id FROM m_save), (SELECT id FROM fk_save) RETURNING id),
-wp_sn2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
-  SELECT 'onSaveNew step 2', (SELECT id FROM frm_item), (SELECT save_new FROM ev), (SELECT post FROM mt),
-    2, 'acceptance_document', NULL, FALSE, '[]', '[{"status": 1}]' RETURNING id),
--- workflow: onSaveEdit
-wp_se1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set)
-  SELECT 'onSaveEdit step 1', (SELECT id FROM frm_item), (SELECT save_edit FROM ev), (SELECT put FROM mt),
-    1, 'document', (SELECT id FROM flt_id), FALSE, '[{"status": 1}]', (SELECT id FROM m_save), (SELECT id FROM fk_save) RETURNING id),
-wp_se2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
-  SELECT 'onSaveEdit step 2', (SELECT id FROM frm_item), (SELECT save_edit FROM ev), (SELECT put FROM mt),
-    2, 'acceptance_document', NULL, FALSE, '[]', '[{"status": 1}]' RETURNING id),
--- workflow: onAcceptance
-wp_ac1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fk_set)
-  SELECT 'onAcceptance step 1', (SELECT id FROM frm_item), (SELECT acceptance FROM ev), (SELECT get FROM mt),
-    1, 'acceptance_document', (SELECT id FROM flt_id), TRUE, '[{"status": 1}]', (SELECT id FROM fk_acc) RETURNING id),
-wp_ac2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server)
-  SELECT 'onAcceptance step 2', (SELECT id FROM frm_item), (SELECT acceptance FROM ev), (SELECT put FROM mt),
-    2, 'document', (SELECT id FROM flt_id), TRUE, '[]', (SELECT id FROM m_accept2) RETURNING id),
-wp_ac3 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set)
-  SELECT 'onAcceptance step 3', (SELECT id FROM frm_item), (SELECT acceptance FROM ev), (SELECT post FROM mt),
-    3, 'employee_directory', NULL, FALSE, '[]', (SELECT id FROM m_accept3), (SELECT id FROM fk_emp) RETURNING id),
-wp_ac4 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server)
-  SELECT 'onAcceptance step 4', (SELECT id FROM frm_item), (SELECT acceptance FROM ev), (SELECT post FROM mt),
-    4, 'employee_data_ledger', NULL, FALSE, '[]', (SELECT id FROM m_accept4) RETURNING id),
-wp_ac5 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
-  SELECT 'onAcceptance step 5', (SELECT id FROM frm_item), (SELECT acceptance FROM ev), (SELECT put FROM mt),
-    5, 'acceptance_document', (SELECT id FROM flt_id), TRUE, '[]', '{"status": 2}' RETURNING id),
--- workflow: onDelete
-wp_de1 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions)
-  SELECT 'onDelete step 1', (SELECT id FROM frm_item), (SELECT delete_ev FROM ev), (SELECT get FROM mt),
-    1, 'acceptance_document', (SELECT id FROM flt_id), TRUE, '[]' RETURNING id),
-wp_de2 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions)
-  SELECT 'onDelete step 2', (SELECT id FROM frm_item), (SELECT delete_ev FROM ev), (SELECT delete_m FROM mt),
-    2, 'employee_data_ledger', (SELECT id FROM flt_doc), FALSE, '[]' RETURNING id),
-wp_de3 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
-  SELECT 'onDelete step 3', (SELECT id FROM frm_item), (SELECT delete_ev FROM ev), (SELECT put FROM mt),
-    3, 'employee_directory', (SELECT id FROM flt_emp), FALSE, '[]', '{"status": 0}' RETURNING id),
-wp_de4 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
-  SELECT 'onDelete step 4', (SELECT id FROM frm_item), (SELECT delete_ev FROM ev), (SELECT put FROM mt),
-    4, 'document', (SELECT id FROM flt_id), TRUE, '[]', '{"status": 0}' RETURNING id),
-wp_de5 AS (INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
-  SELECT 'onDelete step 5', (SELECT id FROM frm_item), (SELECT delete_ev FROM ev), (SELECT put FROM mt),
-    5, 'acceptance_document', (SELECT id FROM flt_id), TRUE, '[]', '{"status": 0}' RETURNING id),
+fk_emp_item AS (
+  INSERT INTO fk_set_item(fk_set, context_field, response_field, output_order)
+  SELECT fk_emp.id, 'id_employee', 'id', 0 FROM fk_emp RETURNING fk_set),
+wp_sn1 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set)
+  SELECT 'onSaveNew step 1', frm_item.id, ev.save_new, mt.post, 1, 'document', NULL, FALSE, '[]', m_save.id, fk_save.id FROM frm_item, ev, mt, m_save, fk_save RETURNING id),
+wp_sn2 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
+  SELECT 'onSaveNew step 2', frm_item.id, ev.save_new, mt.post, 2, 'acceptance_document', NULL, FALSE, '[]', '[{"status": 1}]' FROM frm_item, ev, mt RETURNING id),
+wp_se1 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set)
+  SELECT 'onSaveEdit step 1', frm_item.id, ev.save_edit, mt.put, 1, 'document', flt_id.id, FALSE, '[{"status": 1}]', m_save.id, fk_save.id FROM frm_item, ev, mt, flt_id, m_save, fk_save RETURNING id),
+wp_se2 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
+  SELECT 'onSaveEdit step 2', frm_item.id, ev.save_edit, mt.put, 2, 'acceptance_document', NULL, FALSE, '[]', '[{"status": 1}]' FROM frm_item, ev, mt RETURNING id),
+wp_ac1 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fk_set)
+  SELECT 'onAcceptance step 1', frm_item.id, ev.acceptance, mt.get, 1, 'acceptance_document', flt_id.id, TRUE, '[{"status": 1}]', fk_acc.id FROM frm_item, ev, mt, flt_id, fk_acc RETURNING id),
+wp_ac2 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server)
+  SELECT 'onAcceptance step 2', frm_item.id, ev.acceptance, mt.put, 2, 'document', flt_id.id, TRUE, '[]', m_accept2.id FROM frm_item, ev, mt, flt_id, m_accept2 RETURNING id),
+wp_ac3 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server, fk_set)
+  SELECT 'onAcceptance step 3', frm_item.id, ev.acceptance, mt.post, 3, 'employee_directory', NULL, FALSE, '[]', m_accept3.id, fk_emp.id FROM frm_item, ev, mt, m_accept3, fk_emp RETURNING id),
+wp_ac4 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, set_to_server)
+  SELECT 'onAcceptance step 4', frm_item.id, ev.acceptance, mt.post, 4, 'employee_data_ledger', NULL, FALSE, '[]', m_accept4.id FROM frm_item, ev, mt, m_accept4 RETURNING id),
+wp_ac5 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
+  SELECT 'onAcceptance step 5', frm_item.id, ev.acceptance, mt.put, 5, 'acceptance_document', flt_id.id, TRUE, '[]', '{"status": 2}' FROM frm_item, ev, mt, flt_id RETURNING id),
+wp_de1 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions)
+  SELECT 'onDelete step 1', frm_item.id, ev.delete_ev, mt.get, 1, 'acceptance_document', flt_id.id, TRUE, '[]' FROM frm_item, ev, mt, flt_id RETURNING id),
+wp_de2 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions)
+  SELECT 'onDelete step 2', frm_item.id, ev.delete_ev, mt.delete_m, 2, 'employee_data_ledger', flt_doc.id, FALSE, '[]' FROM frm_item, ev, mt, flt_doc RETURNING id),
+wp_de3 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
+  SELECT 'onDelete step 3', frm_item.id, ev.delete_ev, mt.put, 3, 'employee_directory', flt_emp.id, FALSE, '[]', '{"status": 0}' FROM frm_item, ev, mt, flt_emp RETURNING id),
+wp_de4 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
+  SELECT 'onDelete step 4', frm_item.id, ev.delete_ev, mt.put, 4, 'document', flt_id.id, TRUE, '[]', '{"status": 0}' FROM frm_item, ev, mt, flt_id RETURNING id),
+wp_de5 AS (
+  INSERT INTO workflow_process(name, object_form, events_type, method_type, step, end_point, filter_set, hide_in_preview, conditions, fields)
+  SELECT 'onDelete step 5', frm_item.id, ev.delete_ev, mt.put, 5, 'acceptance_document', flt_id.id, TRUE, '[]', '{"status": 0}' FROM frm_item, ev, mt, flt_id RETURNING id),
 priv AS (
   INSERT INTO privilege(system_object, privilege_type, output_order)
-  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
-  WHERE pt.name IN ('open_list','open_item','create','edit','delete','accept','create_related_documents')
-  RETURNING id)
-SELECT (SELECT id FROM so) AS system_object_id;
+  SELECT so.id, pt.id, pt.id FROM so, privilege_types pt
+  WHERE pt.name IN ('open_list','open_item','create','edit','delete','accept','create_related_documents') RETURNING id)
+SELECT so.id AS system_object_id FROM so;

@@ -7,40 +7,55 @@ WITH so AS (
   SELECT 'Транзакции по реквизитам сотрудников','Транзакции по реквизитам сотрудников',(SELECT id FROM object_type WHERE name='Ledger'),(SELECT id FROM object_status WHERE name='Saved'),1,FALSE,(SELECT id FROM system_object WHERE name='Регистры данных'),(SELECT id FROM object_link WHERE path='employee_data_ledger'),1,(SELECT id FROM object_icon WHERE path='document.png'),'ТР-',0 RETURNING id),
 fld AS (
   INSERT INTO object_fields(system_object,name,object_type)
-  SELECT (SELECT id FROM so),'id_document',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'ddate',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'first_name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'last_name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'middle_name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'first_genitive',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'last_genitive',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'middle_genitive',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'first_accusative',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'last_accusative',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'middle_accusative',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'vk_id',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_employee',(SELECT id FROM object_type WHERE name='Text') RETURNING id,name),
+  SELECT so.id, v.name, ot.id
+  FROM so, (VALUES
+    (1,'id_document'),
+    (2,'ddate'),
+    (3,'first_name'),
+    (4,'last_name'),
+    (5,'middle_name'),
+    (6,'first_genitive'),
+    (7,'last_genitive'),
+    (8,'middle_genitive'),
+    (9,'first_accusative'),
+    (10,'last_accusative'),
+    (11,'middle_accusative'),
+    (12,'vk_id'),
+    (13,'id_employee')) AS v(ord,name), object_type ot
+  WHERE ot.name='Text'
+  ORDER BY v.ord
+  RETURNING id,name),
 frm_list AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Транзакции по реквизитам сотрудников',(SELECT id FROM form_type WHERE name='List_Lager') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Транзакции по реквизитам сотрудников',fty.id FROM so, form_type fty WHERE fty.name='List_Lager' RETURNING id),
 tab0 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции по реквизитам сотрудников',NULL,(SELECT id FROM frm_list),0,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции по реквизитам сотрудников',NULL,frm_list.id,0,TRUE FROM frm_list RETURNING id),
+tabs AS (SELECT 'tab0' AS name, id FROM tab0),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_genitive'),'Имя (род. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_genitive'),'Фамилия (род. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_genitive'),'Отчество (род. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_accusative'),'Имя (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество (вин. падеж)',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='vk_id'),'ID VK',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'ID сотрудника',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id),
+  SELECT t.id, f.id, v.label, v.visible, v.required, fet.id, ros.id, v.dflt
+  FROM (VALUES
+    (1,'tab0','id_document','Документ',TRUE,FALSE,NULL::text,NULL::text,''),
+    (2,'tab0','ddate','Дата',TRUE,FALSE,NULL::text,NULL::text,''),
+    (3,'tab0','first_name','Имя',TRUE,FALSE,NULL::text,NULL::text,''),
+    (4,'tab0','last_name','Фамилия',TRUE,FALSE,NULL::text,NULL::text,''),
+    (5,'tab0','middle_name','Отчество',TRUE,FALSE,NULL::text,NULL::text,''),
+    (6,'tab0','first_genitive','Имя (род. падеж)',TRUE,FALSE,NULL::text,NULL::text,''),
+    (7,'tab0','last_genitive','Фамилия (род. падеж)',TRUE,FALSE,NULL::text,NULL::text,''),
+    (8,'tab0','middle_genitive','Отчество (род. падеж)',TRUE,FALSE,NULL::text,NULL::text,''),
+    (9,'tab0','first_accusative','Имя (вин. падеж)',TRUE,FALSE,NULL::text,NULL::text,''),
+    (10,'tab0','last_accusative','Фамилия (вин. падеж)',TRUE,FALSE,NULL::text,NULL::text,''),
+    (11,'tab0','middle_accusative','Отчество (вин. падеж)',TRUE,FALSE,NULL::text,NULL::text,''),
+    (12,'tab0','vk_id','ID VK',TRUE,FALSE,NULL::text,NULL::text,''),
+    (13,'tab0','id_employee','ID сотрудника',TRUE,FALSE,NULL::text,NULL::text,'')) AS v(ord,tab,fname,label,visible,required,editor,eref,dflt)
+  JOIN tabs t ON t.name = v.tab
+  JOIN fld f ON f.name = v.fname
+  LEFT JOIN field_editor_type fet ON fet.name = v.editor
+  LEFT JOIN object_link olr ON olr.path = v.eref
+  LEFT JOIN system_object ros ON ros.object_link = olr.id
+  ORDER BY v.ord
+  RETURNING id),
 priv AS (
   INSERT INTO privilege(system_object, privilege_type, output_order)
-  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  SELECT so.id, pt.id, pt.id FROM so, privilege_types pt
   WHERE pt.name IN ('open_list','open_item') RETURNING id)
-SELECT (SELECT id FROM so) AS system_object_id;
+SELECT so.id AS system_object_id FROM so;

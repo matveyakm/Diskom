@@ -7,22 +7,37 @@ WITH so AS (
   SELECT 'Транзакции по реквизитам должностей','Транзакции по реквизитам должностей',(SELECT id FROM object_type WHERE name='Ledger'),(SELECT id FROM object_status WHERE name='Saved'),1,FALSE,(SELECT id FROM system_object WHERE name='Регистры данных'),(SELECT id FROM object_link WHERE path='job_title_data_ledger'),1,(SELECT id FROM object_icon WHERE path='document.png'),'ТД-',0 RETURNING id),
 fld AS (
   INSERT INTO object_fields(system_object,name,object_type)
-  SELECT (SELECT id FROM so),'id_document',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'ddate',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'name',(SELECT id FROM object_type WHERE name='Text')
-  UNION ALL   SELECT (SELECT id FROM so),'id_job_title',(SELECT id FROM object_type WHERE name='Text') RETURNING id,name),
+  SELECT so.id, v.name, ot.id
+  FROM so, (VALUES
+    (1,'id_document'),
+    (2,'ddate'),
+    (3,'name'),
+    (4,'id_job_title')) AS v(ord,name), object_type ot
+  WHERE ot.name='Text'
+  ORDER BY v.ord
+  RETURNING id,name),
 frm_list AS (
-  INSERT INTO object_forms(system_object,name,form_type) SELECT (SELECT id FROM so),'Транзакции по реквизитам должности',(SELECT id FROM form_type WHERE name='List_Lager') RETURNING id),
+  INSERT INTO object_forms(system_object,name,form_type) SELECT so.id,'Транзакции по реквизитам должности',fty.id FROM so, form_type fty WHERE fty.name='List_Lager' RETURNING id),
 tab0 AS (
-  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции по реквизитам должности',NULL,(SELECT id FROM frm_list),0,TRUE RETURNING id),
+  INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Транзакции по реквизитам должности',NULL,frm_list.id,0,TRUE FROM frm_list RETURNING id),
+tabs AS (SELECT 'tab0' AS name, id FROM tab0),
 ft AS (
   INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_document'),'Документ',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='name'),'Наименование',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id),
+  SELECT t.id, f.id, v.label, v.visible, v.required, fet.id, ros.id, v.dflt
+  FROM (VALUES
+    (1,'tab0','id_document','Документ',TRUE,FALSE,NULL::text,NULL::text,''),
+    (2,'tab0','ddate','Дата',TRUE,FALSE,NULL::text,NULL::text,''),
+    (3,'tab0','name','Наименование',TRUE,FALSE,NULL::text,NULL::text,''),
+    (4,'tab0','id_job_title','Должность',TRUE,FALSE,NULL::text,NULL::text,'')) AS v(ord,tab,fname,label,visible,required,editor,eref,dflt)
+  JOIN tabs t ON t.name = v.tab
+  JOIN fld f ON f.name = v.fname
+  LEFT JOIN field_editor_type fet ON fet.name = v.editor
+  LEFT JOIN object_link olr ON olr.path = v.eref
+  LEFT JOIN system_object ros ON ros.object_link = olr.id
+  ORDER BY v.ord
+  RETURNING id),
 priv AS (
   INSERT INTO privilege(system_object, privilege_type, output_order)
-  SELECT (SELECT id FROM so), pt.id, pt.id FROM privilege_types pt
+  SELECT so.id, pt.id, pt.id FROM so, privilege_types pt
   WHERE pt.name IN ('open_list','open_item') RETURNING id)
-SELECT (SELECT id FROM so) AS system_object_id;
+SELECT so.id AS system_object_id FROM so;
