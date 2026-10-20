@@ -1,0 +1,165 @@
+erDiagram
+  object_icon {
+    bigint id PK
+  }
+  object_link {
+    bigint id PK
+  }
+  object_status {
+    bigint id PK
+    text name
+  }
+  object_type {
+    bigint id PK
+    text name
+  }
+  system_object {
+    bigint id PK
+    text name
+    bigint object_type FK
+    bigint object_status FK
+    bigint id_system_group FK
+    bigint object_link FK
+    bigint object_icon FK
+  }
+  field_editor_type {
+    bigint id PK
+    text name
+  }
+  fields_tab {
+    bigint id PK
+    bigint tab_form FK
+    bigint object_field FK
+    bigint editor_type FK
+    bigint editor_ref FK
+  }
+  form_type {
+    bigint id PK
+    text name
+  }
+  object_fields {
+    bigint id PK
+    bigint system_object FK
+    text name
+    bigint object_type FK
+  }
+  object_forms {
+    bigint id PK
+    bigint system_object FK
+    text name
+    bigint form_type FK
+  }
+  tab_forms {
+    bigint id PK
+    text name
+    bigint object_form FK
+  }
+  privilege {
+    bigint id PK
+    bigint system_object FK
+    bigint privilege_type FK
+  }
+  privilege_types {
+    bigint id PK
+    text name
+  }
+  related_document {
+    bigint id PK
+    bigint system_object FK
+    bigint document FK
+  }
+  business_process {
+    bigint id PK
+    text name
+  }
+  events_type {
+    bigint id PK
+    text name
+  }
+  filter_set {
+    bigint id PK
+  }
+  filter_set_item {
+    bigint id PK
+    bigint filter_set FK
+    bigint filter_type FK
+  }
+  filter_type {
+    bigint id PK
+    text name
+  }
+  fk_set {
+    bigint id PK
+  }
+  fk_set_item {
+    bigint id PK
+    bigint fk_set FK
+  }
+  map_set {
+    bigint id PK
+  }
+  map_set_item {
+    bigint id PK
+    bigint map_set FK
+    bigint server_field FK
+    bigint application_field FK
+    bigint value_type FK
+  }
+  method_type {
+    bigint id PK
+    text name
+  }
+  value_types {
+    bigint id PK
+    text name
+  }
+  workflow_in_process {
+    bigint id PK
+    bigint workflow_process FK
+    bigint business_process FK
+  }
+  workflow_process {
+    bigint id PK
+    text name
+    bigint object_form FK
+    bigint events_type FK
+    bigint method_type FK
+    bigint filter_set FK
+    bigint set_to_server FK
+    bigint set_to_app FK
+    bigint fk_set FK
+  }
+  system_object ||--o{ fields_tab : "editor_ref"
+  field_editor_type ||--o{ fields_tab : "editor_type"
+  filter_set ||--o{ filter_set_item : "filter_set"
+  filter_type ||--o{ filter_set_item : "filter_type"
+  fk_set ||--o{ fk_set_item : "fk_set"
+  map_set ||--o{ map_set_item : "map_set"
+  value_types ||--o{ map_set_item : "value_type"
+  privilege_types ||--o{ privilege : "privilege_type"
+  system_object ||--o{ privilege : "system_object"
+  system_object ||--o{ related_document : "document"
+  system_object ||--o{ related_document : "system_object"
+  system_object ||--o{ system_object : "id_system_group"
+  object_icon ||--o{ system_object : "object_icon"
+  object_link ||--o{ system_object : "object_link"
+  object_status ||--o{ system_object : "object_status"
+  object_type ||--o{ system_object : "object_type"
+  filter_set ||--o{ workflow_process : "filter_set"
+  fk_set ||--o{ workflow_process : "fk_set"
+  map_set ||--o{ workflow_process : "set_to_app"
+  map_set ||--o{ workflow_process : "set_to_server"
+  object_fields ||..o{ fields_tab : "object_field"
+  tab_forms ||..o{ fields_tab : "tab_form"
+  object_fields ||..o{ map_set_item : "application_field"
+  object_fields ||..o{ map_set_item : "server_field"
+  object_type ||..o{ object_fields : "object_type"
+  system_object ||..o{ object_fields : "system_object"
+  form_type ||..o{ object_forms : "form_type"
+  system_object ||..o{ object_forms : "system_object"
+  object_forms ||..o{ tab_forms : "object_form"
+  business_process ||..o{ workflow_in_process : "business_process"
+  workflow_process ||..o{ workflow_in_process : "workflow_process"
+  events_type ||..o{ workflow_process : "events_type"
+  method_type ||..o{ workflow_process : "method_type"
+  object_forms ||..o{ workflow_process : "object_form"
