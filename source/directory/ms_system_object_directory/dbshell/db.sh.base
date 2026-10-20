@@ -491,7 +491,7 @@ COMMENT ON COLUMN ${DB_TABLENAME}.printing_template       IS 'Printable template
     END;
   $$;
 
-  CREATE VIEW public.${DB_TABLENAME} AS
+  CREATE MATERIALIZED VIEW public.${DB_TABLENAME} AS
   SELECT
     so.id,
     so.name,
@@ -741,7 +741,11 @@ COMMENT ON COLUMN ${DB_TABLENAME}.printing_template       IS 'Printable template
   FROM public.system_object so
   LEFT JOIN public.object_link ol ON ol.id = so.object_link
   LEFT JOIN public.object_icon oi ON oi.id = so.object_icon;
-  COMMENT ON VIEW public.${DB_TABLENAME} IS 'Legacy catalog read view over normalized tables; NOT UPDATABLE';
+
+  -- Unique index lets callers use REFRESH MATERIALIZED VIEW CONCURRENTLY.
+  CREATE UNIQUE INDEX ${DB_TABLENAME}_id_idx ON public.${DB_TABLENAME}(id);
+  COMMENT ON MATERIALIZED VIEW public.${DB_TABLENAME} IS 'Legacy catalog read materialized view over normalized tables; NOT UPDATABLE';
+  ANALYZE public.${DB_TABLENAME};
 
   -- Tables stay tiny (26 rows) forever, i.e. below the autoanalyze
   -- threshold (50 + 10%). Without stats the planner assumes 1000 rows
