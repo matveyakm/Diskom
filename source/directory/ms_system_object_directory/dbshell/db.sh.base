@@ -491,6 +491,37 @@ COMMENT ON COLUMN ${DB_TABLENAME}.printing_template       IS 'Printable template
     END;
   $$;
 
+  -- Stats must exist before the one-time matview build. Tables stay tiny
+  -- (26 rows), below the autoanalyze threshold (50 + 10%); without stats
+  -- the planner assumes 1000 rows and picks a catastrophic shape (15s+).
+  ANALYZE public.system_object;
+  ANALYZE public.object_icon;
+  ANALYZE public.object_link;
+  ANALYZE public.object_status;
+  ANALYZE public.object_type;
+  ANALYZE public.form_type;
+  ANALYZE public.object_fields;
+  ANALYZE public.object_forms;
+  ANALYZE public.tab_forms;
+  ANALYZE public.fields_tab;
+  ANALYZE public.field_editor_type;
+  ANALYZE public.events_type;
+  ANALYZE public.method_type;
+  ANALYZE public.filter_type;
+  ANALYZE public.filter_set;
+  ANALYZE public.filter_set_item;
+  ANALYZE public.value_types;
+  ANALYZE public.map_set;
+  ANALYZE public.map_set_item;
+  ANALYZE public.fk_set;
+  ANALYZE public.fk_set_item;
+  ANALYZE public.related_document;
+  ANALYZE public.privilege_types;
+  ANALYZE public.privilege;
+  ANALYZE public.workflow_process;
+  ANALYZE public.business_process;
+  ANALYZE public.workflow_in_process;
+
   CREATE MATERIALIZED VIEW public.${DB_TABLENAME} AS
   SELECT
     so.id,
@@ -746,37 +777,6 @@ COMMENT ON COLUMN ${DB_TABLENAME}.printing_template       IS 'Printable template
   CREATE UNIQUE INDEX ${DB_TABLENAME}_id_idx ON public.${DB_TABLENAME}(id);
   COMMENT ON MATERIALIZED VIEW public.${DB_TABLENAME} IS 'Legacy catalog read materialized view over normalized tables; NOT UPDATABLE';
   ANALYZE public.${DB_TABLENAME};
-
-  -- Tables stay tiny (26 rows) forever, i.e. below the autoanalyze
-  -- threshold (50 + 10%). Without stats the planner assumes 1000 rows
-  -- and picks a catastrophic shape for the view (15s+ per scan).
-  ANALYZE public.system_object;
-  ANALYZE public.object_icon;
-  ANALYZE public.object_link;
-  ANALYZE public.object_status;
-  ANALYZE public.object_type;
-  ANALYZE public.form_type;
-  ANALYZE public.object_fields;
-  ANALYZE public.object_forms;
-  ANALYZE public.tab_forms;
-  ANALYZE public.fields_tab;
-  ANALYZE public.field_editor_type;
-  ANALYZE public.events_type;
-  ANALYZE public.method_type;
-  ANALYZE public.filter_type;
-  ANALYZE public.filter_set;
-  ANALYZE public.filter_set_item;
-  ANALYZE public.value_types;
-  ANALYZE public.map_set;
-  ANALYZE public.map_set_item;
-  ANALYZE public.fk_set;
-  ANALYZE public.fk_set_item;
-  ANALYZE public.related_document;
-  ANALYZE public.privilege_types;
-  ANALYZE public.privilege;
-  ANALYZE public.workflow_process;
-  ANALYZE public.business_process;
-  ANALYZE public.workflow_in_process;
 
   commit;
 EOSQL
