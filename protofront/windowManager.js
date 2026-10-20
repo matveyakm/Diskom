@@ -42,7 +42,11 @@ class WindowManager {
     const src = context ?? item;
     const result = { ...item };
 
-    this.itemFields.forEach(({ field, default: def }) => {
+    this.itemFields.forEach(({ field, default: def, readonly }) => {
+      // Backend-owned fields (e.g. auto-generated numbers) must never receive
+      // a default: otherwise a numeric default could land in a string column
+      // and break backend decoding. Mirrors frontend applyDefaults.
+      if (readonly) return;
       if (def === undefined) return;
 
       // Не перезаписываем, если значение уже есть

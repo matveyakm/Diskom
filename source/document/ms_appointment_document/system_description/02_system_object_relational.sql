@@ -28,25 +28,25 @@ tab0 AS (
 tab1 AS (
   INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов назначения на должность',NULL,(SELECT id FROM frm_list),1,TRUE RETURNING id),
 ft AS (
-  INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'Код',FALSE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'Сотрудник',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='employee_directory'),''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_organization'),'Комитет',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='organization_directory'),''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='justification'),'Обоснование',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_user'),'IdUser',FALSE,FALSE,NULL::bigint,NULL::bigint,'1'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_basis'),'IdBasis',FALSE,FALSE,NULL::bigint,NULL::bigint,'0'
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'' RETURNING id),
+  INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default",readonly)
+  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id'),'Код',FALSE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_employee'),'Сотрудник',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='employee_directory'),'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_organization'),'Комитет',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='organization_directory'),'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='justification'),'Обоснование',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_user'),'IdUser',FALSE,FALSE,NULL::bigint,NULL::bigint,'1',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='id_basis'),'IdBasis',FALSE,FALSE,NULL::bigint,NULL::bigint,'0',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_department'),'Отдел',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='department_directory'),'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='id_job_title'),'Должность',TRUE,FALSE,(SELECT id FROM field_editor_type WHERE name='dropdown'),(SELECT so2.id FROM system_object so2 JOIN object_link ol ON ol.id=so2.object_link WHERE ol.path='job_title_directory'),'',FALSE RETURNING id),
 flt_id AS (INSERT INTO filter_set DEFAULT VALUES RETURNING id),
 flt_id_i AS (INSERT INTO filter_set_item(filter_set, filter_type, output_order)
   SELECT (SELECT id FROM flt_id), (SELECT id FROM filter_type WHERE name='id'), 0 RETURNING filter_set),

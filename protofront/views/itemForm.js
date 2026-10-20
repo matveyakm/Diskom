@@ -220,6 +220,22 @@ class ItemForm {
       //      form.reset();
     }
 
+    // Backend-owned fields (e.g. auto-generated number): mirror the current
+    // value (or a placeholder) into the read-only display; the paired hidden
+    // input already carries the value that gets submitted.
+    this.fields
+      .filter((col) => col.readonly)
+      .forEach((col) => {
+        const input = form.querySelector(`#field-${col.field}`);
+        const display = form.querySelector(`#readonly-${col.field}`);
+        if (!input || !display) return;
+        display.textContent = input.value
+          ? input.value
+          : this.editingId !== null
+            ? "—"
+            : "Сгенерируется автоматически";
+      });
+
     modal.style.display = "flex";
 
     // Bring to front

@@ -267,6 +267,20 @@ const windowStyles = `
     border-color: #0078d4;
   }
 
+  /* Backend-owned fields (e.g. auto-generated numbers): shown as text,
+   * value still submitted via the paired hidden input. */
+  .form-readonly {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 14px;
+    box-sizing: border-box;
+    min-height: 35px;
+  }
+
   .window-modal-footer {
     display: flex;
     justify-content: flex-end;

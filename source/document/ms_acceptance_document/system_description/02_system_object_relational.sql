@@ -42,29 +42,29 @@ tab2 AS (
 tab3 AS (
   INSERT INTO tab_forms(name,title,tag,object_form,output_order,visible) SELECT 'list','Журнал документов приёмки сотрудника',NULL,(SELECT id FROM frm_list),5,TRUE RETURNING id),
 ft AS (
-  INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default")
-  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='last_genitive'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='first_genitive'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='middle_genitive'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='first_accusative'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='vk_id'),'IdVk',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id_user'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'1'
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id_basis'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0'
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='prefix'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0'
-  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()'
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,''
-  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'' RETURNING id)
+  INSERT INTO fields_tab(tab_form,object_field,label,visible,required,editor_type,editor_ref,"default",readonly)
+  SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='last_name'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='first_name'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab0),(SELECT id FROM fld WHERE name='middle_name'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='last_genitive'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='first_genitive'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab4),(SELECT id FROM fld WHERE name='middle_genitive'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='last_accusative'),'Фамилия',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='first_accusative'),'Имя',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab5),(SELECT id FROM fld WHERE name='middle_accusative'),'Отчество',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab1),(SELECT id FROM fld WHERE name='vk_id'),'IdVk',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id_user'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'1',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='id_basis'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='prefix'),'',FALSE,FALSE,NULL::bigint,NULL::bigint,'0',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab2),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='status'),'',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='ddate'),'Дата',TRUE,TRUE,NULL::bigint,NULL::bigint,'now()',FALSE
+  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='dnumber'),'Номер',TRUE,TRUE,NULL::bigint,NULL::bigint,'',TRUE
+  UNION ALL   SELECT (SELECT id FROM tab3),(SELECT id FROM fld WHERE name='note'),'Примечание',TRUE,FALSE,NULL::bigint,NULL::bigint,'',FALSE RETURNING id)
 ,
 ev AS (
   SELECT
