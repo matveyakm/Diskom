@@ -121,7 +121,12 @@ export const buildDeleteQuery = (
 
     if (hasStepMap(step)) {
         for (const [target, source] of mapEntries(step)) {
-            if (typeof source === "string" && !hasOwnKey(context, source)) continue;
+            // Ссылка из контекста: отсутствующий ключ или нулевой FK —
+            // пропускаем (иначе литерал-имя или ?id=0). Литералы
+            // (не-строки) идут как есть, включая 0.
+            if (typeof source === "string") {
+                if (!hasOwnKey(context, source) || isMissingRef(context[source])) continue;
+            }
             push(target, resolveValue(source, context));
         }
     } else {
@@ -153,6 +158,9 @@ export const buildPutQuery = (
 // filter → пары query. Пустой результат — нормально: вызывающий решает
 // (DELETE/PUT без query бэкенд отвергнет 400; шаг с объектным filter без
 // резолва движок пропускает как идемпотентный no-op чистки).
+// Ноль/пустая строка — тоже "нет значения": id 0 в этой системе означает
+// отсутствие связи (автоинкремент с 1, несвязанные FK хранятся нулями),
+// а PUT ?id=0 давал бы 404 и ронял всё удаление непроведённого документа.
 export const resolveFilterEntries = (
     filter: ProcessingStep["filter"],
     context: Record<string, unknown>,
@@ -161,18 +169,28 @@ export const resolveFilterEntries = (
     if (!filter) return params;
     if (typeof filter === "string") {
         if (filter === "id") {
-            if (context.id !== undefined && context.id !== null) params.id = String(context.id);
-        } else if (context[filter] !== undefined && context[filter] !== null) {
+            if (!isMissingRef(context.id)) params.id = String(context.id);
+        } else if (!isMissingRef(context[filter])) {
             params[filter] = String(context[filter]);
         }
         return params;
     }
     for (const [queryKey, contextKey] of Object.entries(filter)) {
-        if (context[contextKey] !== undefined && context[contextKey] !== null) {
+        if (!isMissingRef(context[contextKey])) {
             params[queryKey] = String(context[contextKey]);
         }
     }
     return params;
+};
+
+// Отсутствие ссылки для идентификации строки: null/undefined, пустая
+// строка, числовой и строковый ноль. Используется только для query
+// идентификации (PUT/DELETE), не для тел и не для значений фильтров
+// списков — status 0 там валиден и ходит другими путями.
+const isMissingRef = (value: unknown): boolean => {
+    if (value === undefined || value === null) return true;
+    if (typeof value === "string" && value.trim() === "") return true;
+    return value === 0 || value === "0";
 };
 
 const hasOwnKey = (context: Record<string, unknown>, key: string): boolean =>

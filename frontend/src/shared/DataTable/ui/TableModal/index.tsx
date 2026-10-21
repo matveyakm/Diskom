@@ -132,7 +132,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     const {mutate: deleteRow, isPending: isDeleting} = useDeleteDocument<T>({
         docName, selectedRow, tableMeta,
         onSuccess: onClose,
-        onError: () => showAlert("Не удалось удалить запись."),
+        onError: (err) => showAlert(`Не удалось удалить запись (${describeActionError(err)}).`),
     });
 
     const {mutate: acceptRow, mutateAsync: acceptRowAsync, isPending: isAccepting} = useAcceptDocument<T>({

@@ -9,7 +9,7 @@ type UseDeleteDocumentProps<T extends TableRow = TableRow> = {
     selectedRow: T | null;
     tableMeta?: MenuItem;
     onSuccess?: () => void;
-    onError?: () => void;
+    onError?: (err: unknown) => void;
 };
 
 export const useDeleteDocument = <T extends TableRow = TableRow>({
@@ -48,8 +48,8 @@ export const useDeleteDocument = <T extends TableRow = TableRow>({
             queryClient.invalidateQueries({queryKey: ["reference"]});
             onSuccess?.();
         },
-        onError: () => {
-            onError?.();
+        onError: (err) => {
+            onError?.(err);
         },
     });
 };
