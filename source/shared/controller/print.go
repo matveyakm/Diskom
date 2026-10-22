@@ -77,16 +77,24 @@ var (
 // align: left|center|right|justify. size: пункты (0 = дефолт типа).
 // indent: левый отступ мм; firstLine: абзацный отступ мм (в DOCX точный,
 // в PDF приближён левым отступом — maroto не умеет first-line).
+// rightIndent: правый отступ мм (DOCX точный; PDF — сужением колонки).
+// spaceBefore/spaceAfter: мм сверху/снизу (дефолт after — 2.1 мм, как раньше);
+// line: межстрочный интервал 1|1.5|2 (DOCX точный; PDF его не умеет —
+// maroto не поддерживает line-height, рендерит одинарным).
 type printTextStyle struct {
-	Font      string  `json:"font,omitempty"`
-	Align     string  `json:"align,omitempty"`
-	Bold      bool    `json:"bold,omitempty"`
-	Italic    bool    `json:"italic,omitempty"`
-	Underline bool    `json:"underline,omitempty"`
-	Color     string  `json:"color,omitempty"`
-	Size      float64 `json:"size,omitempty"`
-	Indent    float64 `json:"indent,omitempty"`
-	FirstLine float64 `json:"firstLine,omitempty"`
+	Font        string  `json:"font,omitempty"`
+	Align       string  `json:"align,omitempty"`
+	Bold        bool    `json:"bold,omitempty"`
+	Italic      bool    `json:"italic,omitempty"`
+	Underline   bool    `json:"underline,omitempty"`
+	Color       string  `json:"color,omitempty"`
+	Size        float64 `json:"size,omitempty"`
+	Indent      float64 `json:"indent,omitempty"`
+	FirstLine   float64 `json:"firstLine,omitempty"`
+	RightIndent float64 `json:"rightIndent,omitempty"`
+	SpaceBefore float64 `json:"spaceBefore,omitempty"`
+	SpaceAfter  float64 `json:"spaceAfter,omitempty"`
+	Line        float64 `json:"line,omitempty"`
 }
 
 // printFontFamily резолвит шрифт блока: свой → дефолт шаблона → arial.
@@ -100,7 +108,27 @@ func printFontFamily(tpl *printTemplate, s printTextStyle) string {
 	return "arial"
 }
 
+// printPageNum — где нумеровать страницы (дефолт footer, как раньше).
+func (tpl *printTemplate) printPageNum() string {
+	if tpl.PageNum == "" {
+		return "footer"
+	}
+	return tpl.PageNum
+}
+
+// printColumnValue резолвит ячейку: литерал text (с подстановками)
+// либо значение поля строки. Пустое — пропускается вызывающим.
+func printColumnValue(c printBlockColumn, row map[string]any) string {
+	if c.Text != "" {
+		return renderPrintText(c.Text, row)
+	}
+	return stringifyPrintValue(row[c.Field])
+}
+
 // printBlock — один презентационный блок шаблона.
+// Table-режим выбирается полями Columns (горизонтальная) или Rows
+// (вертикальная); Header/Borders — указатели, чтобы отличать "не задано"
+// (дефолт true) от явного false.
 type printBlock struct {
 	printTextStyle
 	Type    string             `json:"type"`
@@ -115,14 +143,28 @@ type printBlock struct {
 	Ordered bool               `json:"ordered,omitempty"`
 	Src     string             `json:"src,omitempty"`
 	Width   float64            `json:"width,omitempty"`
+	Header  *bool              `json:"header,omitempty"`
+	Borders *bool              `json:"borders,omitempty"`
+}
+
+// printBlockShow решает tri-state флаг (nil = дефолт true).
+func printBlockShow(v *bool) bool {
+	return v == nil || *v
 }
 
 type printBlockColumn struct {
-	Field string  `json:"field"`
-	Label string  `json:"label"`
-	Ref   string  `json:"ref,omitempty"`
-	Width float64 `json:"width,omitempty"`
-	Align string  `json:"align,omitempty"`
+	Field     string  `json:"field,omitempty"`
+	Text      string  `json:"text,omitempty"`
+	Label     string  `json:"label"`
+	Ref       string  `json:"ref,omitempty"`
+	Width     float64 `json:"width,omitempty"`
+	Align     string  `json:"align,omitempty"`
+	Bold      bool    `json:"bold,omitempty"`
+	Italic    bool    `json:"italic,omitempty"`
+	Underline bool    `json:"underline,omitempty"`
+	Color     string  `json:"color,omitempty"`
+	Size      float64 `json:"size,omitempty"`
+	Font      string  `json:"font,omitempty"`
 }
 
 // printBlockRow — строка вертикальной таблицы (label | value).
@@ -132,15 +174,27 @@ type printBlockRow struct {
 	Ref   string `json:"ref,omitempty"`
 }
 
+// printMargins — поля страницы мм (0 = дефолт движка: PDF 10/10/10/20,
+// DOCX 1440 twips со всех сторон). Пример: {"left": 30, "top": 17.5}.
+type printMargins struct {
+	Left   float64 `json:"left,omitempty"`
+	Top    float64 `json:"top,omitempty"`
+	Right  float64 `json:"right,omitempty"`
+	Bottom float64 `json:"bottom,omitempty"`
+}
+
 // printTemplate — распарсенный и проверенный шаблон. Title необязателен:
 // шапка документа (организация) может идти обычными блоками до заголовка,
 // тогда title пропускается и в PDF, и в DOCX.
+// pageNum: header|footer|none (дефолт footer) — где нумеровать страницы.
 type printTemplate struct {
-	Title  string       `json:"title"`
-	Font   string       `json:"font,omitempty"`
-	Header string       `json:"header,omitempty"`
-	Footer string       `json:"footer,omitempty"`
-	Blocks []printBlock `json:"blocks"`
+	Title   string        `json:"title"`
+	Font    string        `json:"font,omitempty"`
+	Header  string        `json:"header,omitempty"`
+	Footer  string        `json:"footer,omitempty"`
+	PageNum string        `json:"pageNum,omitempty"`
+	Margins *printMargins `json:"margins,omitempty"`
+	Blocks  []printBlock  `json:"blocks"`
 }
 
 // validatePrintStyle проверяет оформительские опции (общие для блоков).
@@ -164,6 +218,15 @@ func validatePrintStyle(where string, s printTextStyle, family string) error {
 	}
 	if s.Indent < 0 || s.Indent > 100 || s.FirstLine < 0 || s.FirstLine > 100 {
 		return fmt.Errorf("%s: invalid indent/firstLine (want 0..100 mm)", where)
+	}
+	if s.RightIndent < 0 || s.RightIndent > 100 {
+		return fmt.Errorf("%s: invalid rightIndent (want 0..100 mm)", where)
+	}
+	if s.SpaceBefore < 0 || s.SpaceBefore > 50 || s.SpaceAfter < 0 || s.SpaceAfter > 50 {
+		return fmt.Errorf("%s: invalid spaceBefore/spaceAfter (want 0..50 mm)", where)
+	}
+	if s.Line != 0 && s.Line != 1 && s.Line != 1.5 && s.Line != 2 {
+		return fmt.Errorf("%s: invalid line %v (want 1|1.5|2)", where, s.Line)
 	}
 	return nil
 }
@@ -194,6 +257,18 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 	}
 	if tpl.Font != "" && tpl.Font != "arial" && tpl.Font != "times" {
 		return nil, fmt.Errorf("print template: invalid font %q (want arial|times)", tpl.Font)
+	}
+	switch tpl.PageNum {
+	case "", "header", "footer", "none":
+	default:
+		return nil, fmt.Errorf("print template: invalid pageNum %q (want header|footer|none)", tpl.PageNum)
+	}
+	if tpl.Margins != nil {
+		for _, m := range []float64{tpl.Margins.Left, tpl.Margins.Top, tpl.Margins.Right, tpl.Margins.Bottom} {
+			if m < 0 || m > 50 {
+				return nil, fmt.Errorf("print template: invalid margins (want 0..50 mm)")
+			}
+		}
 	}
 	for i, b := range tpl.Blocks {
 		where := fmt.Sprintf("print template: block %d", i+1)
@@ -233,11 +308,18 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 					return nil, fmt.Errorf("%s: table needs 1..12 columns", where)
 				}
 				for _, c := range b.Columns {
-					if strings.TrimSpace(c.Label) == "" {
+					// Label нужен только при видимой шапке таблицы.
+					if printBlockShow(b.Header) && strings.TrimSpace(c.Label) == "" {
 						return nil, fmt.Errorf("%s: table column needs label", where)
 					}
-					if !reFilterColumn.MatchString(c.Field) {
+					if c.Text == "" && !reFilterColumn.MatchString(c.Field) {
 						return nil, fmt.Errorf("%s: invalid column field %q", where, c.Field)
+					}
+					if c.Text != "" && c.Field != "" {
+						return nil, fmt.Errorf("%s: column takes either text or field, not both", where)
+					}
+					if c.Text != "" && c.Ref != "" {
+						return nil, fmt.Errorf("%s: column takes either text or ref, not both", where)
 					}
 					if err := validatePrintRef(where, c.Ref); err != nil {
 						return nil, err
@@ -249,6 +331,16 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 					case "", "left", "center", "right", "justify":
 					default:
 						return nil, fmt.Errorf("%s: invalid column align %q", where, c.Align)
+					}
+					cFam := c.Font
+					if cFam == "" {
+						cFam = family
+					}
+					if err := validatePrintStyle(where, printTextStyle{
+						Font: cFam, Bold: c.Bold, Italic: c.Italic, Underline: c.Underline,
+						Color: c.Color, Size: c.Size,
+					}, cFam); err != nil {
+						return nil, err
 					}
 				}
 			} else {

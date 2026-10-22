@@ -254,13 +254,20 @@ func TestParsePrintV2(t *testing.T) {
 		`{"title": "x", "blocks": [{"type": "text", "text": "y", "italic": true}]}`,
 		`{"title": "x", "blocks": [{"type": "text", "text": "y", "size": 100}]}`,
 		`{"title": "x", "blocks": [{"type": "text", "text": "y", "indent": -1}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "rightIndent": 101}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "spaceAfter": -1}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "line": 3}]}`,
 		`{"title": "x", "blocks": [{"type": "image", "src": "../x.png", "width": 40}]}`,
 		`{"title": "x", "blocks": [{"type": "image", "src": "x.gif", "width": 40}]}`,
 		`{"title": "x", "blocks": [{"type": "image", "src": "x.png", "width": 500}]}`,
 		`{"title": "x", "blocks": [{"type": "field", "label": "N", "field": "a", "ref": "Bad-Ref!"}]}`,
-		`{"title": "x", "blocks": [{"type": "table", "columns": [{"field": "a", "label": "L", "width": 99}]}]}`,
 		`{"title": "x", "blocks": [{"type": "table", "columns": [{"field": "a"}], "rows": [{"label": "L", "field": "a"}]}]}`,
+		`{"title": "x", "blocks": [{"type": "table", "columns": [{"label": "L", "text": "t", "field": "a"}]}]}`,
+		`{"title": "x", "blocks": [{"type": "table", "columns": [{"label": "L", "field": "a-b"}]}]}`,
+		`{"title": "x", "blocks": [{"type": "table", "columns": [{"label": "", "text": "t"}]}]}`,
 		`{"title": "x", "blocks": [{"type": "list", "items": []}]}`,
+		`{"title": "x", "blocks": [{"type": "image", "src": "x.png", "width": 40}], "pageNum": "sideways"}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y"}], "margins": {"left": 99}}`,
 	} {
 		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
 			t.Fatalf("want error for %q", bad)
@@ -354,6 +361,59 @@ func TestRenderPrintV2(t *testing.T) {
 		t.Fatal("no Times New Roman in docx")
 	}
 	if _, err := renderPrintPDF(tpl, row, images); err != nil {
+		t.Fatalf("pdf: %v", err)
+	}
+
+	// TestPrintLayoutV2 проверяет точные метрики примера: отступы, интервалы,
+	// borderless-таблицу без шапки, текстовые колонки, поля страницы.
+	v2layout, err := parsePrintTemplate([]byte(`{
+	  "font": "times", "pageNum": "header",
+	  "margins": {"left": 30, "top": 17.5, "right": 15, "bottom": 20},
+	  "blocks": [
+	    {"type": "heading", "text": "Шапка", "align": "left", "size": 14, "rightIndent": 85, "firstLine": 12.5, "spaceBefore": 10.59, "spaceAfter": 10.59},
+	    {"type": "table", "header": false, "borders": false, "columns": [
+	      {"text": "01.01.2026", "align": "left", "color": "333333"},
+	      {"text": "№ ПР-1", "align": "right", "underline": true, "bold": true}
+	    ]},
+	    {"type": "text", "text": "абзац", "align": "justify", "size": 14, "line": 1.5},
+	    {"type": "field", "label": "Основания", "field": "missing_field"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatalf("valid layout template: %v", err)
+	}
+	lrow := map[string]any{"dnumber": "ПР-1"}
+	lout, err := renderPrintDOCX(v2layout, lrow, nil)
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	lparts := unzipDoc(t, lout)
+	ldoc := lparts["word/document.xml"]
+	for _, want := range []string{
+		`w:right="4819"`, `w:firstLine="708"`,
+		`w:before="600" w:after="600"`,
+		`w:val="both"`, `w:line="360" w:lineRule="auto"`,
+		`№ ПР-1`, `w:u w:val="single"`,
+		`w:color w:val="333333"`, `w:b/`,
+		`w:pgMar w:top="992" w:right="850" w:bottom="1134" w:left="1701"`,
+	} {
+		if !strings.Contains(ldoc, want) {
+			t.Fatalf("document.xml lacks %q", want)
+		}
+	}
+	if strings.Contains(ldoc, "Основания") {
+		t.Fatal("empty field must be skipped")
+	}
+	if strings.Contains(ldoc, "tblBorders") {
+		t.Fatal("borders must be absent with borders:false")
+	}
+	if _, ok := lparts["word/footer1.xml"]; ok {
+		t.Fatal("no footer expected with pageNum=header")
+	}
+	if !strings.Contains(lparts["word/header1.xml"], "PAGE") {
+		t.Fatal("no PAGE field in header")
+	}
+	if _, err := renderPrintPDF(v2layout, lrow, nil); err != nil {
 		t.Fatalf("pdf: %v", err)
 	}
 	// Arial-italic запрещён валидацией (нет начертания в бинарнике).

@@ -1,22 +1,30 @@
 {
   "font": "times",
+  "pageNum": "header",
+  "margins": {"left": 30, "top": 17.5, "right": 15, "bottom": 20},
   "blocks": [
     {"type": "image", "src": "emblem.png", "width": 22, "align": "center"},
     {"type": "text", "text": "ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ВЫСШЕГО ОБРАЗОВАНИЯ «САНКТ-ПЕТЕРБУРГСКИЙ ГОСУДАРСТВЕННЫЙ УНИВЕРСИТЕТ» (СПбГУ)", "align": "center", "size": 12},
     {"type": "text", "text": "СТУДЕНЧЕСКИЙ СОВЕТ (СОВЕТ ОБУЧАЮЩИХСЯ)", "align": "center", "bold": true, "size": 13},
     {"type": "text", "text": "ДИСЦИПЛИНАРНЫЙ КОМИТЕТ", "align": "center", "bold": true, "size": 14},
     {"type": "heading", "text": "ПРИКАЗ", "align": "center", "size": 20},
-    {"type": "text", "text": "№ {{dnumber}} от {{ddate}} года", "align": "center", "size": 14},
-    {"type": "heading", "text": "О приёме лица в состав", "align": "center", "size": 14},
-    {"type": "text", "text": "В соответствии с п. 1 Положения о Дисциплинарном комитете Студенческого совета СПбГУ,", "align": "justify", "size": 14},
-    {"type": "text", "text": "ПРИКАЗЫВАЮ:", "align": "left", "firstLine": 12.7, "size": 14},
-    {"type": "list", "ordered": true, "items": [
+    {"type": "table", "header": false, "borders": false, "columns": [
+      {"text": "{{ddate}}", "align": "left", "size": 14},
+      {"text": "№ {{dnumber}}", "align": "right", "underline": true, "size": 14}
+    ]},
+    {"type": "heading", "text": "О приёме лица в состав", "align": "left", "size": 14, "rightIndent": 85, "firstLine": 12.5, "spaceBefore": 10.59, "spaceAfter": 10.59},
+    {"type": "text", "text": "В соответствии с п. 1 Положения о Дисциплинарном комитете Студенческого совета СПбГУ,", "align": "justify", "size": 14, "line": 1.5, "firstLine": 12.7},
+    {"type": "heading", "text": "ПРИКАЗЫВАЮ:", "align": "left", "size": 15, "firstLine": 12.7, "spaceBefore": 2.1, "spaceAfter": 2.1},
+    {"type": "list", "ordered": true, "align": "justify", "size": 14, "line": 1.5, "items": [
       "Принять {{last_name}} {{first_name}} {{middle_name}} в состав Дисциплинарного комитета Студенческого совета (совета обучающихся) СПбГУ.",
       "Руководителю отдела проверки материалов обеспечить ознакомление лица, указанного в п. 1 настоящего Приказа, с настоящим приказом в течение 3 суток с даты издания."
-    ], "size": 14},
+    ]},
     {"type": "field", "label": "Основания", "field": "note", "align": "justify", "size": 14},
     {"type": "image", "src": "sign.png", "width": 35, "align": "left"},
     {"type": "text", "text": "Председатель Дисциплинарного комитета", "size": 14},
-    {"type": "text", "text": "Студенческого совета СПбГУ _________ / И. О. Фамилия", "size": 14}
+    {"type": "table", "header": false, "borders": false, "columns": [
+      {"text": "Студенческого совета СПбГУ", "size": 14},
+      {"text": "И. О. Фамилия", "align": "right", "size": 14}
+    ]}
   ]
 }
