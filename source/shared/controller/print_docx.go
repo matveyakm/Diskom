@@ -181,8 +181,10 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 
 	var body strings.Builder
 
-	body.WriteString(printDocxPara(renderPrintText(tpl.Title, record),
-		printTextStyle{Bold: true, Align: "center"}, 16, true))
+	if strings.TrimSpace(renderPrintText(tpl.Title, record)) != "" {
+		body.WriteString(printDocxPara(renderPrintText(tpl.Title, record),
+			printTextStyle{Bold: true, Align: "center"}, 16, true))
+	}
 	for _, b := range tpl.Blocks {
 		switch b.Type {
 		case "heading":

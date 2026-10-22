@@ -119,7 +119,9 @@ type printBlockRow struct {
 	Ref   string `json:"ref,omitempty"`
 }
 
-// printTemplate — распарсенный и проверенный шаблон.
+// printTemplate — распарсенный и проверенный шаблон. Title необязателен:
+// шапка документа (организация) может идти обычными блоками до заголовка,
+// тогда title пропускается и в PDF, и в DOCX.
 type printTemplate struct {
 	Title  string       `json:"title"`
 	Header string       `json:"header,omitempty"`
@@ -166,9 +168,7 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 	if err := json.Unmarshal(raw, &tpl); err != nil {
 		return nil, fmt.Errorf("invalid print template JSON: %w", err)
 	}
-	if strings.TrimSpace(tpl.Title) == "" {
-		return nil, fmt.Errorf("print template: title is required")
-	}
+	// Title необязателен (шапка организации может идти блоками до заголовка).
 	if len(tpl.Blocks) == 0 || len(tpl.Blocks) > 50 {
 		return nil, fmt.Errorf("print template: blocks 1..50 required, got %d", len(tpl.Blocks))
 	}

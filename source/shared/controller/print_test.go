@@ -34,6 +34,15 @@ func TestParsePrintTemplate(t *testing.T) {
 	if tpl.Title != "Приказ {{dnumber}}" || len(tpl.Blocks) != 5 {
 		t.Fatalf("unexpected parse: %+v", tpl)
 	}
+	// Title необязателен: шапка организации идёт блоками до заголовка.
+	noTitle, err := parsePrintTemplate([]byte(
+		`{"blocks": [{"type": "heading", "text": "ПРИКАЗ", "align": "center"}]}`))
+	if err != nil {
+		t.Fatalf("title-less template must parse: %v", err)
+	}
+	if noTitle.Title != "" {
+		t.Fatalf("title must stay empty: %q", noTitle.Title)
+	}
 	for _, bad := range []string{
 		`{}`,
 		`{"title": "x", "blocks": []}`,
@@ -297,8 +306,7 @@ func TestRenderPrintV2(t *testing.T) {
 	}
 	row := map[string]any{
 		"dnumber": "ПР-71", "note": "тест", "last_name": "Ибрагимов",
-		"ddate":         time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC),
-		"id_department": int64(0),
+		"ddate": time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC),
 	}
 	images := map[string][]byte{"logo.png": testPNGBytes(t)}
 	out, err := renderPrintDOCX(tpl, row, images)
@@ -342,6 +350,20 @@ func TestRenderPrintV2(t *testing.T) {
 	}
 	if _, err := renderPrintPDF(tpl, row, images); err != nil {
 		t.Fatalf("pdf: %v", err)
+	}
+	// Пустой title не печатается отдельным абзацем.
+	bare, err := parsePrintTemplate([]byte(
+		`{"blocks": [{"type": "heading", "text": "ПРИКАЗ", "align": "center"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bareOut, err := renderPrintDOCX(bare, row, nil)
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	bareParts := unzipDoc(t, bareOut)
+	if c := strings.Count(bareParts["word/document.xml"], "<w:p>"); c != 1 {
+		t.Fatalf("want exactly the heading paragraph, got %d <w:p>", c)
 	}
 }
 

@@ -136,15 +136,17 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 		))
 	}
 
-	m.AddRow(20, col.New(12).Add(
-		text.New(renderPrintText(tpl.Title, record), props.Text{
-			Top:   5,
-			Size:  16,
-			Style: fontstyle.Bold,
-			Align: align.Center,
-		}),
-	))
-	m.AddRow(8)
+	if strings.TrimSpace(renderPrintText(tpl.Title, record)) != "" {
+		m.AddRow(20, col.New(12).Add(
+			text.New(renderPrintText(tpl.Title, record), props.Text{
+				Top:   5,
+				Size:  16,
+				Style: fontstyle.Bold,
+				Align: align.Center,
+			}),
+		))
+		m.AddRow(8)
+	}
 
 	for _, b := range tpl.Blocks {
 		switch b.Type {
