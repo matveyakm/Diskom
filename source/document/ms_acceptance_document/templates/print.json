@@ -1,0 +1,14 @@
+{
+  "title": "Приказ о приёме на работу {{dnumber}}",
+  "blocks": [
+    {"type": "field", "label": "Номер документа", "field": "dnumber"},
+    {"type": "field", "label": "Дата", "field": "ddate"},
+    {"type": "table", "title": "Сотрудник", "columns": [
+      {"field": "last_name", "label": "Фамилия"},
+      {"field": "first_name", "label": "Имя"},
+      {"field": "middle_name", "label": "Отчество"}
+    ]},
+    {"type": "field", "label": "Примечание", "field": "note"},
+    {"type": "field", "label": "VK ID", "field": "vk_id"}
+  ]
+}
