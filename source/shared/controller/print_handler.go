@@ -1,0 +1,121 @@
+package restController
+
+// HTTP-проводка печати: двухшаговая выдача на тех же роутах.
+//
+//	POST /api/<table>?print=pdf|docx  тело {"id": N} → 200 {token,size,filename,mime}
+//	GET  /api/<table>?print=file&token=...           → байты файла (разово, TTL 5 мин)
+//
+// Отдельных роутов не заводим (в app.go всего 3) — ветвимся по query
+// внутри Create/Get. Нет шаблона у сущности — 404 (пилот только приём).
+// Битый шаблон — 500 (ошибка оператора, запечён в образ).
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+
+	"gorm.io/gorm"
+)
+
+// handlePrintBuild собирает файл и кладёт в store, возвращает метаданные.
+func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Request) {
+	format := req.URL.Query().Get("print")
+	if format != "pdf" && format != "docx" {
+		r.writeError(w, "Invalid print format, want pdf|docx", http.StatusBadRequest)
+		return
+	}
+
+	var rawBody map[string]any
+	if err := json.NewDecoder(req.Body).Decode(&rawBody); err != nil {
+		r.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	defer req.Body.Close()
+
+	idValue, present := rawBody["id"]
+	if !present || idValue == nil {
+		r.writeError(w, "Missing id parameter", http.StatusBadRequest)
+		return
+	}
+	ids, err := parseIDs(fmt.Sprintf("%v", idValue))
+	if err != nil || len(ids) != 1 {
+		r.writeError(w, "Invalid id parameter", http.StatusBadRequest)
+		return
+	}
+	id := ids[0]
+
+	tpl, found, err := loadPrintTemplate()
+	if err != nil {
+		r.writeError(w, "Failed to load print template: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		r.writeError(w, "No print template for this entity", http.StatusNotFound)
+		return
+	}
+
+	var row map[string]any
+	if err := r.db.Table(r.tableName).Where("id = ?", id).Take(&row).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			r.writeError(w, "Record not found", http.StatusNotFound)
+			return
+		}
+		r.writeError(w, "Failed to retrieve record: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var (
+		data []byte
+		mime string
+		ext  string
+	)
+	switch format {
+	case "pdf":
+		mime, ext = printPdfMime, "pdf"
+		if data, err = renderPrintPDF(tpl, row); err != nil {
+			r.writeError(w, "Failed to render PDF: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	case "docx":
+		mime, ext = printDocxMime, "docx"
+		if data, err = renderPrintDOCX(tpl, row); err != nil {
+			r.writeError(w, "Failed to render DOCX: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	filename := fmt.Sprintf("%s-%d.%s", r.tableName, id, ext)
+	token := printTokenStore.put(printFile{Bytes: data, Filename: filename, Mime: mime})
+
+	r.writeJSONResponse(w, printResponse{
+		Token:    token,
+		Size:     len(data),
+		Filename: filename,
+		Mime:     mime,
+	}, http.StatusOK)
+}
+
+// handlePrintFile отдаёт готовый файл разово (повторный GET — 404).
+func (r *CRUDRepository[T]) handlePrintFile(w http.ResponseWriter, req *http.Request) {
+	token := req.URL.Query().Get("token")
+	if token == "" {
+		r.writeError(w, "Missing token parameter", http.StatusBadRequest)
+		return
+	}
+	f, ok := printTokenStore.get(token)
+	if !ok {
+		r.writeError(w, "Print file expired or invalid token", http.StatusNotFound)
+		return
+	}
+
+	disposition := "attachment"
+	if f.Mime == printPdfMime {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Type", f.Mime)
+	w.Header().Set("Content-Disposition", disposition+`; filename="`+f.Filename+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(f.Bytes)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(f.Bytes)
+}

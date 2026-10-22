@@ -129,6 +129,11 @@ func (r *CRUDRepository[T]) HandleRequest(w http.ResponseWriter, req *http.Reque
 
 // Create handles POST requests to create a new record
 func (r *CRUDRepository[T]) Create(w http.ResponseWriter, req *http.Request) {
+	// Печать — на том же роуте (см. print_handler.go): новых роутов не заводим.
+	if format := req.URL.Query().Get("print"); format != "" {
+		r.handlePrintBuild(w, req)
+		return
+	}
 	var entity T
 	if err := json.NewDecoder(req.Body).Decode(&entity); err != nil {
 		r.writeError(w, "Invalid request body", http.StatusBadRequest)
@@ -169,6 +174,15 @@ func (r *CRUDRepository[T]) Create(w http.ResponseWriter, req *http.Request) {
 
 // Get handles GET requests with pagination support
 func (r *CRUDRepository[T]) Get(w http.ResponseWriter, req *http.Request) {
+	// Выдача готового файла печати (см. print_handler.go).
+	if req.URL.Query().Get("print") == "file" {
+		r.handlePrintFile(w, req)
+		return
+	}
+	if format := req.URL.Query().Get("print"); format != "" {
+		r.writeError(w, "Invalid print request: building is POST-only, download via ?print=file&token=", http.StatusBadRequest)
+		return
+	}
 	// Check if this is a single record request or paginated list request
 	id := req.URL.Query().Get("id")
 	if id != "" {
