@@ -195,7 +195,9 @@ func printDocxTable(headers []string, values []string, styles []printTextStyle, 
 }
 
 // printDocxDrawing — inline-картинка. Размеры в EMU (1 мм = 36000).
-func printDocxDrawing(rid string, widthMm float64, img []byte) string {
+// num — уникальный номер картинки в документе (docPr/cNvPr id обязаны
+// различаться, иначе Word предлагает восстановить документ).
+func printDocxDrawing(num int, rid string, widthMm float64, img []byte) string {
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(img))
 	cx := int(widthMm * 36000)
 	cy := cx
@@ -204,16 +206,16 @@ func printDocxDrawing(rid string, widthMm float64, img []byte) string {
 	}
 	return fmt.Sprintf(
 		`<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">`+
-			`<wp:extent cx="%d" cy="%d"/><wp:docPr id="1" name="img"/>`+
+			`<wp:extent cx="%d" cy="%d"/><wp:docPr id="%d" name="img%d"/>`+
 			`<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`+
 			`<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`+
 			`<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`+
-			`<pic:nvPicPr><pic:cNvPr id="1" name="img"/><pic:cNvPicPr/></pic:nvPicPr>`+
+			`<pic:nvPicPr><pic:cNvPr id="%d" name="img%d"/><pic:cNvPicPr/></pic:nvPicPr>`+
 			`<pic:blipFill><a:blip r:embed="%s"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`+
 			`<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="%d" cy="%d"/></a:xfrm>`+
-			`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></a:spPr>`+
+			`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`+
 			`</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`,
-		cx, cy, rid, cx, cy,
+		cx, cy, num, num, num, num, rid, cx, cy,
 	)
 }
 
@@ -269,7 +271,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			if b.Size != 0 {
 				size = b.Size
 			}
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, size, true, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
+			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, size, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 		case "field":
 			if strings.TrimSpace(stringifyPrintValue(record[b.Field])) == "" {
 				continue
@@ -292,8 +294,21 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				body.WriteString(printDocxPara(prefix+rendered, b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 			}
 		case "image":
-			img := images[b.Src]
-			body.WriteString(printDocxImagePara(printDocxDrawing(imgRids[b.Src], b.Width, img), b.Align))
+			img, ok := images[b.Src]
+			if !ok {
+				return nil, fmt.Errorf("print template: image %q not loaded", b.Src)
+			}
+			num := 0
+			for i, src := range imgOrder {
+				if src == b.Src {
+					num = i + 1
+					break
+				}
+			}
+			if num == 0 {
+				return nil, fmt.Errorf("print template: image %q not registered", b.Src)
+			}
+			body.WriteString(printDocxImagePara(printDocxDrawing(num, imgRids[b.Src], b.Width, img), b.Align))
 		case "table":
 			tblFam := printDocxFont(printFontFamily(tpl, b.printTextStyle))
 			size := 11.0
@@ -417,7 +432,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 		`xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ` +
 		`xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
 		`<w:body>` + body.String() +
-		fmt.Sprintf(`<w:sectPr><w:pgMar w:top="%d" w:right="%d" w:bottom="%d" w:left="%d"/>`, top, right, bottom, left)
+		fmt.Sprintf(`<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="%d" w:right="%d" w:bottom="%d" w:left="%d"/>`, top, right, bottom, left)
 	if headerRel != "" {
 		documentXML += `<w:headerReference w:type="default" r:id="` + headerRel + `"/>`
 	}
@@ -481,6 +496,8 @@ func printDocxStyles(fam string) string {
 }
 
 // printDocxHeader — колонтитул верха: текст и/или номер страницы.
+// fldSimple содержит кэшированное значение (пустой fldSimple без runs
+// Word считает битым и предлагает восстановить документ).
 func printDocxHeader(text string, withPage bool, fam string) string {
 	inner := ""
 	if text != "" {
@@ -488,7 +505,7 @@ func printDocxHeader(text string, withPage bool, fam string) string {
 			xmlEscape(text) + ` </w:t></w:r>`
 	}
 	if withPage {
-		inner += `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:fldSimple w:instr="PAGE" /></w:r>`
+		inner += `<w:fldSimple w:instr=" PAGE "><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">1</w:t></w:r></w:fldSimple>`
 	}
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 		`<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
@@ -505,8 +522,7 @@ func printDocxFooter(text string, withPage bool, fam string) string {
 	if withPage {
 		inner += `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr>` +
 			`<w:t xml:space="preserve">Стр. </w:t></w:r>` +
-			`<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr>` +
-			`<w:fldSimple w:instr="PAGE"/></w:r>`
+			`<w:fldSimple w:instr=" PAGE "><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">1</w:t></w:r></w:fldSimple>`
 	}
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 		`<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +

@@ -208,12 +208,14 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 		fam := printFontFamily(tpl, b.printTextStyle)
 		switch b.Type {
 		case "heading":
+			// Жирность у heading НЕ дефолтная (в отличие от title): пример
+			// требует обычный "О приёме лица в состав" рядом с жирным ПРИКАЗом.
 			size := 13.0
 			if b.Size != 0 {
 				size = b.Size
 			}
 			m.AddRows(printParaRow(renderPrintText(b.Text, record),
-				printTextProps(b.printTextStyle, fam, size, true, align.Left),
+				printTextProps(b.printTextStyle, fam, size, false, align.Left),
 				b.printTextStyle.RightIndent, contentW, 0, orDefault(b.SpaceAfter, 4)))
 		case "field":
 			// Пустой field-блок пропускается (приказы не печатают "Примечание: ").

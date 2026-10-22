@@ -3,15 +3,25 @@ package restController
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/xml"
 	"image"
 	"image/color"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
+)
+
+var (
+	rePrintID    = regexp.MustCompile(`<wp:docPr id="(\d+)"`)
+	rePrintCnV   = regexp.MustCompile(`<pic:cNvPr id="(\d+)"`)
+	rePrintFld   = regexp.MustCompile(`<w:fldSimple[^>]*>.*?</w:fldSimple>|<w:fldSimple[^>]*/>`)
+	rePrintRel   = regexp.MustCompile(`<Relationship[^>]*Target="([^"]+)"[^>]*>`)
+	rePrintEmbed = regexp.MustCompile(`r:embed="(rId[^"]+)"`)
 )
 
 const validPrintTemplate = `{
@@ -305,6 +315,61 @@ func unzipDoc(t *testing.T, out []byte) map[string]string {
 		rc.Close()
 		parts[f.Name] = buf.String()
 	}
+	// Каждый XML-кусок обязан быть well-formed, иначе Word предлагает
+	// восстановить документ (урок: незакрытый pic:spPr).
+	for name, body := range parts {
+		if !strings.HasSuffix(name, ".xml") && !strings.HasSuffix(name, ".rels") {
+			continue
+		}
+		dec := xml.NewDecoder(strings.NewReader(body))
+		for {
+			if _, err := dec.Token(); err != nil {
+				if err.Error() == "EOF" {
+					break
+				}
+				t.Fatalf("%s is not well-formed XML: %v", name, err)
+			}
+		}
+	}
+	// Все цели rels обязаны существовать в пакете (урок: висячие ссылки
+	// Word тоже чинит предложением восстановить документ).
+	checkRels := func(relsPath, base string) {
+		t.Helper()
+		body, ok := parts[relsPath]
+		if !ok {
+			t.Fatalf("missing %s", relsPath)
+		}
+		for _, m := range rePrintRel.FindAllStringSubmatch(body, -1) {
+			if strings.Contains(m[0], "Mode=") {
+				continue // external
+			}
+			target := m[1]
+			if strings.HasPrefix(target, "/") {
+				target = strings.TrimPrefix(target, "/")
+			} else if base != "" {
+				target = base + "/" + target
+			}
+			if _, ok := parts[target]; !ok {
+				t.Fatalf("%s references missing part %q", relsPath, m[1])
+			}
+		}
+	}
+	checkRels("_rels/.rels", "")
+	checkRels("word/_rels/document.xml.rels", "word")
+	// Все r:embed обязаны указывать на существующий media-файл.
+	for _, m := range rePrintEmbed.FindAllStringSubmatch(parts["word/document.xml"], -1) {
+		rid := m[1]
+		found := false
+		for _, r := range rePrintRel.FindAllStringSubmatch(parts["word/_rels/document.xml.rels"], -1) {
+			if strings.Contains(r[0], `Id="`+rid+`"`) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("r:embed %q has no relationship", rid)
+		}
+	}
 	return parts
 }
 
@@ -415,6 +480,51 @@ func TestRenderPrintV2(t *testing.T) {
 	}
 	if _, err := renderPrintPDF(v2layout, lrow, nil); err != nil {
 		t.Fatalf("pdf: %v", err)
+	}
+	// docPr/cNvPr id обязаны быть уникальны (дубли Word чинит восстановлением).
+	seenIDs := make(map[string]bool)
+	for _, m := range append(
+		rePrintID.FindAllStringSubmatch(ldoc, -1),
+		rePrintCnV.FindAllStringSubmatch(ldoc, -1)...) {
+		if seenIDs[m[1]] {
+			t.Fatalf("duplicate drawing id %q", m[1])
+		}
+		seenIDs[m[1]] = true
+	}
+	// Пустых fldSimple быть не должно (только с кэшированным значением).
+	for _, m := range rePrintFld.FindAllString(ldoc, -1) {
+		if !strings.Contains(m, "<w:r>") {
+			t.Fatalf("empty fldSimple: %.60q", m)
+		}
+	}
+	// Два изображения: id обязаны различаться, оба media на месте.
+	twoImg, err := parsePrintTemplate([]byte(`{
+	  "blocks": [
+	    {"type": "image", "src": "a.png", "width": 22, "align": "center"},
+	    {"type": "image", "src": "b.png", "width": 35, "align": "left"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatalf("valid image template: %v", err)
+	}
+	imgBytes := testPNGBytes(t)
+	iout, err := renderPrintDOCX(twoImg, map[string]any{}, map[string][]byte{"a.png": imgBytes, "b.png": imgBytes})
+	if err != nil {
+		t.Fatalf("docx with images: %v", err)
+	}
+	iparts := unzipDoc(t, iout)
+	idoc := iparts["word/document.xml"]
+	ids := rePrintID.FindAllStringSubmatch(idoc, -1)
+	if len(ids) != 2 || ids[0][1] == ids[1][1] {
+		t.Fatalf("drawing ids must be unique, got %v", ids)
+	}
+	for _, want := range []string{"word/media/rIdImg1.png", "word/media/rIdImg2.png"} {
+		if _, ok := iparts[want]; !ok {
+			t.Fatalf("missing media part %q", want)
+		}
+	}
+	if _, err := renderPrintPDF(twoImg, map[string]any{}, map[string][]byte{"a.png": imgBytes, "b.png": imgBytes}); err != nil {
+		t.Fatalf("pdf with images: %v", err)
 	}
 	// Arial-italic запрещён валидацией (нет начертания в бинарнике).
 	// Пустой title не печатается отдельным абзацем.
