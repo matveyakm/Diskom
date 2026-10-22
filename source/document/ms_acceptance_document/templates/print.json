@@ -1,14 +1,15 @@
 {
-  "title": "Приказ о приёме на работу {{dnumber}}",
+  "title": "Приказ о приёме на работу",
   "blocks": [
-    {"type": "field", "label": "Номер документа", "field": "dnumber"},
-    {"type": "field", "label": "Дата", "field": "ddate"},
-    {"type": "table", "title": "Сотрудник", "columns": [
+    {"type": "text", "text": "№ {{dnumber}} от {{ddate}} года", "align": "center"},
+    {"type": "text", "text": "Принять на работу с {{ddate}}:"},
+    {"type": "table", "title": "Работник", "columns": [
       {"field": "last_name", "label": "Фамилия"},
       {"field": "first_name", "label": "Имя"},
       {"field": "middle_name", "label": "Отчество"}
     ]},
-    {"type": "field", "label": "Примечание", "field": "note"},
-    {"type": "field", "label": "VK ID", "field": "vk_id"}
+    {"type": "field", "label": "Основание", "field": "note"},
+    {"type": "text", "text": "Руководитель организации _________ / __________ /"},
+    {"type": "text", "text": "С приказом ознакомлен(а) _________ / __________ /"}
   ]
 }
