@@ -1,0 +1,151 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: oklch(0 0 0 / 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.window {
+    background: var(--background);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    width: 440px;
+    max-width: calc(100vw - 32px);
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.closeX {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.body {
+    padding: 16px 20px 20px;
+}
+
+.formats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.formatOption {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.formatBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.formatHint {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.printBtn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--primary);
+    background: var(--primary);
+    color: var(--primary-text);
+}
+
+.printBtn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.fileRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+}
+
+.fileRow:hover {
+    background: var(--hover);
+}
+
+.fileBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.fileName {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+}
+
+.fileSize {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.errorText {
+    color: #f87171;
+    font-size: 0.875rem;
+    margin-bottom: 12px;
+}

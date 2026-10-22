@@ -15,6 +15,7 @@ import {useDeleteDocument} from "./useDeleteDocument";
 import {useAcceptDocument} from "./useAcceptDocument";
 import {FieldRow} from "./FieldRow";
 import {ConfirmDialog} from "@/shared/ui/ConfirmDialog";
+import {PrintModal} from "@/shared/DataTable/ui/PrintModal";
 import {TableRow} from "@/shared/DataTable/types";
 import Edit from "@/assets/icons/edit.svg?react";
 import Print from "@/assets/icons/printer.svg?react";
@@ -60,6 +61,7 @@ const pipelineMessage = (question: string, consequences: string, effects: Pipeli
 
 const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
+    const [printOpen, setPrintOpen] = useState(false);
 
     const visibleFields = fields.filter(f => !f.hidden);
     const itemName = tableMeta?.item_title;
@@ -258,7 +260,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                         <button type="button" onClick={handleDelete} className={styles.deleteBtn} disabled={isDeleting}>
                             <div className={styles.icon}><Delete/></div> {isDeleting ? "Удаление..." : "Удалить"}
                         </button>
-                        <button type="button" className={styles.actionBtn}>
+                        <button type="button" className={styles.actionBtn} onClick={() => setPrintOpen(true)}>
                             <div className={styles.icon}><Print/></div> Печать
                         </button>
                         <button type="button" className={styles.actionBtn}>
@@ -317,6 +319,15 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                     </form>
                 </div>
             </div>
+
+            {printOpen && selectedRow != null && (
+                <PrintModal
+                    docName={docName}
+                    rowId={selectedRow.id}
+                    docTitle={`${itemName ?? docName} ${getRowValue(selectedRow, "dnumber") ?? ""}`.trim()}
+                    onClose={() => setPrintOpen(false)}
+                />
+            )}
 
             {dialog && (
                 <ConfirmDialog
