@@ -34,8 +34,17 @@ func xmlEscape(s string) string {
 	return r.Replace(s)
 }
 
+// printDocxFont маппит DSL-имя в имя для Word (Tinos метрически
+// совместим с Times New Roman, в документе фигурирует как он).
+func printDocxFont(fam string) string {
+	if fam == "times" {
+		return "Times New Roman"
+	}
+	return "Arial"
+}
+
 // printDocxRun — текстовый ран с оформлением блока.
-func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool) string {
+func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool, fam string) string {
 	style := ""
 	if defBold || s.Bold {
 		style += `<w:b/>`
@@ -54,14 +63,14 @@ func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool) 
 		style += `<w:color w:val="` + strings.ToUpper(s.Color) + `"/>`
 	}
 	return fmt.Sprintf(
-		`<w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r>`,
-		style, int(size*2), xmlEscape(text),
+		`<w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r>`,
+		style, int(size*2), fam, fam, xmlEscape(text),
 	)
 }
 
 // printDocxPara — абзац. center/right/justify через jc; indent/firstLine
 // в twips (1 мм = 56.7 twips, firstLine — точный, в отличие от PDF).
-func printDocxPara(text string, s printTextStyle, defSize float64, defBold bool) string {
+func printDocxPara(text string, s printTextStyle, defSize float64, defBold bool, fam string) string {
 	jc := ""
 	switch s.Align {
 	case "center":
@@ -78,11 +87,11 @@ func printDocxPara(text string, s printTextStyle, defSize float64, defBold bool)
 	}
 	return fmt.Sprintf(
 		`<w:p><w:pPr>%s%s<w:spacing w:after="120"/></w:pPr>%s</w:p>`,
-		jc, ind, printDocxRun(text, s, defSize, defBold),
+		jc, ind, printDocxRun(text, s, defSize, defBold, fam),
 	)
 }
 
-func printDocxCell(text string, bold bool, size float64, align string) string {
+func printDocxCell(text string, bold bool, size float64, align string, fam string) string {
 	style := ""
 	if bold {
 		style = `<w:b/>`
@@ -95,12 +104,12 @@ func printDocxCell(text string, bold bool, size float64, align string) string {
 		jc = `<w:jc w:val="right"/>`
 	}
 	return fmt.Sprintf(
-		`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:pPr>%s</w:pPr><w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
-		jc, style, int(size*2), xmlEscape(text),
+		`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:pPr>%s</w:pPr><w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
+		jc, style, int(size*2), fam, fam, xmlEscape(text),
 	)
 }
 
-func printDocxTable(headers []string, values []string, aligns []string, size float64) string {
+func printDocxTable(headers []string, values []string, aligns []string, size float64, fam string) string {
 	var b strings.Builder
 	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders></w:tblPr><w:tblGrid>`)
 	for range headers {
@@ -108,11 +117,11 @@ func printDocxTable(headers []string, values []string, aligns []string, size flo
 	}
 	b.WriteString(`</w:tblGrid><w:tr>`)
 	for i, h := range headers {
-		b.WriteString(printDocxCell(h, true, size, aligns[i]))
+		b.WriteString(printDocxCell(h, true, size, aligns[i], fam))
 	}
 	b.WriteString(`</w:tr><w:tr>`)
 	for i, v := range values {
-		b.WriteString(printDocxCell(v, false, size, aligns[i]))
+		b.WriteString(printDocxCell(v, false, size, aligns[i], fam))
 	}
 	b.WriteString(`</w:tr></w:tbl>`)
 	return b.String()
@@ -181,9 +190,10 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 
 	var body strings.Builder
 
+	tplFam := printDocxFont(printFontFamily(tpl, printTextStyle{}))
 	if strings.TrimSpace(renderPrintText(tpl.Title, record)) != "" {
 		body.WriteString(printDocxPara(renderPrintText(tpl.Title, record),
-			printTextStyle{Bold: true, Align: "center"}, 16, true))
+			printTextStyle{Bold: true, Align: "center"}, 16, true, tplFam))
 	}
 	for _, b := range tpl.Blocks {
 		switch b.Type {
@@ -192,15 +202,16 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			if b.Size != 0 {
 				size = b.Size
 			}
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, size, true))
+			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, size, true, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 		case "field":
 			if strings.TrimSpace(stringifyPrintValue(record[b.Field])) == "" {
 				continue
 			}
+			fam := printDocxFont(printFontFamily(tpl, b.printTextStyle))
 			body.WriteString(printDocxPara(
-				b.Label+": "+stringifyPrintValue(record[b.Field]), b.printTextStyle, 11, false))
+				b.Label+": "+stringifyPrintValue(record[b.Field]), b.printTextStyle, 11, false, fam))
 		case "text":
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, 11, false))
+			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 		case "list":
 			for i, item := range b.Items {
 				rendered := renderPrintText(item, record)
@@ -211,7 +222,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				if b.Ordered {
 					prefix = fmt.Sprintf("%d. ", i+1)
 				}
-				body.WriteString(printDocxPara(prefix+rendered, b.printTextStyle, 11, false))
+				body.WriteString(printDocxPara(prefix+rendered, b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 			}
 		case "image":
 			img := images[b.Src]
@@ -223,7 +234,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 					size = b.Size
 				}
 				body.WriteString(printDocxPara(renderPrintText(b.Title, record),
-					printTextStyle{Bold: true}, size, true))
+					printTextStyle{Bold: true}, size, true, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 			}
 			size := 11.0
 			if b.Size != 0 {
@@ -238,14 +249,15 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 					values = append(values, stringifyPrintValue(record[c.Field]))
 					aligns = append(aligns, c.Align)
 				}
-				body.WriteString(printDocxTable(headers, values, aligns, size))
+				body.WriteString(printDocxTable(headers, values, aligns, size, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 			} else {
+				tblFam := printDocxFont(printFontFamily(tpl, b.printTextStyle))
 				var rows strings.Builder
 				rows.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="6000"/></w:tblGrid>`)
 				for _, r := range b.Rows {
 					rows.WriteString(`<w:tr>`)
-					rows.WriteString(printDocxCell(r.Label, true, size, ""))
-					rows.WriteString(printDocxCell(stringifyPrintValue(record[r.Field]), false, size, ""))
+					rows.WriteString(printDocxCell(r.Label, true, size, "", tblFam))
+					rows.WriteString(printDocxCell(stringifyPrintValue(record[r.Field]), false, size, "", tblFam))
 					rows.WriteString(`</w:tr>`)
 				}
 				rows.WriteString(`</w:tbl>`)
@@ -255,7 +267,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 	}
 	if tpl.Footer != "" {
 		body.WriteString(printDocxPara(renderPrintText(tpl.Footer, record),
-			printTextStyle{Align: "center", Color: "808080"}, 9, false))
+			printTextStyle{Align: "center", Color: "808080"}, 9, false, tplFam))
 	}
 
 	// --- сборка пакета ---
@@ -321,11 +333,11 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 		{"_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` + rels.String()},
 		{"word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` + docRels.String()},
 		{"word/document.xml", documentXML},
-		{"word/styles.xml", printDocxStyles()},
-		{"word/footer1.xml", printDocxFooter(tpl.Footer)},
+		{"word/styles.xml", printDocxStyles(tplFam)},
+		{"word/footer1.xml", printDocxFooter(tpl.Footer, tplFam)},
 	}
 	if tpl.Header != "" {
-		parts = append(parts, docxPart{"word/header1.xml", printDocxHeader(tpl.Header, nil)})
+		parts = append(parts, docxPart{"word/header1.xml", printDocxHeader(tpl.Header, tplFam)})
 	}
 
 	var buf bytes.Buffer
@@ -359,37 +371,37 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 	return buf.Bytes(), nil
 }
 
-// printDocxStyles — минимальный Normal (Arial).
-func printDocxStyles() string {
+// printDocxStyles — Normal по умолчанию (шрифт шаблона).
+func printDocxStyles(fam string) string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 		`<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
 		`<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>` +
-		`<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:style>` +
+		`<w:rPr><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:sz w:val="22"/></w:rPr></w:style>` +
 		`</w:styles>`
 }
 
 // printDocxHeader — колонтитул верха (статический текст).
-func printDocxHeader(text string, _ map[string]any) string {
+func printDocxHeader(text string, fam string) string {
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 		`<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
-		`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">` +
+		`<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">` +
 		xmlEscape(text) +
 		`</w:t></w:r></w:p></w:hdr>`
 }
 
 // printDocxFooter — колонтитул низа: текст + "Стр. N".
-func printDocxFooter(text string) string {
+func printDocxFooter(text string, fam string) string {
 	inner := ""
 	if text != "" {
-		inner = `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">` +
+		inner = `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">` +
 			xmlEscape(text) + ` </w:t></w:r>`
 	}
 	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 		`<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
 		`<w:p><w:pPr><w:jc w:val="center"/></w:pPr>` + inner +
-		`<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:color w:val="808080"/></w:rPr>` +
+		`<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr>` +
 		`<w:t xml:space="preserve">Стр. </w:t></w:r>` +
-		`<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:color w:val="808080"/></w:rPr>` +
+		`<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr>` +
 		`<w:fldSimple w:instr="PAGE"/></w:r>` +
 		`</w:p></w:ftr>`
 }

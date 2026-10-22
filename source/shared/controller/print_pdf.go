@@ -35,18 +35,38 @@ var printArialRegular []byte
 //go:embed fonts/ARIALBD.TTF
 var printArialBold []byte
 
+//go:embed fonts/TINOS-Regular.ttf
+var printTinosRegular []byte
+
+//go:embed fonts/TINOS-Bold.ttf
+var printTinosBold []byte
+
+//go:embed fonts/TINOS-Italic.ttf
+var printTinosItalic []byte
+
+//go:embed fonts/TINOS-BoldItalic.ttf
+var printTinosBoldItalic []byte
+
 // Шрифты грузятся один раз на процесс (per-request грузить — расточительно,
 // maroto-инстанс при этом всё равно новый на каждый документ).
 var printFontsOnce = sync.OnceValue(func() []entity.CustomFont {
 	customFonts, err := fontrepository.New().
 		AddUTF8FontFromBytes("Arial", fontstyle.Normal, printArialRegular).
 		AddUTF8FontFromBytes("Arial", fontstyle.Bold, printArialBold).
+		AddUTF8FontFromBytes("Times", fontstyle.Normal, printTinosRegular).
+		AddUTF8FontFromBytes("Times", fontstyle.Bold, printTinosBold).
+		AddUTF8FontFromBytes("Times", fontstyle.Italic, printTinosItalic).
+		AddUTF8FontFromBytes("Times", fontstyle.BoldItalic, printTinosBoldItalic).
 		Load()
 	if err != nil {
 		panic("print: load fonts: " + err.Error())
 	}
 	return customFonts
 })
+
+// print_pdffamily: Tinos метрически совместим с Times New Roman,
+// в PDF фигурирует как "Times" (лицензионно чисто, Apache 2.0).
+const printFontTimes = "Times"
 
 // printAlign маппит DSL-выравнивание в maroto (дефолт — переданный).
 func printAlign(a string, def align.Type) align.Type {
@@ -93,16 +113,18 @@ func printFontStyle(s printTextStyle, defBold bool) fontstyle.Type {
 }
 
 // printTextProps — общие текстовые пропсы блока (дефолты — per-type).
-func printTextProps(s printTextStyle, defSize float64, defBold bool, defAlign align.Type) props.Text {
+func printTextProps(s printTextStyle, family string, defSize float64, defBold bool, defAlign align.Type) props.Text {
 	size := defSize
 	if s.Size != 0 {
 		size = s.Size
 	}
+	fam := printPdfFontName(family)
 	return props.Text{
-		Size:  size,
-		Style: printFontStyle(s, defBold),
-		Align: printAlign(s.Align, defAlign),
-		Color: printColor(s.Color),
+		Family: fam,
+		Size:   size,
+		Style:  printFontStyle(s, defBold),
+		Align:  printAlign(s.Align, defAlign),
+		Color:  printColor(s.Color),
 		// Абзацный отступ в PDF приближаем левым (честно: maroto не умеет
 		// first-line; точный — только в DOCX).
 		Left: s.Indent + s.FirstLine,
@@ -129,9 +151,10 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 	if tpl.Header != "" {
 		m.AddRow(8, col.New(12).Add(
 			text.New(renderPrintText(tpl.Header, record), props.Text{
-				Size:  9,
-				Align: align.Center,
-				Color: &props.Color{Red: 128, Green: 128, Blue: 128},
+				Family: printPdfFamily(tpl),
+				Size:   9,
+				Align:  align.Center,
+				Color:  &props.Color{Red: 128, Green: 128, Blue: 128},
 			}),
 		))
 	}
@@ -139,10 +162,11 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 	if strings.TrimSpace(renderPrintText(tpl.Title, record)) != "" {
 		m.AddRow(20, col.New(12).Add(
 			text.New(renderPrintText(tpl.Title, record), props.Text{
-				Top:   5,
-				Size:  16,
-				Style: fontstyle.Bold,
-				Align: align.Center,
+				Family: printPdfFamily(tpl),
+				Top:    5,
+				Size:   16,
+				Style:  fontstyle.Bold,
+				Align:  align.Center,
 			}),
 		))
 		m.AddRow(8)
@@ -156,7 +180,7 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 				size = b.Size
 			}
 			m.AddRow(size+3, col.New(12).Add(
-				text.New(renderPrintText(b.Text, record), printTextProps(b.printTextStyle, size, true, align.Left)),
+				text.New(renderPrintText(b.Text, record), printTextProps(b.printTextStyle, printFontFamily(tpl, b.printTextStyle), size, true, align.Left)),
 			))
 			m.AddRow(4)
 		case "field":
@@ -164,12 +188,12 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 			// через stringifyPrintValue, дублируем защиту здесь).
 			if value := stringifyPrintValue(record[b.Field]); value != "" {
 				m.AddRow(8, col.New(12).Add(
-					text.New(b.Label+": "+value, printTextProps(b.printTextStyle, 10, false, align.Left)),
+					text.New(b.Label+": "+value, printTextProps(b.printTextStyle, printFontFamily(tpl, b.printTextStyle), 10, false, align.Left)),
 				))
 			}
 		case "text":
 			m.AddRow(8, col.New(12).Add(
-				text.New(renderPrintText(b.Text, record), printTextProps(b.printTextStyle, 10, false, align.Left)),
+				text.New(renderPrintText(b.Text, record), printTextProps(b.printTextStyle, printFontFamily(tpl, b.printTextStyle), 10, false, align.Left)),
 			))
 		case "list":
 			for i, item := range b.Items {
@@ -182,7 +206,7 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 					prefix = fmt.Sprintf("%d. ", i+1)
 				}
 				m.AddRow(8, col.New(12).Add(
-					text.New(prefix+rendered, printTextProps(b.printTextStyle, 10, false, align.Left)),
+					text.New(prefix+rendered, printTextProps(b.printTextStyle, printFontFamily(tpl, b.printTextStyle), 10, false, align.Left)),
 				))
 			}
 			m.AddRow(2)
@@ -203,9 +227,10 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 			))
 			m.AddRow(4)
 		case "table":
+			fam := printFontFamily(tpl, b.printTextStyle)
 			if b.Title != "" {
 				m.AddRow(10, col.New(12).Add(
-					text.New(renderPrintText(b.Title, record), props.Text{Size: 11, Style: fontstyle.Bold}),
+					text.New(renderPrintText(b.Title, record), props.Text{Family: printPdfFontName(fam), Size: 11, Style: fontstyle.Bold}),
 				))
 			}
 			size := 9.0
@@ -218,9 +243,10 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 				for i, c := range b.Columns {
 					header.Add(col.New(widths[i]).Add(
 						text.New(c.Label, props.Text{
-							Size:  size,
-							Style: fontstyle.Bold,
-							Align: printAlign(c.Align, align.Left),
+							Family: printPdfFontName(fam),
+							Size:   size,
+							Style:  fontstyle.Bold,
+							Align:  printAlign(c.Align, align.Left),
 						}),
 					))
 				}
@@ -229,8 +255,9 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 				for i, c := range b.Columns {
 					data.Add(col.New(widths[i]).Add(
 						text.New(stringifyPrintValue(record[c.Field]), props.Text{
-							Size:  size,
-							Align: printAlign(c.Align, align.Left),
+							Family: printPdfFontName(fam),
+							Size:   size,
+							Align:  printAlign(c.Align, align.Left),
 						}),
 					))
 				}
@@ -240,10 +267,10 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 					value := stringifyPrintValue(record[r.Field])
 					labelRow := row.New(8)
 					labelRow.Add(col.New(4).Add(
-						text.New(r.Label, props.Text{Size: size, Style: fontstyle.Bold}),
+						text.New(r.Label, props.Text{Family: printPdfFontName(fam), Size: size, Style: fontstyle.Bold}),
 					))
 					labelRow.Add(col.New(8).Add(
-						text.New(value, props.Text{Size: size}),
+						text.New(value, props.Text{Family: printPdfFontName(fam), Size: size}),
 					))
 					m.AddRows(labelRow)
 				}
@@ -255,9 +282,10 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 	if tpl.Footer != "" {
 		m.AddRow(8, col.New(12).Add(
 			text.New(renderPrintText(tpl.Footer, record), props.Text{
-				Size:  9,
-				Align: align.Center,
-				Color: &props.Color{Red: 128, Green: 128, Blue: 128},
+				Family: printPdfFamily(tpl),
+				Size:   9,
+				Align:  align.Center,
+				Color:  &props.Color{Red: 128, Green: 128, Blue: 128},
 			}),
 		))
 	}
@@ -267,6 +295,19 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 		return nil, err
 	}
 	return document.GetBytes(), nil
+}
+
+// printPdfFamily — семейство по умолчанию шаблона (блоки резолвят своё сами).
+func printPdfFamily(tpl *printTemplate) string {
+	return printPdfFontName(printFontFamily(tpl, printTextStyle{}))
+}
+
+// printPdfFontName маппит DSL-имя в имя семейства maroto.
+func printPdfFontName(fam string) string {
+	if fam == "times" {
+		return printFontTimes
+	}
+	return "Arial"
 }
 
 // printColumnWidths делит сетку 12 по весам колонок (дефолт 1).

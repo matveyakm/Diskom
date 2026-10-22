@@ -73,10 +73,12 @@ var (
 )
 
 // printTextStyle — общие оформительские опции текстовых блоков.
-// align: left|center|right|justify. size: пункты (0 = дефолт типа блока).
+// font: arial (дефолт) или times (Tinos, метрически Times New Roman).
+// align: left|center|right|justify. size: пункты (0 = дефолт типа).
 // indent: левый отступ мм; firstLine: абзацный отступ мм (в DOCX точный,
-// в PDF приближён левым отступом — честно задокументировано здесь).
+// в PDF приближён левым отступом — maroto не умеет first-line).
 type printTextStyle struct {
+	Font      string  `json:"font,omitempty"`
 	Align     string  `json:"align,omitempty"`
 	Bold      bool    `json:"bold,omitempty"`
 	Italic    bool    `json:"italic,omitempty"`
@@ -85,6 +87,17 @@ type printTextStyle struct {
 	Size      float64 `json:"size,omitempty"`
 	Indent    float64 `json:"indent,omitempty"`
 	FirstLine float64 `json:"firstLine,omitempty"`
+}
+
+// printFontFamily резолвит шрифт блока: свой → дефолт шаблона → arial.
+func printFontFamily(tpl *printTemplate, s printTextStyle) string {
+	if s.Font != "" {
+		return s.Font
+	}
+	if tpl.Font != "" {
+		return tpl.Font
+	}
+	return "arial"
 }
 
 // printBlock — один презентационный блок шаблона.
@@ -124,13 +137,20 @@ type printBlockRow struct {
 // тогда title пропускается и в PDF, и в DOCX.
 type printTemplate struct {
 	Title  string       `json:"title"`
+	Font   string       `json:"font,omitempty"`
 	Header string       `json:"header,omitempty"`
 	Footer string       `json:"footer,omitempty"`
 	Blocks []printBlock `json:"blocks"`
 }
 
 // validatePrintStyle проверяет оформительские опции (общие для блоков).
-func validatePrintStyle(where string, s printTextStyle) error {
+func validatePrintStyle(where string, s printTextStyle, family string) error {
+	if s.Font != "" && s.Font != "arial" && s.Font != "times" {
+		return fmt.Errorf("%s: invalid font %q (want arial|times)", where, s.Font)
+	}
+	if s.Italic && family != "times" {
+		return fmt.Errorf("%s: italic needs times (arial has no italic face embedded)", where)
+	}
 	switch s.Align {
 	case "", "left", "center", "right", "justify":
 	default:
@@ -172,9 +192,19 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 	if len(tpl.Blocks) == 0 || len(tpl.Blocks) > 50 {
 		return nil, fmt.Errorf("print template: blocks 1..50 required, got %d", len(tpl.Blocks))
 	}
+	if tpl.Font != "" && tpl.Font != "arial" && tpl.Font != "times" {
+		return nil, fmt.Errorf("print template: invalid font %q (want arial|times)", tpl.Font)
+	}
 	for i, b := range tpl.Blocks {
 		where := fmt.Sprintf("print template: block %d", i+1)
-		if err := validatePrintStyle(where, b.printTextStyle); err != nil {
+		family := b.Font
+		if family == "" {
+			family = tpl.Font
+		}
+		if family == "" {
+			family = "arial"
+		}
+		if err := validatePrintStyle(where, b.printTextStyle, family); err != nil {
 			return nil, err
 		}
 		if err := validatePrintRef(where, b.Ref); err != nil {

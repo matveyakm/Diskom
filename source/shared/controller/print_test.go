@@ -226,7 +226,7 @@ func v2PrintTemplate() string {
   "header": "Комитет",
   "footer": "Стр.",
   "blocks": [
-    {"type": "heading", "text": "Шапка", "align": "center", "italic": true, "color": "333333", "size": 14},
+    {"type": "heading", "text": "Шапка", "font": "times", "align": "center", "italic": true, "color": "333333", "size": 14},
     {"type": "field", "label": "Номер", "field": "dnumber", "bold": true, "align": "right"},
     {"type": "field", "label": "Отдел", "field": "id_department", "ref": "department_directory"},
     {"type": "text", "text": "Принять.", "align": "justify", "underline": true, "indent": 10, "firstLine": 5},
@@ -250,6 +250,8 @@ func TestParsePrintV2(t *testing.T) {
 	}
 	for _, bad := range []string{
 		`{"title": "x", "blocks": [{"type": "text", "text": "y", "color": "zzz"}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "font": "comic"}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "italic": true}]}`,
 		`{"title": "x", "blocks": [{"type": "text", "text": "y", "size": 100}]}`,
 		`{"title": "x", "blocks": [{"type": "text", "text": "y", "indent": -1}]}`,
 		`{"title": "x", "blocks": [{"type": "image", "src": "../x.png", "width": 40}]}`,
@@ -348,9 +350,13 @@ func TestRenderPrintV2(t *testing.T) {
 	if !strings.Contains(parts["word/document.xml"], "headerReference") {
 		t.Fatal("header not referenced")
 	}
+	if !strings.Contains(doc, "Times New Roman") {
+		t.Fatal("no Times New Roman in docx")
+	}
 	if _, err := renderPrintPDF(tpl, row, images); err != nil {
 		t.Fatalf("pdf: %v", err)
 	}
+	// Arial-italic запрещён валидацией (нет начертания в бинарнике).
 	// Пустой title не печатается отдельным абзацем.
 	bare, err := parsePrintTemplate([]byte(
 		`{"blocks": [{"type": "heading", "text": "ПРИКАЗ", "align": "center"}]}`))
