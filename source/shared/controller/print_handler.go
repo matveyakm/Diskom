@@ -65,6 +65,26 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 		return
 	}
 
+	// Имена вместо id: подменяем до рендера (fail-open внутри).
+	record := resolvePrintRefs(row, tpl, r.httpClient)
+
+	// Картинки шаблона — заранее (битый файл — 500, операторская ошибка).
+	images := make(map[string][]byte)
+	for _, b := range tpl.Blocks {
+		if b.Type != "image" {
+			continue
+		}
+		if _, dup := images[b.Src]; dup {
+			continue
+		}
+		img, _, err := loadPrintImage(b.Src)
+		if err != nil {
+			r.writeError(w, "Failed to load print image: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		images[b.Src] = img
+	}
+
 	var (
 		data []byte
 		mime string
@@ -73,13 +93,13 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	switch format {
 	case "pdf":
 		mime, ext = printPdfMime, "pdf"
-		if data, err = renderPrintPDF(tpl, row); err != nil {
+		if data, err = renderPrintPDF(tpl, record, images); err != nil {
 			r.writeError(w, "Failed to render PDF: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	case "docx":
 		mime, ext = printDocxMime, "docx"
-		if data, err = renderPrintDOCX(tpl, row); err != nil {
+		if data, err = renderPrintDOCX(tpl, record, images); err != nil {
 			r.writeError(w, "Failed to render DOCX: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

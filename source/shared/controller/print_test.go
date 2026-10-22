@@ -3,6 +3,12 @@ package restController
 import (
 	"archive/zip"
 	"bytes"
+	"image"
+	"image/color"
+	"image/png"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -36,7 +42,7 @@ func TestParsePrintTemplate(t *testing.T) {
 		`{"title": "x", "blocks": [{"type": "field", "label": "N", "field": "a-b"}]}`,
 		`{"title": "x", "blocks": [{"type": "table", "columns": []}]}`,
 		`{"title": "x", "blocks": [{"type": "text"}]}`,
-		`{"title": "x", "blocks": [{"type": "text", "text": "y", "align": "right"}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "align": "diagonal"}]}`,
 		`not json`,
 	} {
 		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
@@ -72,7 +78,7 @@ func TestRenderPrintPDF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := renderPrintPDF(tpl, samplePrintRow())
+	out, err := renderPrintPDF(tpl, samplePrintRow(), nil)
 	if err != nil {
 		t.Fatalf("pdf: %v", err)
 	}
@@ -89,7 +95,7 @@ func TestRenderPrintDOCX(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := renderPrintDOCX(tpl, samplePrintRow())
+	out, err := renderPrintDOCX(tpl, samplePrintRow(), nil)
 	if err != nil {
 		t.Fatalf("docx: %v", err)
 	}
@@ -136,7 +142,7 @@ func TestPrintEmptyFieldSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := map[string]any{"note": "", "dnumber": "ПР-71"}
-	out, err := renderPrintDOCX(tpl, row)
+	out, err := renderPrintDOCX(tpl, row, nil)
 	if err != nil {
 		t.Fatalf("docx: %v", err)
 	}
@@ -161,7 +167,7 @@ func TestPrintEmptyFieldSkipped(t *testing.T) {
 		t.Fatal("non-empty field block must stay")
 	}
 	// PDF тоже собирается без пустых строк (проверяем сборку, не пиксели).
-	if _, err := renderPrintPDF(tpl, row); err != nil {
+	if _, err := renderPrintPDF(tpl, row, nil); err != nil {
 		t.Fatalf("pdf: %v", err)
 	}
 }
@@ -185,13 +191,190 @@ func TestPrintStore(t *testing.T) {
 }
 
 func TestPrintColumnWidths(t *testing.T) {
-	for n, want := range map[int]int{1: 12, 2: 12, 3: 12, 5: 12} {
+	mk := func(weights ...float64) []printBlockColumn {
+		cols := make([]printBlockColumn, len(weights))
+		for i, w := range weights {
+			cols[i] = printBlockColumn{Field: "f", Label: "l", Width: w}
+		}
+		return cols
+	}
+	for _, cols := range [][]printBlockColumn{
+		mk(0), mk(0, 0), mk(0, 0, 0), mk(2, 1, 1), mk(12),
+	} {
 		sum := 0
-		for _, w := range printColumnWidths(n) {
+		for _, w := range printColumnWidths(cols) {
 			sum += w
 		}
-		if sum != want {
-			t.Fatalf("widths(%d) sum = %d", n, sum)
+		if sum != 12 {
+			t.Fatalf("widths(%v) sum = %d, want 12", cols, sum)
 		}
+	}
+}
+
+func v2PrintTemplate() string {
+	return `{
+  "title": "Приказ {{dnumber}}",
+  "header": "Комитет",
+  "footer": "Стр.",
+  "blocks": [
+    {"type": "heading", "text": "Шапка", "align": "center", "italic": true, "color": "333333", "size": 14},
+    {"type": "field", "label": "Номер", "field": "dnumber", "bold": true, "align": "right"},
+    {"type": "field", "label": "Отдел", "field": "id_department", "ref": "department_directory"},
+    {"type": "text", "text": "Принять.", "align": "justify", "underline": true, "indent": 10, "firstLine": 5},
+    {"type": "list", "ordered": true, "items": ["п.1 {{note}}", "п.2"]},
+    {"type": "list", "items": ["• {{missing}}", "ок"]},
+    {"type": "table", "title": "Т", "columns": [{"field": "last_name", "label": "Ф", "width": 2, "align": "center"}]},
+    {"type": "table", "title": "Р", "rows": [{"label": "Д", "field": "ddate"}]},
+    {"type": "image", "src": "logo.png", "width": 40, "align": "center"},
+    {"type": "text", "text": "Подпись"}
+  ]
+}`
+}
+
+func TestParsePrintV2(t *testing.T) {
+	tpl, err := parsePrintTemplate([]byte(v2PrintTemplate()))
+	if err != nil {
+		t.Fatalf("valid v2: %v", err)
+	}
+	if len(tpl.Blocks) != 10 {
+		t.Fatalf("blocks = %d", len(tpl.Blocks))
+	}
+	for _, bad := range []string{
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "color": "zzz"}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "size": 100}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "indent": -1}]}`,
+		`{"title": "x", "blocks": [{"type": "image", "src": "../x.png", "width": 40}]}`,
+		`{"title": "x", "blocks": [{"type": "image", "src": "x.gif", "width": 40}]}`,
+		`{"title": "x", "blocks": [{"type": "image", "src": "x.png", "width": 500}]}`,
+		`{"title": "x", "blocks": [{"type": "field", "label": "N", "field": "a", "ref": "Bad-Ref!"}]}`,
+		`{"title": "x", "blocks": [{"type": "table", "columns": [{"field": "a", "label": "L", "width": 99}]}]}`,
+		`{"title": "x", "blocks": [{"type": "table", "columns": [{"field": "a"}], "rows": [{"label": "L", "field": "a"}]}]}`,
+		`{"title": "x", "blocks": [{"type": "list", "items": []}]}`,
+	} {
+		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
+			t.Fatalf("want error for %q", bad)
+		}
+	}
+}
+
+// testPNGBytes генерирует 2x1 PNG без внешних файлов.
+func testPNGBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	img.Set(0, 0, color.RGBA{255, 0, 0, 255})
+	img.Set(1, 0, color.RGBA{0, 0, 255, 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func unzipDoc(t *testing.T, out []byte) map[string]string {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
+	if err != nil {
+		t.Fatalf("not a zip: %v", err)
+	}
+	parts := make(map[string]string)
+	for _, f := range zr.File {
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		buf := new(bytes.Buffer)
+		_, _ = buf.ReadFrom(rc)
+		rc.Close()
+		parts[f.Name] = buf.String()
+	}
+	return parts
+}
+
+func TestRenderPrintV2(t *testing.T) {
+	tpl, err := parsePrintTemplate([]byte(v2PrintTemplate()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := map[string]any{
+		"dnumber": "ПР-71", "note": "тест", "last_name": "Ибрагимов",
+		"ddate":         time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC),
+		"id_department": int64(0),
+	}
+	images := map[string][]byte{"logo.png": testPNGBytes(t)}
+	out, err := renderPrintDOCX(tpl, row, images)
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	parts := unzipDoc(t, out)
+	doc := parts["word/document.xml"]
+	for _, want := range []string{
+		"w:color", "w:i", "w:u", // стили
+		`w:jc w:val="right"`, `w:jc w:val="both"`, `w:jc w:val="center"`, // выравнивания
+		`w:ind w:left=`, "w:firstLine", // отступы
+		"1. п.1", "2. п.2", "• ок", // списки (пустой пункт пропущен)
+		"rIdImg1", // картинка
+	} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("document.xml lacks %q", want)
+		}
+	}
+	// Вертикальная таблица: label и значение.
+	if !strings.Contains(doc, "Р") || !strings.Contains(doc, "21.10.2026") {
+		t.Fatal("vertical rows table missing")
+	}
+	if strings.Contains(doc, "• {{missing}}") || strings.Contains(doc, "missing") {
+		t.Fatal("empty list item must be skipped")
+	}
+	if _, ok := parts["word/media/rIdImg1.png"]; !ok {
+		t.Fatal("no media part for image")
+	}
+	if !strings.Contains(parts["word/_rels/document.xml.rels"], "media/rIdImg1.png") {
+		t.Fatal("media rel missing")
+	}
+	if !strings.Contains(parts["word/footer1.xml"], "PAGE") {
+		t.Fatal("no PAGE field in footer")
+	}
+	if !strings.Contains(parts["word/header1.xml"], "Комитет") {
+		t.Fatal("no header part")
+	}
+	if !strings.Contains(parts["word/document.xml"], "headerReference") {
+		t.Fatal("header not referenced")
+	}
+	if _, err := renderPrintPDF(tpl, row, images); err != nil {
+		t.Fatalf("pdf: %v", err)
+	}
+}
+
+func TestResolvePrintRefs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": 19, "name": "Иванов"}]}`))
+	}))
+	defer srv.Close()
+	t.Setenv("REF_EMPLOYEE_DIRECTORY", srv.URL)
+
+	tpl, err := parsePrintTemplate([]byte(`{"title": "x", "blocks": [
+	  {"type": "field", "label": "С", "field": "id_employee", "ref": "employee_directory"}
+	]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := resolvePrintRefs(map[string]any{"id_employee": int64(19), "x": 1}, tpl, srv.Client())
+	if got["id_employee"] != "Иванов" {
+		t.Fatalf("ref not resolved: %v", got["id_employee"])
+	}
+	if got["x"] != 1 {
+		t.Fatal("unrelated field changed")
+	}
+	// Без связи — сырой id, без падения.
+	got = resolvePrintRefs(map[string]any{"id_employee": int64(0)}, tpl, srv.Client())
+	if got["id_employee"] != int64(0) {
+		t.Fatalf("zero id must stay raw: %v", got["id_employee"])
+	}
+	// Нет env — сырой id, без падения.
+	os.Unsetenv("REF_EMPLOYEE_DIRECTORY")
+	got = resolvePrintRefs(map[string]any{"id_employee": int64(19)}, tpl, srv.Client())
+	if got["id_employee"] != int64(19) {
+		t.Fatalf("missing env must leave raw id: %v", got["id_employee"])
 	}
 }
