@@ -5,6 +5,7 @@ package restController
 
 import (
 	_ "embed"
+	"strings"
 	"sync"
 
 	"github.com/johnfercher/maroto/v2"
@@ -72,16 +73,24 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any) ([]byte, error) {
 				text.New(renderPrintText(b.Text, record), props.Text{
 					Size:  13,
 					Style: fontstyle.Bold,
+					Align: printAlign(b.Align),
 				}),
 			))
 			m.AddRow(4)
 		case "field":
+			// Пустое поле — пропускаем: приказы не печатают "Примечание: ".
+			if strings.TrimSpace(stringifyPrintValue(record[b.Field])) == "" {
+				continue
+			}
 			m.AddRow(8, col.New(12).Add(
 				text.New(b.Label+": "+stringifyPrintValue(record[b.Field]), props.Text{Size: 10}),
 			))
 		case "text":
 			m.AddRow(8, col.New(12).Add(
-				text.New(renderPrintText(b.Text, record), props.Text{Size: 10}),
+				text.New(renderPrintText(b.Text, record), props.Text{
+					Size:  10,
+					Align: printAlign(b.Align),
+				}),
 			))
 		case "table":
 			n := len(b.Columns)
@@ -114,6 +123,14 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any) ([]byte, error) {
 		return nil, err
 	}
 	return document.GetBytes(), nil
+}
+
+// printAlign маппит DSL-выравнивание в maroto (дефолт — влево).
+func printAlign(a string) align.Type {
+	if a == "center" {
+		return align.Center
+	}
+	return align.Left
 }
 
 // printColumnWidths делит сетку 12 на n колонок целыми ширинами.

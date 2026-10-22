@@ -31,14 +31,18 @@ func xmlEscape(s string) string {
 	return r.Replace(s)
 }
 
-func printDocxPara(text string, bold bool, sizeHalfPoints int) string {
+func printDocxPara(text string, bold bool, sizeHalfPoints int, center bool) string {
 	style := ""
 	if bold {
 		style = `<w:b/>`
 	}
+	just := ""
+	if center {
+		just = `<w:jc w:val="center"/>`
+	}
 	return fmt.Sprintf(
-		`<w:p><w:pPr><w:spacing w:after="120"/></w:pPr><w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p>`,
-		style, sizeHalfPoints, xmlEscape(text),
+		`<w:p><w:pPr>%s<w:spacing w:after="120"/></w:pPr><w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p>`,
+		just, style, sizeHalfPoints, xmlEscape(text),
 	)
 }
 
@@ -74,18 +78,22 @@ func printDocxTable(headers []string, values []string) string {
 // renderPrintDOCX строит .docx байты из шаблона и строки документа.
 func renderPrintDOCX(tpl *printTemplate, record map[string]any) ([]byte, error) {
 	var body strings.Builder
-	body.WriteString(printDocxPara(renderPrintText(tpl.Title, record), true, 32))
+	body.WriteString(printDocxPara(renderPrintText(tpl.Title, record), true, 32, true))
 	for _, b := range tpl.Blocks {
+		center := b.Align == "center"
 		switch b.Type {
 		case "heading":
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), true, 26))
+			body.WriteString(printDocxPara(renderPrintText(b.Text, record), true, 26, center))
 		case "field":
-			body.WriteString(printDocxPara(b.Label+": "+stringifyPrintValue(record[b.Field]), false, 22))
+			if strings.TrimSpace(stringifyPrintValue(record[b.Field])) == "" {
+				continue
+			}
+			body.WriteString(printDocxPara(b.Label+": "+stringifyPrintValue(record[b.Field]), false, 22, false))
 		case "text":
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), false, 22))
+			body.WriteString(printDocxPara(renderPrintText(b.Text, record), false, 22, center))
 		case "table":
 			if b.Title != "" {
-				body.WriteString(printDocxPara(renderPrintText(b.Title, record), true, 24))
+				body.WriteString(printDocxPara(renderPrintText(b.Title, record), true, 24, false))
 			}
 			headers := make([]string, 0, len(b.Columns))
 			values := make([]string, 0, len(b.Columns))

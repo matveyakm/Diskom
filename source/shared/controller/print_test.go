@@ -36,6 +36,7 @@ func TestParsePrintTemplate(t *testing.T) {
 		`{"title": "x", "blocks": [{"type": "field", "label": "N", "field": "a-b"}]}`,
 		`{"title": "x", "blocks": [{"type": "table", "columns": []}]}`,
 		`{"title": "x", "blocks": [{"type": "text"}]}`,
+		`{"title": "x", "blocks": [{"type": "text", "text": "y", "align": "right"}]}`,
 		`not json`,
 	} {
 		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
@@ -116,6 +117,52 @@ func TestRenderPrintDOCX(t *testing.T) {
 	}
 	if strings.Contains(doc, "a&b") {
 		t.Fatal("unescaped & in document.xml")
+	}
+	if !strings.Contains(doc, `<w:jc w:val="center"/>`) {
+		t.Fatal("no centered paragraph (align=center not rendered)")
+	}
+}
+
+// Пустой field-блок не печатается: приказы не содержат строк вида "Основание: ".
+func TestPrintEmptyFieldSkipped(t *testing.T) {
+	tpl, err := parsePrintTemplate([]byte(`{
+	  "title": "Приказ",
+	  "blocks": [
+	    {"type": "field", "label": "Основание", "field": "note"},
+	    {"type": "field", "label": "Номер", "field": "dnumber"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := map[string]any{"note": "", "dnumber": "ПР-71"}
+	out, err := renderPrintDOCX(tpl, row)
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
+	if err != nil {
+		t.Fatalf("not a zip: %v", err)
+	}
+	var doc string
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			rc, _ := f.Open()
+			buf := new(bytes.Buffer)
+			_, _ = buf.ReadFrom(rc)
+			rc.Close()
+			doc = buf.String()
+		}
+	}
+	if strings.Contains(doc, "Основание") {
+		t.Fatal("empty field block must be skipped")
+	}
+	if !strings.Contains(doc, "ПР-71") {
+		t.Fatal("non-empty field block must stay")
+	}
+	// PDF тоже собирается без пустых строк (проверяем сборку, не пиксели).
+	if _, err := renderPrintPDF(tpl, row); err != nil {
+		t.Fatalf("pdf: %v", err)
 	}
 }
 

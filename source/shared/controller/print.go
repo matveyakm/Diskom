@@ -12,13 +12,18 @@ package restController
 //
 //	{
 //	  "title": "Приказ о приёме {{dnumber}}",
-//	  "blocks": [
-//	    {"type": "heading", "text": "..."},
-//	    {"type": "field", "label": "Номер", "field": "dnumber"},
-//	    {"type": "table", "title": "...",
-//	     "columns": [{"field": "last_name", "label": "Фамилия"}]},
-//	    {"type": "text", "text": "Основание: {{justification}}"}
-//	  ]
+//   "blocks": [
+//     {"type": "heading", "text": "...", "align": "center"},
+//     {"type": "field", "label": "Номер", "field": "dnumber"},
+//     {"type": "table", "title": "...",
+//      "columns": [{"field": "last_name", "label": "Фамилия"}]},
+//     {"type": "text", "text": "Основание: {{note}}", "align": "left"}
+//   ]
+//
+// {{field}} резолвится из строки документа, даты — в 02.01.2006,
+// отсутствующее поле — пустая строка. Пустой field-блок (незаполненное
+// поле) в документ не попадает вовсе — настоящие приказы не печатают
+// строки вида "Примечание: ". align — только left|center.
 //	}
 //
 // {{field}} резолвится из строки документа, даты — в 02.01.2006,
@@ -59,11 +64,11 @@ var (
 type printBlock struct {
 	Type    string             `json:"type"`
 	Text    string             `json:"text,omitempty"`
+	Align   string             `json:"align,omitempty"`
 	Label   string             `json:"label,omitempty"`
 	Field   string             `json:"field,omitempty"`
 	Title   string             `json:"title,omitempty"`
 	Columns []printBlockColumn `json:"columns,omitempty"`
-	_       struct{}           `json:"-"`
 }
 
 type printBlockColumn struct {
@@ -95,6 +100,9 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 	}
 	for i, b := range tpl.Blocks {
 		where := fmt.Sprintf("print template: block %d", i+1)
+		if b.Align != "" && b.Align != "left" && b.Align != "center" {
+			return nil, fmt.Errorf("%s: invalid align %q (want left|center)", where, b.Align)
+		}
 		switch b.Type {
 		case "heading", "text":
 			if strings.TrimSpace(b.Text) == "" {
