@@ -285,6 +285,22 @@ func TestPrintPDFParaSplits(t *testing.T) {
 	}
 }
 
+func TestPrintPilotTemplate(t *testing.T) {
+	// Пилотный шаблон обязан парситься и валидироваться: именно его битый
+	// JSON однажды дал 500 в проде вместо документа.
+	raw, err := os.ReadFile("../../document/ms_acceptance_document/templates/print.json")
+	if err != nil {
+		t.Fatalf("pilot template unreadable: %v", err)
+	}
+	tpl, err := parsePrintTemplate(raw)
+	if err != nil {
+		t.Fatalf("pilot template invalid: %v", err)
+	}
+	if tpl.PageNum != "header" {
+		t.Fatalf("pilot pageNum = %q, want header", tpl.PageNum)
+	}
+}
+
 func TestPrintColumnWidths(t *testing.T) {
 	mk := func(weights ...float64) []printBlockColumn {
 		cols := make([]printBlockColumn, len(weights))
