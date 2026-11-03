@@ -216,18 +216,18 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 			}
 			m.AddRows(printParaRow(renderPrintText(b.Text, record),
 				printTextProps(b.printTextStyle, fam, size, false, align.Left),
-				b.printTextStyle.RightIndent, contentW, 0, orDefault(b.SpaceAfter, 4)))
+				b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4))...)
 		case "field":
 			// Пустой field-блок пропускается (приказы не печатают "Примечание: ").
 			if value := stringifyPrintValue(record[b.Field]); value != "" {
 				m.AddRows(printParaRow(b.Label+": "+value,
 					printTextProps(b.printTextStyle, fam, 10, false, align.Left),
-					b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4)))
+					b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4))...)
 			}
 		case "text":
 			m.AddRows(printParaRow(renderPrintText(b.Text, record),
 				printTextProps(b.printTextStyle, fam, 10, false, align.Left),
-				b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4)))
+				b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4))...)
 		case "list":
 			n := 0
 			for _, item := range b.Items {
@@ -242,7 +242,7 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 				}
 				m.AddRows(printParaRow(prefix+rendered,
 					printTextProps(b.printTextStyle, fam, 10, false, align.Left),
-					b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4)))
+					b.printTextStyle.RightIndent, contentW, b.SpaceBefore, orDefault(b.SpaceAfter, 4))...)
 			}
 		case "image":
 			img, ok := images[b.Src]
@@ -341,26 +341,56 @@ func printAutoRow(c core.Component) core.Row {
 
 // printParaRow — абзац с Top/Bottom интервалами и правым отступом.
 // RightIndent в PDF приближён сужением колонки (точный — только в DOCX).
-func printParaRow(value string, p props.Text, rightIndent, contentW, top, bottom float64) core.Row {
-	p.Top += top
-	p.Bottom += bottom
-	t := text.New(value, p)
-	tw := 12
-	if rightIndent > 0 && contentW > rightIndent {
-		tw = int(12 * (contentW - rightIndent) / contentW)
-		if tw < 1 {
-			tw = 1
+// \t раскрывается в пробелы (~12.7 мм, как таб-стоп Word по умолчанию;
+// точные таб-стопы — только в DOCX). \n режется на отдельные строки:
+// maroto считает высоту только по пробелам, необработанный \n дал бы
+// наслоение строк друг на друга.
+func printParaRow(value string, p props.Text, rightIndent, contentW, top, bottom float64) []core.Row {
+	lines := strings.Split(expandPrintTabs(value, p.Size), "\n")
+	rows := make([]core.Row, 0, len(lines))
+	for i, line := range lines {
+		tp := p
+		if i == 0 {
+			tp.Top += top
 		}
-		if tw > 11 {
-			tw = 11
+		if i == len(lines)-1 {
+			tp.Bottom += bottom
 		}
+		t := text.New(line, tp)
+		tw := 12
+		if rightIndent > 0 && contentW > rightIndent {
+			tw = int(12 * (contentW - rightIndent) / contentW)
+			if tw < 1 {
+				tw = 1
+			}
+			if tw > 11 {
+				tw = 11
+			}
+		}
+		r := row.New()
+		r.Add(col.New(tw).Add(t))
+		if tw < 12 {
+			r.Add(col.New(12 - tw))
+		}
+		rows = append(rows, r)
 	}
-	r := row.New()
-	r.Add(col.New(tw).Add(t))
-	if tw < 12 {
-		r.Add(col.New(12 - tw))
+	return rows
+}
+
+// expandPrintTabs раскрывает табы в пробелы (~12.7 мм, таб-стоп Word
+// по умолчанию). Точные таб-стопы — только в DOCX.
+func expandPrintTabs(value string, sizePt float64) string {
+	if !strings.Contains(value, "\t") {
+		return value
 	}
-	return r
+	if sizePt <= 0 {
+		sizePt = 11
+	}
+	n := int(12.7/(0.25*sizePt*25.4/72) + 0.5)
+	if n < 1 {
+		n = 1
+	}
+	return strings.ReplaceAll(value, "\t", strings.Repeat(" ", n))
 }
 
 // printCellProps — пропсы ячейки таблицы (стиль колонки поверх блочного).

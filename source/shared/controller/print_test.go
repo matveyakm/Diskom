@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/johnfercher/maroto/v2/pkg/props"
 )
 
 var (
@@ -206,6 +208,42 @@ func TestPrintStore(t *testing.T) {
 	}
 	if _, ok := s.get("nope"); ok {
 		t.Fatal("unknown token must 404")
+	}
+}
+
+func TestPrintFallbackPlaceholder(t *testing.T) {
+	row := map[string]any{"a": "", "b": "B", "c": "C"}
+	if got := renderPrintText("{{a|b}}", row); got != "B" {
+		t.Fatalf("fallback empty first = %q, want B", got)
+	}
+	if got := renderPrintText("{{c|b}}", row); got != "C" {
+		t.Fatalf("fallback present first = %q, want C", got)
+	}
+	if got := renderPrintText("{{a|missing}}", row); got != "" {
+		t.Fatalf("all empty = %q, want empty", got)
+	}
+	if got := renderPrintText("{{a|}}", row); got != "{{a|}}" {
+		t.Fatalf("bad syntax must stay literal, got %q", got)
+	}
+	if got := renderPrintText("{{a-b}}", row); got != "{{a-b}}" {
+		t.Fatalf("bad ident must stay literal, got %q", got)
+	}
+}
+
+func TestPrintPDFParaSplits(t *testing.T) {
+	// \n режется на отдельные авторяды (иначе maroto насчитает высоту
+	// только по пробелам и строки налезут друг на друга).
+	p := props.Text{Family: "Times", Size: 14}
+	rows := printParaRow("A\nB\nC", p, 0, 190, 0, 0)
+	if len(rows) != 3 {
+		t.Fatalf("want 3 rows for 2 breaks, got %d", len(rows))
+	}
+	// Таб раскрывается в пробелы (~12.7 мм).
+	if got := expandPrintTabs("\tX", 14); got != strings.Repeat(" ", 10)+"X" {
+		t.Fatalf("tab expansion = %q", got)
+	}
+	if got := expandPrintTabs("ab", 14); got != "ab" {
+		t.Fatalf("no tab = unchanged, got %q", got)
 	}
 }
 
@@ -480,6 +518,46 @@ func TestRenderPrintV2(t *testing.T) {
 	}
 	if _, err := renderPrintPDF(v2layout, lrow, nil); err != nil {
 		t.Fatalf("pdf: %v", err)
+	}
+	// Плавающая картинка: якорь с абсолютными координатами, без w:tab-инлайна не обойтись.
+	// Табы и переносы строк в тексте.
+	fly, err := parsePrintTemplate([]byte(`{
+	  "blocks": [
+	    {"type": "image", "src": "a.png", "width": 35, "float": true, "x": 120, "y": 232},
+	    {"type": "text", "text": "A\tB\nC", "align": "justify"}
+	  ]
+	}`))
+	if err != nil {
+		t.Fatalf("valid float template: %v", err)
+	}
+	fout, err := renderPrintDOCX(fly, map[string]any{}, map[string][]byte{"a.png": testPNGBytes(t)})
+	if err != nil {
+		t.Fatalf("docx float: %v", err)
+	}
+	fparts := unzipDoc(t, fout)
+	fdoc := fparts["word/document.xml"]
+	for _, want := range []string{
+		`wp:anchor`, `relativeFrom="page"`, `<wp:posOffset>4320000</wp:posOffset>`,
+		`<w:tab/>`, `<w:br/>`, `w:val="both"`,
+	} {
+		if !strings.Contains(fdoc, want) {
+			t.Fatalf("document.xml lacks %q", want)
+		}
+	}
+	if strings.Contains(fdoc, "<wp:inline") {
+		t.Fatal("float image must not use inline placement")
+	}
+	// Валидация float: координаты за пределами A4 запрещены.
+	for _, bad := range []string{
+		`{"blocks": [{"type": "image", "src": "a.png", "width": 35, "float": true, "x": 500, "y": 10}]}`,
+		`{"blocks": [{"type": "image", "src": "a.png", "width": 35, "float": true, "x": 10}]}`,
+	} {
+		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
+			t.Fatalf("want error for %q", bad)
+		}
+	}
+	if _, err := renderPrintPDF(fly, map[string]any{}, map[string][]byte{"a.png": testPNGBytes(t)}); err != nil {
+		t.Fatalf("pdf float: %v", err)
 	}
 	// docPr/cNvPr id обязаны быть уникальны (дубли Word чинит восстановлением).
 	seenIDs := make(map[string]bool)

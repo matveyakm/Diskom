@@ -67,7 +67,8 @@ const (
 )
 
 var (
-	rePrintPlaceholder = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}`)
+	rePrintPlaceholder = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*\|\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*\}\}`)
+	rePrintIdent       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	rePrintColor       = regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
 	printTokenStore    = newPrintStore()
 )
@@ -143,8 +144,15 @@ type printBlock struct {
 	Ordered bool               `json:"ordered,omitempty"`
 	Src     string             `json:"src,omitempty"`
 	Width   float64            `json:"width,omitempty"`
-	Header  *bool              `json:"header,omitempty"`
-	Borders *bool              `json:"borders,omitempty"`
+	// Float: картинка поверх текста (wp:anchor) в позиции x/y мм от
+	// верхнего левого угла страницы. Без float — в потоке текста
+	// (wp:inline). В PDF движок абсолютного позиционирования не умеет,
+	// там float рендерится инлайн (зафиксировано тестом и докой).
+	Float   bool    `json:"float,omitempty"`
+	X       float64 `json:"x,omitempty"`
+	Y       float64 `json:"y,omitempty"`
+	Header  *bool   `json:"header,omitempty"`
+	Borders *bool   `json:"borders,omitempty"`
 }
 
 // printBlockShow решает tri-state флаг (nil = дефолт true).
@@ -379,6 +387,14 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 			if b.Width < 5 || b.Width > 190 {
 				return nil, fmt.Errorf("%s: image width 5..190 mm required", where)
 			}
+			if b.Float {
+				// Координаты обязательны и строго внутри страницы:
+				// ноль означает "забыли указать", а не верхний левый угол
+				// (там шапка; штамп туда ставить бессмысленно).
+				if b.X <= 0 || b.X > 210 || b.Y <= 0 || b.Y > 297 {
+					return nil, fmt.Errorf("%s: float image needs x in 0..210 and y in 0..297 mm", where)
+				}
+			}
 		default:
 			return nil, fmt.Errorf("%s: unknown type %q (want heading|field|table|list|image|text)", where, b.Type)
 		}
@@ -460,10 +476,23 @@ func stringifyPrintValue(v any) string {
 }
 
 // renderPrintText подставляет {{field}} из строки (отсутствующее — "").
+// Форма {{a|b|...}} — первый непустой (для склонений, которых может не быть:
+// {{last_genitive|last_name}}). Все альтернативы проверены регекспом,
+// неидентификатор сюда не попадёт — но при пустом результате после
+// подстановки плейсхолдер растворяется (как отсутствующее поле).
 func renderPrintText(s string, row map[string]any) string {
 	return rePrintPlaceholder.ReplaceAllStringFunc(s, func(m string) string {
-		name := rePrintPlaceholder.FindStringSubmatch(m)[1]
-		return stringifyPrintValue(row[name])
+		inner := strings.TrimSpace(m[2 : len(m)-2])
+		for _, name := range strings.Split(inner, "|") {
+			name = strings.TrimSpace(name)
+			if !rePrintIdent.MatchString(name) {
+				return m
+			}
+			if v := strings.TrimSpace(stringifyPrintValue(row[name])); v != "" {
+				return v
+			}
+		}
+		return ""
 	})
 }
 

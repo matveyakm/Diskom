@@ -44,6 +44,8 @@ func printDocxFont(fam string) string {
 }
 
 // printDocxRun — текстовый ран с оформлением блока.
+// \n внутри текста — разрыв строки (<w:br/>), \t — табуляция (<w:tab/>):
+// так шаблоны выражают и жёсткие переносы, и ведущий таб абзаца.
 func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool, fam string) string {
 	style := ""
 	if defBold || s.Bold {
@@ -62,10 +64,24 @@ func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool, 
 	if s.Color != "" {
 		style += `<w:color w:val="` + strings.ToUpper(s.Color) + `"/>`
 	}
-	return fmt.Sprintf(
-		`<w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r>`,
-		style, int(size*2), fam, fam, xmlEscape(text),
-	)
+	rpr := fmt.Sprintf(`<w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr>`,
+		style, int(size*2), fam, fam)
+	var b strings.Builder
+	for i, part := range strings.Split(text, "\n") {
+		if i > 0 {
+			b.WriteString(`<w:r>` + rpr + `<w:br/></w:r>`)
+		}
+		sub := strings.Split(part, "\t")
+		for j, chunk := range sub {
+			if j > 0 {
+				b.WriteString(`<w:r>` + rpr + `<w:tab/></w:r>`)
+			}
+			if chunk != "" {
+				b.WriteString(`<w:r>` + rpr + `<w:t xml:space="preserve">` + xmlEscape(chunk) + `</w:t></w:r>`)
+			}
+		}
+	}
+	return b.String()
 }
 
 // printDocxPara — абзац. center/right/justify через jc; отступы и интервалы
@@ -198,12 +214,7 @@ func printDocxTable(headers []string, values []string, styles []printTextStyle, 
 // num — уникальный номер картинки в документе (docPr/cNvPr id обязаны
 // различаться, иначе Word предлагает восстановить документ).
 func printDocxDrawing(num int, rid string, widthMm float64, img []byte) string {
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(img))
-	cx := int(widthMm * 36000)
-	cy := cx
-	if err == nil && cfg.Width > 0 {
-		cy = int(widthMm * float64(cfg.Height) / float64(cfg.Width) * 36000)
-	}
+	cx, cy := printImageExtent(img, widthMm)
 	return fmt.Sprintf(
 		`<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">`+
 			`<wp:extent cx="%d" cy="%d"/><wp:docPr id="%d" name="img%d"/>`+
@@ -217,6 +228,39 @@ func printDocxDrawing(num int, rid string, widthMm float64, img []byte) string {
 			`</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`,
 		cx, cy, num, num, num, num, rid, cx, cy,
 	)
+}
+
+// printDocxFloatingDrawing — картинка поверх текста (wp:anchor) в позиции
+// x/y мм от верхнего левого угла страницы. behindDoc=0 — поверх текста.
+func printDocxFloatingDrawing(num int, rid string, widthMm, xMm, yMm float64, img []byte) string {
+	cx, cy := printImageExtent(img, widthMm)
+	return fmt.Sprintf(
+		`<w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">`+
+			`<wp:simplePos x="0" y="0"/>`+
+			`<wp:positionH relativeFrom="page"><wp:posOffset>%d</wp:posOffset></wp:positionH>`+
+			`<wp:positionV relativeFrom="page"><wp:posOffset>%d</wp:posOffset></wp:positionV>`+
+			`<wp:extent cx="%d" cy="%d"/><wp:docPr id="%d" name="img%d"/>`+
+			`<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`+
+			`<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`+
+			`<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`+
+			`<pic:nvPicPr><pic:cNvPr id="%d" name="img%d"/><pic:cNvPicPr/></pic:nvPicPr>`+
+			`<pic:blipFill><a:blip r:embed="%s"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`+
+			`<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="%d" cy="%d"/></a:xfrm>`+
+			`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`+
+			`</pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing>`,
+		int(xMm*36000), int(yMm*36000), cx, cy, num, num, num, num, rid, cx, cy,
+	)
+}
+
+// printImageExtent — размеры картинки в EMU с сохранением пропорций.
+func printImageExtent(img []byte, widthMm float64) (int, int) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(img))
+	cx := int(widthMm * 36000)
+	cy := cx
+	if err == nil && cfg.Width > 0 {
+		cy = int(widthMm * float64(cfg.Height) / float64(cfg.Width) * 36000)
+	}
+	return cx, cy
 }
 
 // printDocxImagePara оборачивает drawing в абзац с выравниванием.
@@ -308,7 +352,13 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			if num == 0 {
 				return nil, fmt.Errorf("print template: image %q not registered", b.Src)
 			}
-			body.WriteString(printDocxImagePara(printDocxDrawing(num, imgRids[b.Src], b.Width, img), b.Align))
+			if b.Float {
+				// Якорь вставляется сырым XML: через printDocxPara его бы
+				// заэскейпило в текст. Выравнивание абзаца на anchor не влияет.
+				body.WriteString(`<w:p><w:r>` + printDocxFloatingDrawing(num, imgRids[b.Src], b.Width, b.X, b.Y, img) + `</w:r></w:p>`)
+			} else {
+				body.WriteString(printDocxImagePara(printDocxDrawing(num, imgRids[b.Src], b.Width, img), b.Align))
+			}
 		case "table":
 			tblFam := printDocxFont(printFontFamily(tpl, b.printTextStyle))
 			size := 11.0
