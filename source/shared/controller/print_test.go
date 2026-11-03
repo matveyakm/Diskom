@@ -211,22 +211,60 @@ func TestPrintStore(t *testing.T) {
 	}
 }
 
-func TestPrintFallbackPlaceholder(t *testing.T) {
-	row := map[string]any{"a": "", "b": "B", "c": "C"}
-	if got := renderPrintText("{{a|b}}", row); got != "B" {
-		t.Fatalf("fallback empty first = %q, want B", got)
+func TestPrintRequiredPlaceholder(t *testing.T) {
+	// Пилотный шаблон приёма обязан парситься: именно его битый JSON
+	// однажды дал 500 в проде вместо документа.
+	raw, err := os.ReadFile("../../document/ms_acceptance_document/templates/print.json")
+	if err != nil {
+		t.Fatalf("pilot template unreadable: %v", err)
 	}
-	if got := renderPrintText("{{c|b}}", row); got != "C" {
-		t.Fatalf("fallback present first = %q, want C", got)
+	if _, err := parsePrintTemplate(raw); err != nil {
+		t.Fatalf("pilot template invalid: %v", err)
 	}
-	if got := renderPrintText("{{a|missing}}", row); got != "" {
-		t.Fatalf("all empty = %q, want empty", got)
+	// {{x!}} резолвится как обычно, обязательность проверяется отдельно.
+	row := map[string]any{"a": "A", "b": ""}
+	if got := renderPrintText("{{a!}}|{{b!}}", row); got != "A|" {
+		t.Fatalf("strict renders value as-is, got %q", got)
 	}
-	if got := renderPrintText("{{a|}}", row); got != "{{a|}}" {
-		t.Fatalf("bad syntax must stay literal, got %q", got)
+	tpl, err := parsePrintTemplate([]byte(`{"blocks": [
+	  {"type": "text", "text": "A {{a!}} B {{b!}}"}
+	]}`))
+	if err != nil {
+		t.Fatalf("valid strict template: %v", err)
 	}
-	if got := renderPrintText("{{a-b}}", row); got != "{{a-b}}" {
-		t.Fatalf("bad ident must stay literal, got %q", got)
+	if err := validatePrintRow(tpl, row); err == nil {
+		t.Fatal("want error for empty required field b")
+	} else if !strings.Contains(err.Error(), `"b"`) {
+		t.Fatalf("error must name the field, got: %v", err)
+	}
+	if err := validatePrintRow(tpl, map[string]any{"a": "A", "b": "x"}); err != nil {
+		t.Fatalf("filled required fields must pass: %v", err)
+	}
+	// Без ! — tolerant, как раньше: пустое растворяется, ошибки нет.
+	plain, err := parsePrintTemplate([]byte(`{"blocks": [{"type": "text", "text": "A {{b}}"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validatePrintRow(plain, row); err != nil {
+		t.Fatalf("non-strict empty must not fail: %v", err)
+	}
+	// Мусор вместо имени — не плейсхолдер вообще, остаётся текстом.
+	if got := renderPrintText("{{a-b}} {{a|b}}", row); got != "{{a-b}} {{a|b}}" {
+		t.Fatalf("garbage must stay literal, got %q", got)
+	}
+	// Заполненные склонения — родительный в документе, а не именительный.
+	gen, err := parsePrintTemplate([]byte(`{"blocks": [
+	  {"type": "text", "text": "Принять {{ln!}} {{fn}}."}
+	]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := map[string]any{"ln": "Иванова", "fn": "Анну"}
+	if err := validatePrintRow(gen, full); err != nil {
+		t.Fatalf("filled strict must pass: %v", err)
+	}
+	if got := renderPrintText("Принять {{ln!}} {{fn}}.", full); got != "Принять Иванова Анну." {
+		t.Fatalf("genitive render = %q", got)
 	}
 }
 
@@ -538,6 +576,7 @@ func TestRenderPrintV2(t *testing.T) {
 	fdoc := fparts["word/document.xml"]
 	for _, want := range []string{
 		`wp:anchor`, `relativeFrom="page"`, `<wp:posOffset>4320000</wp:posOffset>`,
+		`<wp:wrapNone/>`,
 		`<w:tab/>`, `<w:br/>`, `w:val="both"`,
 	} {
 		if !strings.Contains(fdoc, want) {

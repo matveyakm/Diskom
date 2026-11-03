@@ -232,6 +232,8 @@ func printDocxDrawing(num int, rid string, widthMm float64, img []byte) string {
 
 // printDocxFloatingDrawing — картинка поверх текста (wp:anchor) в позиции
 // x/y мм от верхнего левого угла страницы. behindDoc=0 — поверх текста.
+// wrapNone обязателен: без элемента обтекания Word считает пакет битым
+// и предлагает восстановить документ.
 func printDocxFloatingDrawing(num int, rid string, widthMm, xMm, yMm float64, img []byte) string {
 	cx, cy := printImageExtent(img, widthMm)
 	return fmt.Sprintf(
@@ -239,7 +241,8 @@ func printDocxFloatingDrawing(num int, rid string, widthMm, xMm, yMm float64, im
 			`<wp:simplePos x="0" y="0"/>`+
 			`<wp:positionH relativeFrom="page"><wp:posOffset>%d</wp:posOffset></wp:positionH>`+
 			`<wp:positionV relativeFrom="page"><wp:posOffset>%d</wp:posOffset></wp:positionV>`+
-			`<wp:extent cx="%d" cy="%d"/><wp:docPr id="%d" name="img%d"/>`+
+			`<wp:extent cx="%d" cy="%d"/><wp:wrapNone/>`+
+			`<wp:docPr id="%d" name="img%d"/>`+
 			`<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`+
 			`<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`+
 			`<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">`+

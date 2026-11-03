@@ -68,6 +68,14 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	// Имена вместо id: подменяем до рендера (fail-open внутри).
 	record := resolvePrintRefs(row, tpl, r.httpClient)
 
+	// Обязательные поля шаблона ({{x!}}): пустое значение — честная ошибка
+	// сборки, а не дыра в документе. Пользователь раньше замечает проблему
+	// и зовёт администратора, чем подписывает неверный приказ.
+	if err := validatePrintRow(tpl, record); err != nil {
+		r.writeError(w, "Cannot print: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Картинки шаблона — заранее (битый файл — 500, операторская ошибка).
 	images := make(map[string][]byte)
 	for _, b := range tpl.Blocks {

@@ -67,8 +67,7 @@ const (
 )
 
 var (
-	rePrintPlaceholder = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*\|\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*\}\}`)
-	rePrintIdent       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	rePrintPlaceholder = regexp.MustCompile(`\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(!?)\s*\}\}`)
 	rePrintColor       = regexp.MustCompile(`^[0-9a-fA-F]{6}$`)
 	printTokenStore    = newPrintStore()
 )
@@ -476,24 +475,48 @@ func stringifyPrintValue(v any) string {
 }
 
 // renderPrintText подставляет {{field}} из строки (отсутствующее — "").
-// Форма {{a|b|...}} — первый непустой (для склонений, которых может не быть:
-// {{last_genitive|last_name}}). Все альтернативы проверены регекспом,
-// неидентификатор сюда не попадёт — но при пустом результате после
-// подстановки плейсхолдер растворяется (как отсутствующее поле).
+// Суффикс ! ({{field!}}) помечает обязательное поле: само значение всё равно
+// подставляется как есть (пустое — пусто), а проверка обязательности делается
+// отдельно в validatePrintRow ДО рендера — молчаливый пропуск запрещён.
 func renderPrintText(s string, row map[string]any) string {
 	return rePrintPlaceholder.ReplaceAllStringFunc(s, func(m string) string {
-		inner := strings.TrimSpace(m[2 : len(m)-2])
-		for _, name := range strings.Split(inner, "|") {
-			name = strings.TrimSpace(name)
-			if !rePrintIdent.MatchString(name) {
-				return m
+		name := rePrintPlaceholder.FindStringSubmatch(m)[1]
+		return stringifyPrintValue(row[name])
+	})
+}
+
+// validatePrintRow проверяет обязательные плейсхолдеры ({{field!}}):
+// отсутствующее или пустое значение — это ошибка сборки документа, а не
+// пустая строка. Честная ошибка вместо молчаливого неверного документа:
+// пользователь раньше замечает и зовёт администратора, а не подписывает
+// приказ с дырами. Пустая строка считается отсутствием (пробелы тримятся).
+func validatePrintRow(tpl *printTemplate, row map[string]any) error {
+	var texts []string
+	texts = append(texts, tpl.Title, tpl.Header, tpl.Footer)
+	for _, b := range tpl.Blocks {
+		texts = append(texts, b.Text)
+		texts = append(texts, b.Items...)
+		for _, c := range b.Columns {
+			texts = append(texts, c.Text)
+		}
+	}
+	seen := make(map[string]bool)
+	for _, t := range texts {
+		for _, m := range rePrintPlaceholder.FindAllStringSubmatch(t, -1) {
+			if m[2] != "!" {
+				continue
 			}
-			if v := strings.TrimSpace(stringifyPrintValue(row[name])); v != "" {
-				return v
+			name := strings.TrimSpace(m[1])
+			if seen[name] {
+				continue
+			}
+			seen[name] = true
+			if strings.TrimSpace(stringifyPrintValue(row[name])) == "" {
+				return fmt.Errorf("print template: required field %q is empty", name)
 			}
 		}
-		return ""
-	})
+	}
+	return nil
 }
 
 // printID64 приводит id из строки к int64 (pgx даёт int64, JSON —
