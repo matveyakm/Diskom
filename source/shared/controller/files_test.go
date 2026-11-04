@@ -89,6 +89,38 @@ func TestFileLimitsEnv(t *testing.T) {
 	}
 }
 
+func TestParseActualDate(t *testing.T) {
+	for _, tc := range []struct {
+		in   string
+		ok   bool
+		want string
+	}{
+		{"2026-03-01", true, "2026-03-01"},
+		{"2026-03-01T00:00:00Z", true, "2026-03-01"},
+		{"", false, ""},
+		{"yesterday", false, ""},
+		{"2026-13-01", false, ""},
+	} {
+		got, ok := parseActualDate(tc.in)
+		if ok != tc.ok {
+			t.Fatalf("parseActualDate(%q) ok = %v, want %v", tc.in, ok, tc.ok)
+		}
+		if ok && got.Format("2006-01-02") != tc.want {
+			t.Fatalf("parseActualDate(%q) = %v, want %s", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestStripActualParams(t *testing.T) {
+	out := stripActualParams(map[string][]string{
+		"actual": {"effective_date"}, "at": {"2026-03-01"},
+		"id_committee": {"1"}, "sort": {"id"}, "foo-bar": {"x"},
+	})
+	if len(out) != 1 || out["id_committee"][0] != "1" {
+		t.Fatalf("stripActualParams = %v", out)
+	}
+}
+
 func TestHasDeletePredicate(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

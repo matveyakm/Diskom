@@ -39,7 +39,7 @@
       "columns": [
         { "field": "id_document", "label": "Документ", "end_point": "symbolism_document"},
         { "field": "ddate", "label": "Дата"},
-        { "field": "id_committee", "label": "Комитет", "end_point": "department_directory"},
+        { "field": "id_committee", "label": "Комитет", "end_point": "organization_directory"},
         { "field": "comment", "label": "Комментарий"}
       ]
     }',

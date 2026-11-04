@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -191,8 +193,88 @@ func (r *CRUDRepository[T]) Get(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Актуальная версия на дату: ?actual=<поле>&at=<дата> — одна строка,
+	// максимальная <поле> среди field <= at (поле задаётся вызывающим;
+	// дефолтная договорённость — ddate; точечная настройка под сущность
+	// не требует схемы: поле — параметр запроса, а не конфига).
+	if req.URL.Query().Get("actual") != "" {
+		r.getActual(w, req)
+		return
+	}
+
 	// Handle paginated list request
 	r.getList(w, req)
+}
+
+// getActual отвечает на вопрос «какая версия актуальна на дату»:
+// новейшая строка, у которой <field> <= <at> (поле не NULL).
+// Соседние exact-фильтры учитываются (напр. id_committee=1 — актуальная
+// символика конкретного комитета). Нет такой — честный 404, а не пусто.
+func (r *CRUDRepository[T]) getActual(w http.ResponseWriter, req *http.Request) {
+	field := strings.TrimSpace(req.URL.Query().Get("actual"))
+	if !reFilterColumn.MatchString(field) {
+		r.writeError(w, "Invalid actual parameter: want a column name", http.StatusBadRequest)
+		return
+	}
+	at, ok := parseActualDate(strings.TrimSpace(req.URL.Query().Get("at")))
+	if !ok {
+		r.writeError(w, "Invalid at parameter: want RFC3339 or YYYY-MM-DD date", http.StatusBadRequest)
+		return
+	}
+	params := req.URL.Query()
+	filtered, err := applyFieldFilters(r.db.Table(r.tableName), stripActualParams(params))
+	if err != nil {
+		r.writeError(w, "Invalid filter parameter: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if empty, ierr := hasEmptyIn(params); ierr != nil {
+		r.writeError(w, "Invalid filter parameter: "+ierr.Error(), http.StatusBadRequest)
+		return
+	} else if empty {
+		r.writeError(w, "Actual version not found", http.StatusNotFound)
+		return
+	}
+	var entity T
+	q := filtered.Where(field+" IS NOT NULL").Where(field+" <= ?", at).Order(field + " DESC").First(&entity)
+	if q.Error != nil {
+		if q.Error == gorm.ErrRecordNotFound {
+			r.writeError(w, "Actual version not found", http.StatusNotFound)
+			return
+		}
+		r.writeError(w, "Failed to find actual version: "+q.Error.Error(), http.StatusInternalServerError)
+		return
+	}
+	r.writeJSONResponse(w, entity, http.StatusOK)
+}
+
+// stripActualParams выкидывает служебные ключи actual/at (и зарезервированные
+// — через общий splitFilterKey), чтобы applyFieldFilters их не тронул.
+func stripActualParams(params map[string][]string) map[string][]string {
+	out := make(map[string][]string, len(params))
+	for k, v := range params {
+		if k == "actual" || k == "at" {
+			continue
+		}
+		if _, ok := splitFilterKey(k); !ok {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// parseActualDate принимает RFC3339 или YYYY-MM-DD (день — как начало суток UTC).
+func parseActualDate(s string) (time.Time, bool) {
+	if s == "" {
+		return time.Time{}, false
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
 }
 
 // getByID retrieves a single record by ID

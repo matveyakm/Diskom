@@ -6,6 +6,7 @@ import "time"
 type Object struct {
 	Id               int64     `gorm:"column:id;primaryKey" json:"id"`
 	DDate            time.Time `gorm:"column:ddate" json:"ddate"`
+	EffectiveDate    time.Time `gorm:"column:effective_date" json:"effective_date"`
 	DNumber          string    `gorm:"column:dnumber" json:"dnumber"`
 	IdCommittee      int64     `gorm:"column:id_committee" json:"id_committee"`
 	IdLogo           int64     `gorm:"column:id_logo" json:"id_logo"`

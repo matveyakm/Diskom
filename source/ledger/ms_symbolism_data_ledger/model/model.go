@@ -7,6 +7,7 @@ type Object struct {
 	Id               int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	IdDocument       int64     `gorm:"column:id_document" json:"id_document"`
 	DDate            time.Time `gorm:"column:ddate" json:"ddate"`
+	EffectiveDate    time.Time `gorm:"column:effective_date" json:"effective_date"`
 	IdCommittee      int64     `gorm:"column:id_committee" json:"id_committee"`
 	IdLogo           int64     `gorm:"column:id_logo" json:"id_logo"`
 	Comment          string    `gorm:"column:comment" json:"comment"`

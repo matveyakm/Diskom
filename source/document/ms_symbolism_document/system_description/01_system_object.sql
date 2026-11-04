@@ -40,7 +40,7 @@
         { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
-        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "department_directory" },
+        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "organization_directory" },
         { "field": "id_logo", "label": "Логотип", "hidden": false, "type": "file" }
       ]
     }',
@@ -62,6 +62,13 @@
       "default": "now()"
     },
     {
+      "field": "effective_date",
+      "label": "Действует с",
+      "hidden": false,
+      "required": true,
+      "default": "ddate"
+    },
+    {
       "field": "dnumber",
       "readonly": true,
       "label": "Номер",
@@ -74,7 +81,7 @@
       "hidden": false,
       "required": true,
       "type": "select",
-      "end_point": "department_directory"
+      "end_point": "organization_directory"
     },
     {
       "field": "id_logo",
@@ -162,6 +169,7 @@
                 [
                     {"id": "id"},
                     {"ddate": "ddate"},
+                    {"effective_date": "effective_date"},
                     {"dnumber": "dnumber"},
                     {"id_committee": "id_committee"},
                     {"id_logo": "id_logo"},
@@ -311,6 +319,7 @@
                 "map": [
                     {"id_document":      "id"},
                     {"ddate":            "ddate"},
+                    {"effective_date":   "effective_date"},
                     {"id_committee":     "id_committee"},
                     {"id_logo":          "id_logo"},
                     {"comment":          "comment"},

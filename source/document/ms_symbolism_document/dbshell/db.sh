@@ -13,6 +13,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   CREATE TABLE public.${DB_TABLENAME} (
     id			bigint PRIMARY KEY,
     ddate			timestamp,
+    effective_date			timestamp,
     dnumber			text,
     id_committee			bigint,
     id_logo			bigint,
@@ -29,6 +30,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON TABLE  public.${DB_TABLENAME} IS 'Symbolism Document';
   COMMENT ON COLUMN public.${DB_TABLENAME}.id IS 'Id';
   COMMENT ON COLUMN public.${DB_TABLENAME}.ddate IS 'Ddate';
+  COMMENT ON COLUMN public.${DB_TABLENAME}.effective_date IS 'Effective Date';
   COMMENT ON COLUMN public.${DB_TABLENAME}.dnumber IS 'Dnumber';
   COMMENT ON COLUMN public.${DB_TABLENAME}.id_committee IS 'Id Committee';
   COMMENT ON COLUMN public.${DB_TABLENAME}.id_logo IS 'Id Logo';
