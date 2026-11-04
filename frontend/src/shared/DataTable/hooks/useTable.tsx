@@ -35,7 +35,7 @@ export const useTable = <T extends TableRow = TableRow>({columns, rows, fields, 
                         if (v === undefined || v === null || v === "") return "—";
                         if (!serviceRef) return String(v);
                         const url = `/api/${serviceRef}/files?content=${encodeURIComponent(String(v))}`;
-                        return <a href={url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>📎</a>;
+                        return <a href={url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>Скачать</a>;
                     }
                     // Prefer backend-resolved display name (see ?expand=),
                     // fall back to the raw value when absent.

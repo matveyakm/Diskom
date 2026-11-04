@@ -40,7 +40,7 @@
         { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
-        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "department_directory" },
+        { "field": "id_committee", "label": "Отдел", "hidden": false, "end_point": "department_directory" },
         { "field": "id_logo", "label": "Логотип", "hidden": false, "type": "file" }
       ]
     }',
@@ -70,7 +70,7 @@
     },
     {
       "field": "id_committee",
-      "label": "Комитет",
+      "label": "Отдел",
       "hidden": false,
       "required": true,
       "type": "select",

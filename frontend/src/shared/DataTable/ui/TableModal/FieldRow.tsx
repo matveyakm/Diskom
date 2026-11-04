@@ -247,6 +247,8 @@ const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) =
     const [fileSize, setFileSize] = useState<number | null>(null);
     const [status, setStatus] = useState<FileUploadStatus>("idle");
     const [errorMsg, setErrorMsg] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isRequired = field.required ?? false;
 
@@ -274,9 +276,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) =
         );
     }
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const uploadFile = (file: File) => {
         if (!serviceRef) {
             setStatus("error");
             setErrorMsg("Неизвестная сущность");
@@ -322,6 +322,13 @@ const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) =
         reader.readAsDataURL(file);
     };
 
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file) return;
+        uploadFile(file);
+    };
+
     return (
         <>
             {!bare && (
@@ -334,17 +341,45 @@ const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) =
                     <a href={downloadUrl} target="_blank" rel="noreferrer">Скачать</a>
                 </div>
             )}
-            <input type="file" accept=".png,.jpg,.jpeg,.pdf" onChange={handleChange}/>
-            {fileName && (
-                <div className={styles.autocompleteLoading}>
-                    {fileName}{fileSize !== null ? ` (${formatFileSize(fileSize)})` : ""}
-                </div>
-            )}
-            {status === "uploading" && <div className={styles.autocompleteLoading}>Загрузка...</div>}
-            {status === "done" && <div className={styles.autocompleteLoading}>Загружено</div>}
-            {status === "error" && errorMsg && (
-                <div style={{color: "red", fontSize: "12px"}}>{errorMsg}</div>
-            )}
+            <div
+                className={`${styles.fileDropZone} ${isDragging ? styles.fileDropZoneActive : ""}`}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) uploadFile(file);
+                }}
+            >
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.pdf"
+                    onChange={handleChange}
+                    className={styles.fileInputHidden}
+                />
+                <button
+                    type="button"
+                    className={styles.filePickBtn}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    Выбрать файл
+                </button>
+                {fileName && (
+                    <div className={styles.autocompleteLoading}>
+                        {fileName}{fileSize !== null ? ` (${formatFileSize(fileSize)})` : ""}
+                    </div>
+                )}
+                {status === "uploading" && <div className={styles.autocompleteLoading}>Загрузка...</div>}
+                {status === "done" && <div className={styles.autocompleteLoading}>Загружено</div>}
+                {status === "error" && errorMsg && (
+                    <div style={{color: "red", fontSize: "12px"}}>{errorMsg}</div>
+                )}
+            </div>
             <input type="hidden" name={field.field} value={fileId} required={isRequired}/>
         </>
     );

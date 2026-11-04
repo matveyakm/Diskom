@@ -471,3 +471,38 @@
     transform: translate(0px, -1px);
   }
 }
+
+.fileDropZone {
+  border: 1px dashed var(--border-default);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.fileDropZoneActive {
+  border-color: var(--primary);
+  background: var(--hover);
+}
+
+.filePickBtn {
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.filePickBtn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.fileInputHidden {
+  display: none;
+}
