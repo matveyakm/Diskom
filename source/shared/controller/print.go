@@ -1,6 +1,6 @@
 package restController
 
-// Печать документов: JSON-шаблон → PDF (maroto) и DOCX (stdlib).
+// Печать документов: JSON-шаблон → PDF (folio) и DOCX (stdlib).
 //
 // Один шаблон описывает оба формата (поведение — в данных): новый
 // документ/отчёт = новый файл templates/print.json в папке сервиса,
@@ -75,12 +75,11 @@ var (
 // printTextStyle — общие оформительские опции текстовых блоков.
 // font: arial (дефолт) или times (Tinos, метрически Times New Roman).
 // align: left|center|right|justify. size: пункты (0 = дефолт типа).
-// indent: левый отступ мм; firstLine: абзацный отступ мм (в DOCX точный,
-// в PDF приближён левым отступом — maroto не умеет first-line).
-// rightIndent: правый отступ мм (DOCX точный; PDF — сужением колонки).
+// indent: левый отступ мм; firstLine: абзацный отступ мм (точный в обоих
+// форматах: DOCX — w:firstLine, PDF — folio SetFirstLineIndent).
+// rightIndent: правый отступ мм (точный в обоих форматах).
 // spaceBefore/spaceAfter: мм сверху/снизу (дефолт after — 2.1 мм, как раньше);
-// line: межстрочный интервал 1|1.5|2 (DOCX точный; PDF его не умеет —
-// maroto не поддерживает line-height, рендерит одинарным).
+// line: межстрочный интервал 1|1.5|2 (точный в обоих форматах).
 type printTextStyle struct {
 	Font        string  `json:"font,omitempty"`
 	Align       string  `json:"align,omitempty"`
@@ -143,10 +142,11 @@ type printBlock struct {
 	Ordered bool               `json:"ordered,omitempty"`
 	Src     string             `json:"src,omitempty"`
 	Width   float64            `json:"width,omitempty"`
-	// Float: картинка поверх текста (wp:anchor) в позиции x/y мм от
-	// верхнего левого угла страницы. Без float — в потоке текста
-	// (wp:inline). В PDF движок абсолютного позиционирования не умеет,
-	// там float рендерится инлайн (зафиксировано тестом и докой).
+	// Float: картинка поверх текста: в DOCX — wp:anchor, в PDF — folio
+	// Div.AddOverlay (настоящий оверлей, не поток). x — мм от левого края
+	// текстовой колонки, y — мм ниже верха абзаца-якоря (позиция блока
+	// image в потоке; так пишет сам Word). Без float — в потоке текста
+	// (wp:inline / обычный элемент).
 	Float   bool    `json:"float,omitempty"`
 	X       float64 `json:"x,omitempty"`
 	Y       float64 `json:"y,omitempty"`
@@ -387,9 +387,9 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 				return nil, fmt.Errorf("%s: image width 5..190 mm required", where)
 			}
 			if b.Float {
-				// Координаты обязательны и строго внутри страницы:
-				// ноль означает "забыли указать", а не верхний левый угол
-				// (там шапка; штамп туда ставить бессмысленно).
+				// Координаты обязательны: ноль означает "забыли указать",
+				// а не нулевое смещение. x — от края колонки (уже страницы
+				// не бывает), y — вниз от абзаца-якоря.
 				if b.X <= 0 || b.X > 210 || b.Y <= 0 || b.Y > 297 {
 					return nil, fmt.Errorf("%s: float image needs x in 0..210 and y in 0..297 mm", where)
 				}

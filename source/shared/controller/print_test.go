@@ -14,8 +14,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/johnfercher/maroto/v2/pkg/props"
 )
 
 var (
@@ -269,19 +267,33 @@ func TestPrintRequiredPlaceholder(t *testing.T) {
 }
 
 func TestPrintPDFParaSplits(t *testing.T) {
-	// \n режется на отдельные авторяды (иначе maroto насчитает высоту
-	// только по пробелам и строки налезут друг на друга).
-	p := props.Text{Family: "Times", Size: 14}
-	rows := printParaRow("A\nB\nC", p, 0, 190, 0, 0)
-	if len(rows) != 3 {
-		t.Fatalf("want 3 rows for 2 breaks, got %d", len(rows))
+	// \n режется на отдельные абзацы (явный разрыв строки, как <w:br/>).
+	fonts := printFolioFontsOnce()
+	tpl, err := parsePrintTemplate([]byte(`{"blocks": [{"type": "text", "text": "A"}]}`))
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Таб раскрывается в пробелы (~12.7 мм).
+	elems := printFolioPara(fonts, tpl, printTextStyle{}, "A\nB\nC", 11, false, 0)
+	if len(elems) != 3 {
+		t.Fatalf("want 3 elements for 2 breaks, got %d", len(elems))
+	}
+	// Таб в середине строки раскрывается в пробелы (~12.7 мм).
 	if got := expandPrintTabs("\tX", 14); got != strings.Repeat(" ", 10)+"X" {
 		t.Fatalf("tab expansion = %q", got)
 	}
 	if got := expandPrintTabs("ab", 14); got != "ab" {
 		t.Fatalf("no tab = unchanged, got %q", got)
+	}
+	// Ведущие табы отщепляются в firstLine-индент (пробелы в начале
+	// строки при justify схлопываются, индент переживает любое выравнивание).
+	if n, rest := splitLeadingTabs("\t\tX"); n != 2 || rest != "X" {
+		t.Fatalf("splitLeadingTabs = %d,%q", n, rest)
+	}
+	if n, rest := splitLeadingTabs("A\tB"); n != 0 || rest != "A\tB" {
+		t.Fatalf("mid-line tab must stay, got %d,%q", n, rest)
+	}
+	if n, rest := splitLeadingTabs(""); n != 0 || rest != "" {
+		t.Fatalf("empty = 0,empty, got %d,%q", n, rest)
 	}
 }
 
@@ -312,12 +324,12 @@ func TestPrintColumnWidths(t *testing.T) {
 	for _, cols := range [][]printBlockColumn{
 		mk(0), mk(0, 0), mk(0, 0, 0), mk(2, 1, 1), mk(12),
 	} {
-		sum := 0
-		for _, w := range printColumnWidths(cols) {
+		sum := 0.0
+		for _, w := range printFolioColWidths(cols, 465.0) {
 			sum += w
 		}
-		if sum != 12 {
-			t.Fatalf("widths(%v) sum = %d, want 12", cols, sum)
+		if sum < 464.9 || sum > 465.1 {
+			t.Fatalf("widths(%v) sum = %v, want 465", cols, sum)
 		}
 	}
 }
@@ -573,12 +585,12 @@ func TestRenderPrintV2(t *testing.T) {
 	if _, err := renderPrintPDF(v2layout, lrow, nil); err != nil {
 		t.Fatalf("pdf: %v", err)
 	}
-	// Плавающая картинка: якорь с абсолютными координатами, без w:tab-инлайна не обойтись.
-	// Табы и переносы строк в тексте.
+	// Плавающая картинка: якорь относительно колонки/абзаца (как пишет
+	// сам Word), а не абсолют от страницы. Табы и переносы строк в тексте.
 	fly, err := parsePrintTemplate([]byte(`{
 	  "blocks": [
-	    {"type": "image", "src": "a.png", "width": 35, "float": true, "x": 120, "y": 232},
-	    {"type": "text", "text": "A\tB\nC", "align": "justify"}
+	    {"type": "image", "src": "a.png", "width": 35, "float": true, "x": 95, "y": 8},
+	    {"type": "text", "text": "\tA\tB\n\tC", "align": "justify"}
 	  ]
 	}`))
 	if err != nil {
@@ -591,9 +603,11 @@ func TestRenderPrintV2(t *testing.T) {
 	fparts := unzipDoc(t, fout)
 	fdoc := fparts["word/document.xml"]
 	for _, want := range []string{
-		`wp:anchor`, `relativeFrom="page"`, `<wp:posOffset>4320000</wp:posOffset>`,
+		`wp:anchor`, `relativeFrom="column"`, `relativeFrom="paragraph"`,
+		`<wp:posOffset>3420000</wp:posOffset>`, `<wp:posOffset>288000</wp:posOffset>`,
 		`<wp:wrapNone/>`,
 		`<w:tab/>`, `<w:br/>`, `w:val="both"`,
+		`w:line="1" w:lineRule="exact"`, // контейнер якоря нулевой высоты
 	} {
 		if !strings.Contains(fdoc, want) {
 			t.Fatalf("document.xml lacks %q", want)
@@ -601,6 +615,20 @@ func TestRenderPrintV2(t *testing.T) {
 	}
 	if strings.Contains(fdoc, "<wp:inline") {
 		t.Fatal("float image must not use inline placement")
+	}
+	if strings.Contains(fdoc, `relativeFrom="page"`) {
+		t.Fatal("float anchor must be column/paragraph-relative, not page-absolute")
+	}
+	// Неймспейсы картинок обязаны быть объявлены в корне: без них Word
+	// открывает документ с «не удалось прочитать содержимое» и чинит
+	// сносом кусков (Go-парсер в unzipDoc такое пропускает молча).
+	for _, want := range []string{
+		`xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"`,
+		`xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"`,
+	} {
+		if !strings.Contains(fdoc, want) {
+			t.Fatalf("document.xml lacks namespace %q (Word shows unreadable-content warning)", want)
+		}
 	}
 	// Валидация float: координаты за пределами A4 запрещены.
 	for _, bad := range []string{
@@ -650,6 +678,21 @@ func TestRenderPrintV2(t *testing.T) {
 	ids := rePrintID.FindAllStringSubmatch(idoc, -1)
 	if len(ids) != 2 || ids[0][1] == ids[1][1] {
 		t.Fatalf("drawing ids must be unique, got %v", ids)
+	}
+	// docPr/@id и pic:cNvPr/@id делят область уникальности документа:
+	// совпадение значений — «не удалось прочитать содержимое» в Word.
+	allIDs := make(map[string]bool)
+	for _, m := range append(
+		rePrintID.FindAllStringSubmatch(idoc, -1),
+		rePrintCnV.FindAllStringSubmatch(idoc, -1)...) {
+		if allIDs[m[1]] {
+			t.Fatalf("duplicate drawing id %q across docPr/cNvPr", m[1])
+		}
+		allIDs[m[1]] = true
+	}
+	// Default на расширение — один, дубли путают строгие читалки.
+	if c := strings.Count(iparts["[Content_Types].xml"], `Extension="png"`); c != 1 {
+		t.Fatalf("want single png Default, got %d", c)
 	}
 	for _, want := range []string{"word/media/rIdImg1.png", "word/media/rIdImg2.png"} {
 		if _, ok := iparts[want]; !ok {

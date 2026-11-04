@@ -20,8 +20,8 @@
       "Руководителю отдела проверки материалов обеспечить ознакомление лица, указанного в п. 1 настоящего Приказа, с настоящим приказом в течение 3 суток с даты издания."
     ]},
     {"type": "field", "label": "Основания", "field": "note", "align": "justify", "size": 14},
-    {"type": "image", "src": "sign.png", "width": 35, "float": true, "x": 120, "y": 232},
-    {"type": "text", "text": "Председатель Дисциплинарного комитета", "size": 14},
+    {"type": "image", "src": "sign.png", "width": 35, "float": true, "x": 95, "y": 8},
+    {"type": "text", "text": "Председатель Дисциплинарного комитета", "size": 14, "spaceBefore": 8.4},
     {"type": "table", "header": false, "borders": false, "columns": [
       {"text": "Студенческого совета СПбГУ", "size": 14},
       {"text": "И. О. Фамилия", "align": "right", "size": 14}

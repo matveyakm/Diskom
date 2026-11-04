@@ -150,9 +150,14 @@ func printDocxCell(text string, s printTextStyle, defBold bool, size float64, al
 	case "justify":
 		jc = `<w:jc w:val="both"/>`
 	}
+	// Пустой pPr не эмитим вообще (валидный, но лишний узел для строгих читалок).
+	ppr := ""
+	if jc != "" {
+		ppr = `<w:pPr>` + jc + `</w:pPr>`
+	}
 	return fmt.Sprintf(
-		`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:pPr>%s</w:pPr><w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
-		jc, style, int(size*2), fam, fam, xmlEscape(text),
+		`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p>%s<w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
+		ppr, style, int(size*2), fam, fam, xmlEscape(text),
 	)
 }
 
@@ -184,9 +189,27 @@ func printColumnStyle(tpl *printTemplate, b printTextStyle, c printBlockColumn) 
 	return out
 }
 
+// printDocxContentTwips — ширина текстовой зоны в twips (A4 11906 минус поля;
+// 0 в шаблоне = дефолт движка 1440, как в pgMar ниже).
+func printDocxContentTwips(tpl *printTemplate) int {
+	left, right := 1440, 1440
+	if tpl.Margins != nil {
+		if tpl.Margins.Left != 0 {
+			left = int(tpl.Margins.Left * 56.7)
+		}
+		if tpl.Margins.Right != 0 {
+			right = int(tpl.Margins.Right * 56.7)
+		}
+	}
+	return 11906 - left - right
+}
+
 func printDocxTable(headers []string, values []string, styles []printTextStyle, widths []int, header, borders bool, fam string) string {
 	var b strings.Builder
-	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/>`)
+	// Фиксированная раскладка: колонки строго по gridCol. При auto (дефолт
+	// Word) ширины игнорируются и колонки сжимаются по контенту — ячейки
+	// без границ слипаются (баг таблицы подписи: «И. О. Фамилия» без пробела).
+	b.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblLayout w:type="fixed"/>`)
 	if borders {
 		b.WriteString(`<w:tblBorders><w:top w:val="single" w:sz="4"/><w:left w:val="single" w:sz="4"/><w:bottom w:val="single" w:sz="4"/><w:right w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/><w:insideV w:val="single" w:sz="4"/></w:tblBorders>`)
 	}
@@ -210,9 +233,15 @@ func printDocxTable(headers []string, values []string, styles []printTextStyle, 
 	return b.String()
 }
 
+// printDocxCnvIDOffset разводит id в разных областях видимости:
+// docPr/@id и pic:cNvPr/@id оба требуют уникальности в пределах документа
+// (сам Word пишет их из разных диапазонов: 6 vs 2001819034). Совпадение
+// значений — «не удалось прочитать содержимое» с починкой сносом кусков.
+const printDocxCnvIDOffset = 100000
+
 // printDocxDrawing — inline-картинка. Размеры в EMU (1 мм = 36000).
-// num — уникальный номер картинки в документе (docPr/cNvPr id обязаны
-// различаться, иначе Word предлагает восстановить документ).
+// num — уникальный номер картинки в документе (docPr id; cNvPr id
+// получается сдвигом и с docPr не пересекается — см. выше).
 func printDocxDrawing(num int, rid string, widthMm float64, img []byte) string {
 	cx, cy := printImageExtent(img, widthMm)
 	return fmt.Sprintf(
@@ -226,21 +255,25 @@ func printDocxDrawing(num int, rid string, widthMm float64, img []byte) string {
 			`<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="%d" cy="%d"/></a:xfrm>`+
 			`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`+
 			`</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`,
-		cx, cy, num, num, num, num, rid, cx, cy,
+		cx, cy, num, num, num+printDocxCnvIDOffset, num, rid, cx, cy,
 	)
 }
 
-// printDocxFloatingDrawing — картинка поверх текста (wp:anchor) в позиции
-// x/y мм от верхнего левого угла страницы. behindDoc=0 — поверх текста.
-// wrapNone обязателен: без элемента обтекания Word считает пакет битым
-// и предлагает восстановить документ.
+// printDocxFloatingDrawing — картинка поверх текста (wp:anchor): x — мм
+// от левого края текстовой колонки, y — мм ниже верха абзаца-якоря.
+// Так пишет сам Word (см. templ_example.docx: positionH from column,
+// positionV from paragraph). Абсолют от страницы здесь непригоден:
+// низ документа гуляет от длины переменных полей (напр. примечания),
+// а подпись обязана сидеть над своим блоком всегда. behindDoc=0 —
+// поверх текста. wrapNone обязателен: без элемента обтекания Word считает
+// пакет битым и предлагает восстановить документ.
 func printDocxFloatingDrawing(num int, rid string, widthMm, xMm, yMm float64, img []byte) string {
 	cx, cy := printImageExtent(img, widthMm)
 	return fmt.Sprintf(
 		`<w:drawing><wp:anchor distT="0" distB="0" distL="114300" distR="114300" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1">`+
 			`<wp:simplePos x="0" y="0"/>`+
-			`<wp:positionH relativeFrom="page"><wp:posOffset>%d</wp:posOffset></wp:positionH>`+
-			`<wp:positionV relativeFrom="page"><wp:posOffset>%d</wp:posOffset></wp:positionV>`+
+			`<wp:positionH relativeFrom="column"><wp:posOffset>%d</wp:posOffset></wp:positionH>`+
+			`<wp:positionV relativeFrom="paragraph"><wp:posOffset>%d</wp:posOffset></wp:positionV>`+
 			`<wp:extent cx="%d" cy="%d"/><wp:wrapNone/>`+
 			`<wp:docPr id="%d" name="img%d"/>`+
 			`<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">`+
@@ -251,7 +284,7 @@ func printDocxFloatingDrawing(num int, rid string, widthMm, xMm, yMm float64, im
 			`<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="%d" cy="%d"/></a:xfrm>`+
 			`<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`+
 			`</pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing>`,
-		int(xMm*36000), int(yMm*36000), cx, cy, num, num, num, num, rid, cx, cy,
+		int(xMm*36000), int(yMm*36000), cx, cy, num, num, num+printDocxCnvIDOffset, num, rid, cx, cy,
 	)
 }
 
@@ -358,7 +391,12 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			if b.Float {
 				// Якорь вставляется сырым XML: через printDocxPara его бы
 				// заэскейпило в текст. Выравнивание абзаца на anchor не влияет.
-				body.WriteString(`<w:p><w:r>` + printDocxFloatingDrawing(num, imgRids[b.Src], b.Width, b.X, b.Y, img) + `</w:r></w:p>`)
+				// Контейнер якоря — нулевой высоты (exact 1 twips + шрифт 1пт):
+				// в примере якорь вообще живёт внутри содержательного абзаца
+				// и места в потоке не занимает; иначе весь текст ниже уезжает
+				// на строку вниз и подпись относительно него выглядит выше
+				// (в PDF div-контейнер и так нулевой — там всё сходилось).
+				body.WriteString(`<w:p><w:pPr><w:spacing w:after="0" w:before="0" w:line="1" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr><w:r>` + printDocxFloatingDrawing(num, imgRids[b.Src], b.Width, b.X, b.Y, img) + `</w:r></w:p>`)
 			} else {
 				body.WriteString(printDocxImagePara(printDocxDrawing(num, imgRids[b.Src], b.Width, img), b.Align))
 			}
@@ -380,7 +418,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				headers := make([]string, 0, len(b.Columns))
 				values := make([]string, 0, len(b.Columns))
 				styles := make([]printTextStyle, 0, len(b.Columns))
-				colW := printTwipsWidths(b.Columns)
+				colW := printTwipsWidths(b.Columns, printDocxContentTwips(tpl))
 				for _, c := range b.Columns {
 					headers = append(headers, c.Label)
 					values = append(values, printColumnValue(c, record))
@@ -394,7 +432,8 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				if !printBlockShow(b.Borders) {
 					borders = ""
 				}
-				rows.WriteString(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/>` + borders + `</w:tblPr><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="6000"/></w:tblGrid>`)
+				contentTw := printDocxContentTwips(tpl)
+				rows.WriteString(fmt.Sprintf(`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblLayout w:type="fixed"/>`+borders+`</w:tblPr><w:tblGrid><w:gridCol w:w="%d"/><w:gridCol w:w="%d"/></w:tblGrid>`, contentTw/3, contentTw-contentTw/3))
 				for _, r := range b.Rows {
 					rows.WriteString(`<w:tr>`)
 					rows.WriteString(printDocxCell(r.Label, printTextStyle{Bold: true}, true, size, "left", tblFam))
@@ -430,12 +469,19 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 	if showFooter {
 		contentTypes.WriteString(`<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`)
 	}
+	// Default на расширение — один (дубли одного Extension путают строгие
+	// читалки; раньше при двух png картинках писалось дважды).
+	seenExt := make(map[string]bool)
 	for src := range images {
 		ext := "png"
 		ctype := "image/png"
 		if strings.HasSuffix(strings.ToLower(src), ".jpg") || strings.HasSuffix(strings.ToLower(src), ".jpeg") {
 			ext, ctype = "jpeg", "image/jpeg"
 		}
+		if seenExt[ext] {
+			continue
+		}
+		seenExt[ext] = true
 		contentTypes.WriteString(`<Default Extension="` + ext + `" ContentType="` + ctype + `"/>`)
 	}
 	contentTypes.WriteString(`</Types>`)
@@ -480,10 +526,17 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			left = int(tpl.Margins.Left * 56.7)
 		}
 	}
+	// xmlns:a/pic объявлены строго обязательно: картинки (inline и anchor)
+	// используют эти префиксы, без объявления Word открывает документ
+	// с «обнаружено содержимое, которое не удалось прочитать» и чинит
+	// его сносом кусков (у нас так склеивалась таблица подписи).
+	// Go-парсер в тестах такое пропускает молча — ловить только явным ассертом.
 	documentXML := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 		`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ` +
 		`xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ` +
-		`xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
+		`xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ` +
+		`xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" ` +
+		`xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
 		`<w:body>` + body.String() +
 		fmt.Sprintf(`<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="%d" w:right="%d" w:bottom="%d" w:left="%d"/>`, top, right, bottom, left)
 	if headerRel != "" {
