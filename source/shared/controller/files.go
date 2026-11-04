@@ -79,10 +79,13 @@ type fileMeta struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-// fileUpload — тело загрузки (отдельный запрос, не часть документа).
+// fileUpload — тело загрузки (отдельный запрос, не часть документа):
+// либо {file_name, data: base64}, либо {copy_from: id, id_document?}.
 type fileUpload struct {
-	FileName string `json:"file_name"`
-	Data     string `json:"data"`
+	FileName   string `json:"file_name"`
+	Data       string `json:"data"`
+	CopyFrom   any    `json:"copy_from"`
+	IdDocument *int64 `json:"id_document"`
 }
 
 // FileHandler обслуживает /api/files одного микросервиса.
@@ -188,6 +191,10 @@ func (h *FileHandler) HandleRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 // upload принимает файл отдельным запросом (сирота, без id_document).
+// Вариант {"copy_from": <id>, "id_document"?: <doc>} — дублирует существующий
+// файл новой строкой (замороженная копия для нового хозяина: печать видит
+// только свои прикреплённые файлы, живые ссылки на чужие запрещены).
+// Нет копируемого — тихий no-op {"copied": false} (первый приказ серии).
 func (h *FileHandler) upload(w http.ResponseWriter, req *http.Request, r *CRUDRepository[FileObject]) {
 	maxBody := fileMaxBytes()*4/3 + fileBodySlackBytes
 	req.Body = http.MaxBytesReader(w, req.Body, maxBody)
@@ -197,6 +204,10 @@ func (h *FileHandler) upload(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		return
 	}
 	defer req.Body.Close()
+	if up.Data == "" {
+		h.copy(w, req, r, up)
+		return
+	}
 	name := sanitizeFileName(up.FileName)
 	if name == "" || name == "." || len(up.FileName) > maxFileNameLen {
 		r.writeError(w, "Invalid file_name", http.StatusBadRequest)
@@ -224,6 +235,48 @@ func (h *FileHandler) upload(w http.ResponseWriter, req *http.Request, r *CRUDRe
 	r.writeJSONResponse(w, fileMeta{
 		Id: row.Id, FileName: row.FileName, Mime: row.Mime,
 		Size: row.Size, IdDocument: nil, CreatedAt: row.CreatedAt,
+	}, http.StatusCreated)
+}
+
+// copy дублирует файл новой строкой (тот же байты/имя/mime).
+// id_document в запросе — сразу прикрепить копию (проверяется существование
+// документа; чужие файлы копировать можно — это копия, не угон).
+func (h *FileHandler) copy(w http.ResponseWriter, req *http.Request, r *CRUDRepository[FileObject], up fileUpload) {
+	srcID, ok := printID64(up.CopyFrom)
+	if !ok {
+		// Некого копировать (первый приказ / нет прошлого логотипа) — no-op.
+		r.writeJSONResponse(w, map[string]any{"copied": false}, http.StatusOK)
+		return
+	}
+	var src FileObject
+	if err := h.db.Table(src.TableName()).Where("id = ?", srcID).First(&src).Error; err != nil {
+		r.writeError(w, "Source file not found", http.StatusNotFound)
+		return
+	}
+	row := FileObject{FileName: src.FileName, Mime: src.Mime, Size: src.Size, Data: src.Data}
+	if up.IdDocument != nil {
+		if *up.IdDocument <= 0 {
+			r.writeError(w, "Invalid id_document", http.StatusBadRequest)
+			return
+		}
+		var exists int64
+		if err := h.db.Table(h.parentTable).Where("id = ?", *up.IdDocument).Count(&exists).Error; err != nil {
+			r.writeError(w, "Failed to check document: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if exists == 0 {
+			r.writeError(w, "Document not found", http.StatusBadRequest)
+			return
+		}
+		row.IdDocument = up.IdDocument
+	}
+	if err := h.db.Table(row.TableName()).Create(&row).Error; err != nil {
+		r.writeError(w, "Failed to copy file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	r.writeJSONResponse(w, map[string]any{
+		"id": row.Id, "file_name": row.FileName, "mime": row.Mime,
+		"size": row.Size, "id_document": row.IdDocument, "copied": true,
 	}, http.StatusCreated)
 }
 

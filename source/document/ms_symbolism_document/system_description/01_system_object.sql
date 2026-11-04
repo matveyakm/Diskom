@@ -40,7 +40,7 @@
         { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
-        { "field": "id_committee", "label": "Отдел", "hidden": false, "end_point": "department_directory" },
+        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "department_directory" },
         { "field": "id_logo", "label": "Логотип", "hidden": false, "type": "file" }
       ]
     }',
@@ -70,7 +70,7 @@
     },
     {
       "field": "id_committee",
-      "label": "Отдел",
+      "label": "Комитет",
       "hidden": false,
       "required": true,
       "type": "select",
@@ -82,6 +82,12 @@
       "hidden": false,
       "required": true,
       "type": "file"
+    },
+    {
+      "field": "id_logo_old",
+      "label": "",
+      "hidden": true,
+      "required": false
     },
     {
       "field": "comment",
@@ -120,6 +126,18 @@
         [
             {
                 "Step": 1,
+                "method": "get",
+                "hide_in_preview": true,
+                "end_point": "symbolism_document",
+                "query": {"status": 2},
+                "merge": false,
+                "FK":
+                [
+                    {"_old_logo": "id_logo"}
+                ]
+            },
+            {
+                "Step": 2,
                 "method": "post",
                 "end_point": "document",
                 "map":
@@ -137,16 +155,25 @@
                 ]
             },
             {
-                "Step": 2,
+                "Step": 3,
                 "method": "post",
                 "end_point": "symbolism_document",
-                "fields":
+                "map":
                 [
-                    {"status": 1}
+                    {"id": "id"},
+                    {"ddate": "ddate"},
+                    {"dnumber": "dnumber"},
+                    {"id_committee": "id_committee"},
+                    {"id_logo": "id_logo"},
+                    {"comment": "comment"},
+                    {"status": 1},
+                    {"id_user": 1},
+                    {"prefix": 0},
+                    {"id_transaction": "id_transaction"}
                 ]
             },
             {
-                "Step": 3,
+                "Step": 4,
                 "method": "put",
                 "end_point": "symbolism_document/files",
                 "map":
@@ -154,6 +181,35 @@
                     {"id": "id_logo"},
                     {"id_document": "id"},
                     {"replace": true}
+                ]
+            },
+            {
+                "Step": 5,
+                "method": "post",
+                "end_point": "symbolism_document/files",
+                "map":
+                [
+                    {"copy_from": "_old_logo"},
+                    {"id_document": "id"}
+                ],
+                "FK":
+                [
+                    {"id_logo_old": "id"},
+                    {"copied": "copied"}
+                ]
+            },
+            {
+                "Step": 6,
+                "method": "put",
+                "hide_in_preview": true,
+                "end_point": "symbolism_document",
+                "filter": "id",
+                "conditions": [
+                    {"copied": true}
+                ],
+                "map":
+                [
+                    {"id_logo_old": "id_logo_old"}
                 ]
             }
         ]

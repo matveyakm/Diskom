@@ -9,6 +9,7 @@ type Object struct {
 	DNumber          string    `gorm:"column:dnumber" json:"dnumber"`
 	IdCommittee      int64     `gorm:"column:id_committee" json:"id_committee"`
 	IdLogo           int64     `gorm:"column:id_logo" json:"id_logo"`
+	IdLogoOld        int64     `gorm:"column:id_logo_old" json:"id_logo_old"`
 	Comment          string    `gorm:"column:comment" json:"comment"`
 	IdBasis          int16     `gorm:"column:id_basis" json:"id_basis"`
 	Status           int16     `gorm:"column:status" json:"status"`

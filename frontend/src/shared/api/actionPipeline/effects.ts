@@ -23,6 +23,14 @@ export interface ProcessingStep {
     // filter: строка same-name (?id=<ctx.id>) или объект-переименование
     // (?id=<ctx.id_employee>). Путь исполнения — executeStep в index.ts.
     filter?: string | Record<string, unknown>;
+    // query: статические литералы в query (не из контекста),
+    // например {"status": 2} для выборки только проведённых.
+    query?: Record<string, unknown>;
+    // merge: вливать ли GET-запись в контекст (дефолт true — как раньше).
+    // merge: false оставляет контекст нетронутым, работает только FK:
+    // для справочных GET (предыдущий логотип и т.п.), чтобы чужая строка
+    // не затоптала поля формы для следующих шагов.
+    merge?: boolean;
     FK?: Record<string, string>[];
     conditions?: Record<string, unknown>[];
 }

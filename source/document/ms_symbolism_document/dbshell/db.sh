@@ -16,6 +16,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     dnumber			text,
     id_committee			bigint,
     id_logo			bigint,
+    id_logo_old			bigint,
     comment			text,
     id_basis			smallint,
     status			smallint default 1,

@@ -83,6 +83,22 @@ const resolveValue = (source: unknown, context: Record<string, unknown>): unknow
     return source;
 };
 
+// firstRecordOf достаёт первую запись из ответа: одиночная строка как есть,
+// пачка {data: [...]} — нулевой элемент, пустая пачка — undefined (merge и
+// FK молча пропускают, вместо падения на конверте).
+const firstRecordOf = (response: unknown): Record<string, unknown> | undefined => {
+    const unwrapped = (response as Record<string, unknown>)?.data ?? response;
+    const inner = Array.isArray(unwrapped)
+        ? unwrapped[0]
+        : Array.isArray((unwrapped as Record<string, unknown>)?.data)
+          ? (unwrapped as { data: Record<string, unknown>[] }).data[0]
+          : unwrapped;
+    if (inner && typeof inner === "object") {
+        return inner as Record<string, unknown>;
+    }
+    return undefined;
+};
+
 const checkConditions = (
     conditions: Record<string, unknown>[] | undefined,
     context: Record<string, unknown>,
@@ -164,6 +180,15 @@ const executeStep = async (
     // DELETE: query строится ещё и из map (target←source из контекста;
     // отсутствующий ключ/нулевой FK пропускаются, литералы идут как есть).
     // PUT/POST map уезжает в тело (там его читает бэкенд).
+    // Явные литералы query (не из контекста): например {"status": 2} —
+    // static-фильтр, которого нет в форме (провести можно только проведённое,
+    // удалить — только своё; движок literals не резолвит).
+    if (step.query && typeof step.query === "object" && !Array.isArray(step.query)) {
+        for (const [target, value] of Object.entries(step.query as Record<string, unknown>)) {
+            if (value === undefined || value === null || value === "") continue;
+            params[target] = String(value);
+        }
+    }
     if (method === "delete" && step.map) {
         const mappings = Array.isArray(step.map) ? step.map : [step.map];
         for (const mapping of mappings) {
@@ -192,15 +217,16 @@ const executeStep = async (
             console.log(`[actionPipeline] GET ${fullUrl}`);
             response = await api.get<unknown>(fullUrl);
             console.log(`[actionPipeline] GET response:`, JSON.stringify(response));
-            const unwrapped = (response as Record<string, unknown>)?.data ?? response;
-            console.log(`[actionPipeline] GET unwrapped:`, JSON.stringify(unwrapped));
-            if (unwrapped) {
-                const record = Array.isArray(unwrapped) ? (unwrapped as unknown[])[0] : unwrapped;
-                console.log(`[actionPipeline] GET record:`, JSON.stringify(record));
-                if (record && typeof record === "object") {
-                    Object.assign(context, record as Record<string, unknown>);
-                    console.log(`[actionPipeline] Context after GET:`, JSON.stringify(context));
-                }
+            // Первая запись ответа — и одиночная строка, и data[0] пачки
+            // (без фильтра бэкенд отдаёт конверт {data, pagination}; сортировка
+            // по умолчанию — id DESC, т.е. первой идёт самая новая запись).
+            // merge:false — не вливать запись в контекст (нужен только FK:
+            // иначе чужая строка затопчет поля формы для следующих шагов).
+            const record = firstRecordOf(response);
+            console.log(`[actionPipeline] GET record:`, JSON.stringify(record));
+            if (record && typeof record === "object" && step.merge !== false) {
+                Object.assign(context, record);
+                console.log(`[actionPipeline] Context after GET:`, JSON.stringify(context));
             }
         } else if (method === "delete") {
             // Query — единственный рабочий путь: path-style бэкенд не
@@ -221,7 +247,7 @@ const executeStep = async (
         throw err;
     }
 
-    const responseData = (response as Record<string, unknown>)?.data ?? response;
+    const responseData = firstRecordOf(response);
     if (step.FK && Array.isArray(step.FK) && responseData) {
         console.log(`[actionPipeline] FK mapping from response:`, JSON.stringify(responseData));
         for (const fkMap of step.FK) {
