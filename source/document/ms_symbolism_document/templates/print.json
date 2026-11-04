@@ -1,0 +1,16 @@
+{
+  "font": "times",
+  "pageNum": "header",
+  "margins": {"left": 30, "top": 17.5, "right": 15, "bottom": 20},
+  "blocks": [
+    {"type": "image", "field": "id_logo", "width": 30, "align": "center"},
+    {"type": "heading", "text": "ПРИКАЗ", "align": "center", "bold": true, "size": 20},
+    {"type": "table", "header": false, "borders": false, "columns": [
+      {"text": "{{ddate}}", "align": "left", "underline": true, "size": 14},
+      {"text": "№ {{dnumber}}", "align": "right", "underline": true, "size": 14}
+    ]},
+    {"type": "heading", "text": "Об установлении символики", "align": "left", "size": 14, "rightIndent": 85, "firstLine": 12.7, "spaceBefore": 10.59, "spaceAfter": 10.59},
+    {"type": "field", "label": "Комитет", "field": "id_committee", "ref": "department_directory", "align": "justify", "size": 14},
+    {"type": "field", "label": "Комментарий", "field": "comment", "align": "justify", "size": 14}
+  ]
+}

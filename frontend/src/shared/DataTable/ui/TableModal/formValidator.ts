@@ -39,7 +39,7 @@ export const collectFormData = (
             continue;
         }
         typedFields[field.field] =
-            field.type === "select" && field.end_point
+            (field.type === "select" && field.end_point) || field.type === "file"
                 ? coerceSelectValue(String(value))
                 : String(value);
     }

@@ -40,7 +40,7 @@ const DataTable = <T extends TableRow = TableRow>({
         [columnFilters]
     );
 
-    const {table} = useTable<T>({columns, rows, fields});
+    const {table} = useTable<T>({columns, rows, fields, serviceRef: docName});
     const {isOpen, data: selectedRow, mode, openForEdit, openForCreate, close} = useModal<T>();
     const {menu, openMenu, closeMenu} = useContextMenu<T>();
     const {activeRow, selectRow, clearSelection} = useRowSelection<T>();

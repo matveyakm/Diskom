@@ -12,7 +12,7 @@ export const parseTableColumns = (rawColumnsStr: string | undefined) => {
                 .map((c) => ({
                     key: c.field,
                     label: c.label,
-                    type: c.type === "status" ? "status" : "text",
+                    type: c.type === "status" ? "status" : c.type === "file" ? "file" : "text",
                     end_point: c.end_point,
                 })) as TableColumnConfig[];
         }

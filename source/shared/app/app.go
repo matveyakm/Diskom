@@ -20,6 +20,9 @@ type App[T any] struct {
 	Mux        *http.ServeMux
 	Cfg        *config.Config
 	Repository *restController.CRUDRepository[T]
+	// Files — вторая таблица сервиса (файловые приложения сущностей,
+	// см. controller/files.go). Одна на БД, одинаковая везде.
+	Files *restController.FileHandler
 }
 
 func (a *App[T]) CreateConnection() {
@@ -64,6 +67,13 @@ func (a *App[T]) CreateConnection() {
 
 	a.ORM = db
 	a.Repository = restController.NewCRUDRepository[T](a.ORM, a.Cfg.Server.TableName)
+	// Таблица files — во всех БД одинаково (AutoMigrate покрывает и
+	// существующие volume: initdb-скрипты для них уже не выполнятся).
+	// Отдельного DDL в db.sh нет осознанно: схема одна, владеет shared.
+	if err := restController.EnsureFileTable(a.ORM); err != nil {
+		panic(fmt.Errorf("files table migrate error: %w", err))
+	}
+	a.Files = restController.NewFileHandler(a.ORM, a.Cfg.Server.TableName)
 }
 
 func (a *App[T]) CreateRoutes() {
@@ -74,6 +84,13 @@ func (a *App[T]) CreateRoutes() {
 		w.Write([]byte("Service is running"))
 	})
 	mux.HandleFunc(basePath, a.Repository.HandleRequest)
+	// Файлы — на двух путях: /api/files (прямой доступ по IP контейнера)
+	// и /api/<ref>/files (через traefik: PathPrefix префикс НЕ срезает,
+	// сервис видит полный путь; пайплайны ходят как end_point "<ref>/files").
+	mux.HandleFunc("/api/files", a.Files.HandleRequest)
+	mux.HandleFunc("/api/"+a.Cfg.Server.TableName+"/files", a.Files.HandleRequest)
+	// Фоновая чистка файлов-сирот (лёгкий тикер; планировщика в стенде нет).
+	a.Files.StartFileGC()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"healthy"}`))

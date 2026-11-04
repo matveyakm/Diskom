@@ -26,4 +26,6 @@ use (
 	./directory/ms_disciplinary_measures
 	./directory/ms_reasons_for_the_dcs_disagreement
 	./report/ms_job_report
+	./document/ms_symbolism_document
+	./ledger/ms_symbolism_data_ledger
 )

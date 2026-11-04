@@ -5,7 +5,7 @@ import type {ColumnSort, TableColumnFilters} from "@/shared/DataTable/filters/ty
 export interface TableColumnConfig {
     key: string;
     label: string;
-    type: "text" | "status";
+    type: "text" | "status" | "file";
     end_point?: string;
 }
 

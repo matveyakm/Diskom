@@ -77,20 +77,38 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	}
 
 	// Картинки шаблона — заранее (битый файл — 500, операторская ошибка).
+	// src: файл из папки шаблона; field: байты из таблицы files того же
+	// сервиса (id файла из строки документа, принадлежность документу
+	// проверяется — чужие файлы в чужую печать не текут).
 	images := make(map[string][]byte)
 	for _, b := range tpl.Blocks {
 		if b.Type != "image" {
 			continue
 		}
-		if _, dup := images[b.Src]; dup {
+		if _, dup := images[b.imageKey()]; dup {
 			continue
 		}
-		img, _, err := loadPrintImage(b.Src)
+		if b.Src != "" {
+			img, _, err := loadPrintImage(b.Src)
+			if err != nil {
+				r.writeError(w, "Failed to load print image: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			images[b.imageKey()] = img
+			continue
+		}
+		fileID, ok := printID64(record[b.Field])
+		if !ok {
+			// Поле пустое — картинку пропускаем (как пустой field-блок),
+			// а не рвём сборку: логотип может появиться позже.
+			continue
+		}
+		img, _, err := fileBytesForPrint(r.db, fileID, id)
 		if err != nil {
 			r.writeError(w, "Failed to load print image: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		images[b.Src] = img
+		images[b.imageKey()] = img
 	}
 
 	var (

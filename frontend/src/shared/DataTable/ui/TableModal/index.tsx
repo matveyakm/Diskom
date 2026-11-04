@@ -113,6 +113,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                 value={getRowValue(selectedRow, field.field)}
                 isEditing={isEditing}
                 error={errors[field.field]}
+                serviceRef={docName}
             />
         </div>
     );
@@ -293,6 +294,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                                             getValue={name => getRowValue(selectedRow, name)}
                                             isEditing={isEditing}
                                             errors={errors}
+                                            serviceRef={docName}
                                         />
                                     </section>
                                 );

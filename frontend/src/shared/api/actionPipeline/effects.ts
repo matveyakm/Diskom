@@ -17,9 +17,12 @@ export interface ProcessingStep {
     method?: string;
     end_point: string;
     hide_in_preview?: boolean;
-    map?: Record<string, unknown>[];
+    // map: массив односоставных {target: source} или плоский объект.
+    map?: Record<string, unknown>[] | Record<string, unknown>;
     fields?: Record<string, unknown>[];
-    filter?: string;
+    // filter: строка same-name (?id=<ctx.id>) или объект-переименование
+    // (?id=<ctx.id_employee>). Путь исполнения — executeStep в index.ts.
+    filter?: string | Record<string, unknown>;
     FK?: Record<string, string>[];
     conditions?: Record<string, unknown>[];
 }

@@ -3,6 +3,7 @@ package restController
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -358,12 +359,28 @@ func (r *CRUDRepository[T]) getList(w http.ResponseWriter, req *http.Request) {
 
 // Update handles PUT requests to update an existing record
 func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
-	var entity T
-	if err := json.NewDecoder(req.Body).Decode(&entity); err != nil {
+	// Тело читаем один раз в байты, дальше две расшифровки: структура
+	// (id-фолбэк и эхо в ответе) и map (какие колонки реально прислали).
+	// Пишем ровно присланные ключи: struct-Update пропускает нулевые
+	// значения, поэтому PUT {status: 0} молча никуда не вёл и отвечал 404.
+	// Присланный null колонку не затирает (мина dnumber цела), id из SET
+	// исключён (это идентичность строки, а не данные).
+	rawBody, err := io.ReadAll(http.MaxBytesReader(w, req.Body, updateMaxBodyBytes))
+	if err != nil {
 		r.writeError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 	defer req.Body.Close()
+	var entity T
+	if err := json.Unmarshal(rawBody, &entity); err != nil {
+		r.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	var sent map[string]any
+	if err := json.Unmarshal(rawBody, &sent); err != nil {
+		r.writeError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
 	// Получаем ID из URL или из тела запроса
 	id := req.URL.Query().Get("id")
@@ -377,6 +394,16 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 		id = fmt.Sprintf("%v", idValue)
 	}
 
+	// Пишем только известные колонки таблицы: в теле от пайплайнов бывают
+	// служебные ключи контекста (id_system_object и т.п.) — их в SET нельзя
+	// (БД ответит "column does not exist"). Раньше их тихо ронял декодер
+	// в структуру; теперь фильтруем явно по схеме (id и null — мимо).
+	columns := r.updateColumns(sent)
+	if len(columns) == 0 {
+		r.writeError(w, "Nothing to update", http.StatusBadRequest)
+		return
+	}
+
 	// Начинаем транзакцию
 	tx := r.db.Begin()
 	if tx.Error != nil {
@@ -384,7 +411,7 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	result := tx.Table(r.tableName).Where("id = ?", id).Updates(&entity)
+	result := tx.Table(r.tableName).Where("id = ?", id).Select(columns).Updates(&entity)
 	if result.Error != nil {
 		tx.Rollback()
 		r.writeError(w, "Failed to update record: "+result.Error.Error(), http.StatusInternalServerError)
@@ -411,20 +438,35 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 	r.writeJSONResponse(w, updatedEntity, http.StatusOK)
 }
 
+// updateMaxBodyBytes — кап тела PUT (файлы идут отдельным endpoint,
+// обычным строкам с запасом хватает).
+const updateMaxBodyBytes int64 = 2 << 20
+
+// updateColumns возвращает присланные ключи тела, являющиеся колонками
+// таблицы (кроме id и null). Незнакомые ключи контекста отбрасываются.
+func (r *CRUDRepository[T]) updateColumns(sent map[string]any) []string {
+	var zero T
+	stmt := &gorm.Statement{DB: r.db}
+	if err := stmt.Parse(&zero); err != nil {
+		return nil
+	}
+	columns := make([]string, 0, len(sent))
+	for col, val := range sent {
+		if col == "id" || val == nil {
+			continue
+		}
+		if _, ok := stmt.Schema.FieldsByDBName[col]; !ok {
+			if _, ok := stmt.Schema.FieldsByName[col]; !ok {
+				continue
+			}
+		}
+		columns = append(columns, col)
+	}
+	return columns
+}
+
 // Delete handles DELETE requests to remove a record
 func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
-	id := req.URL.Query().Get("id")
-	if id == "" {
-		r.writeError(w, "Missing id parameter", http.StatusBadRequest)
-		return
-	}
-
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		r.writeError(w, "Invalid id parameter", http.StatusBadRequest)
-		return
-	}
-
 	// Используем транзакцию для согласованности
 	tx := r.db.Begin()
 	if tx.Error != nil {
@@ -432,25 +474,89 @@ func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	result := tx.Table(r.tableName).Where("id = ?", idInt).Delete(nil)
+	// Одиночное удаление (?id=): как раньше — 400/404/204.
+	if id := req.URL.Query().Get("id"); id != "" {
+		idInt, err := strconv.Atoi(id)
+		if err != nil {
+			tx.Rollback()
+			r.writeError(w, "Invalid id parameter", http.StatusBadRequest)
+			return
+		}
+		if err := deleteWhere(w, r, tx, "id = ?", idInt, true); err != nil {
+			tx.Rollback()
+			return
+		}
+		if err := tx.Commit().Error; err != nil {
+			r.writeError(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Фильтрованный multi-DELETE (exact/суффиксы/ids — тот же язык, что
+	// у списков: applyFieldFilters; зарезервированные ключи мимо).
+	// Пустой DELETE — 400, ноль совпадений — 204. Нужен шагам on_delete
+	// пайплайнов (чистка проводок и файлов по id_document).
+	params := req.URL.Query()
+	filtered, ferr := applyFieldFilters(tx.Table(r.tableName), params)
+	if ferr != nil {
+		tx.Rollback()
+		r.writeError(w, "Invalid filter parameter: "+ferr.Error(), http.StatusBadRequest)
+		return
+	}
+	if empty, ierr := hasEmptyIn(params); ierr != nil {
+		tx.Rollback()
+		r.writeError(w, "Invalid filter parameter: "+ierr.Error(), http.StatusBadRequest)
+		return
+	} else if empty {
+		tx.Rollback()
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	// Без предикатов удалять нечего — честный 400 вместо сноса таблицы.
+	if !hasDeletePredicate(params) {
+		tx.Rollback()
+		r.writeError(w, "Missing id parameter", http.StatusBadRequest)
+		return
+	}
+	result := filtered.Delete(nil)
 	if result.Error != nil {
 		tx.Rollback()
-		r.writeError(w, "Failed to delete record: "+result.Error.Error(), http.StatusInternalServerError)
+		r.writeError(w, "Failed to delete records: "+result.Error.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	if result.RowsAffected == 0 {
-		tx.Rollback()
-		r.writeError(w, "Record not found", http.StatusNotFound)
-		return
-	}
-
 	if err := tx.Commit().Error; err != nil {
 		r.writeError(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// hasDeletePredicate проверяет, есть ли в query хоть один предикат
+// (зарезервированные ключи вроде sort/order предикатами не считаются).
+func hasDeletePredicate(params map[string][]string) bool {
+	for key := range params {
+		if _, ok := splitFilterKey(key); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// deleteWhere удаляет по готовому условию (одиночный путь ?id=);
+// notFoundAs404=true — 404 при нуле совпадений, иначе тихий 204.
+func deleteWhere[T any](w http.ResponseWriter, r *CRUDRepository[T], tx *gorm.DB, query string, arg any, notFoundAs404 bool) error {
+	result := tx.Table(r.tableName).Where(query, arg).Delete(nil)
+	if result.Error != nil {
+		r.writeError(w, "Failed to delete record: "+result.Error.Error(), http.StatusInternalServerError)
+		return result.Error
+	}
+	if result.RowsAffected == 0 && notFoundAs404 {
+		r.writeError(w, "Record not found", http.StatusNotFound)
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // getDistinct serves ?distinct=: capped distinct column values for the

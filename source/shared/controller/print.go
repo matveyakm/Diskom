@@ -159,6 +159,15 @@ func printBlockShow(v *bool) bool {
 	return v == nil || *v
 }
 
+// imageKey — ключ картинки в map байтов: src для файлов шаблона,
+// "field:<имя>" для картинок из строки (id файла из таблицы files).
+func (b printBlock) imageKey() string {
+	if b.Src != "" {
+		return b.Src
+	}
+	return "field:" + b.Field
+}
+
 type printBlockColumn struct {
 	Field     string  `json:"field,omitempty"`
 	Text      string  `json:"text,omitempty"`
@@ -376,12 +385,22 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 				}
 			}
 		case "image":
-			if strings.TrimSpace(b.Src) == "" || b.Src != filepath.Base(b.Src) {
-				return nil, fmt.Errorf("%s: image src must be a plain file name", where)
+			// Картинка — либо файл из папки шаблона (src), либо байты
+			// из поля строки (field = id файла из таблицы files того же
+			// сервиса). Ровно один из двух — иначе не понять, что рисовать.
+			if (b.Src == "") == (b.Field == "") {
+				return nil, fmt.Errorf("%s: image needs either src or field (not both/neither)", where)
 			}
-			ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(b.Src), "."))
-			if ext != "png" && ext != "jpg" && ext != "jpeg" {
-				return nil, fmt.Errorf("%s: image must be png|jpg", where)
+			if b.Src != "" {
+				if strings.TrimSpace(b.Src) == "" || b.Src != filepath.Base(b.Src) {
+					return nil, fmt.Errorf("%s: image src must be a plain file name", where)
+				}
+				ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(b.Src), "."))
+				if ext != "png" && ext != "jpg" && ext != "jpeg" {
+					return nil, fmt.Errorf("%s: image must be png|jpg", where)
+				}
+			} else if !reFilterColumn.MatchString(b.Field) {
+				return nil, fmt.Errorf("%s: invalid image field %q", where, b.Field)
 			}
 			if b.Width < 5 || b.Width > 190 {
 				return nil, fmt.Errorf("%s: image width 5..190 mm required", where)

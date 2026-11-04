@@ -5,7 +5,7 @@ import {BlockRenderProps} from "./blockRegistry";
 // Табличка "падеж × ФИО": строки и колонки задаются в конфиге блока
 // (rows: [{label, fields}], columns: ["Ф", "И", "О"]).
 // Поля вне строк рисуются обычным списком под таблицей.
-export const DeclensionTable = ({block, fields, getValue, isEditing, errors}: BlockRenderProps) => {
+export const DeclensionTable = ({block, fields, getValue, isEditing, errors, serviceRef}: BlockRenderProps) => {
     const byName = new Map(fields.map(f => [f.field, f]));
     const covered = new Set((block.rows ?? []).flatMap(r => r.fields));
     const rest = fields.filter(f => !covered.has(f.field));
@@ -29,7 +29,7 @@ export const DeclensionTable = ({block, fields, getValue, isEditing, errors}: Bl
                                 if (!field) return null;
                                 return (
                                     <td key={name} className={errors[name] ? styles.fieldError : ""}>
-                                        <FieldRow field={field} value={getValue(name)} isEditing={isEditing} error={errors[name]} bare/>
+                                        <FieldRow field={field} value={getValue(name)} isEditing={isEditing} error={errors[name]} bare serviceRef={serviceRef}/>
                                     </td>
                                 );
                             })}
@@ -45,6 +45,7 @@ export const DeclensionTable = ({block, fields, getValue, isEditing, errors}: Bl
                     isEditing={isEditing}
                     error={errors[field.field]}
                     bare
+                    serviceRef={serviceRef}
                 />
             ))}
         </>

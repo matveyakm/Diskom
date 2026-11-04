@@ -254,10 +254,10 @@ func printFolioColWidths(cols []printBlockColumn, totalPt float64) []float64 {
 	return widths
 }
 
-// printFolioImage декодирует картинку блока (формат — по расширению,
-// байты уже проверены loadPrintImage; содержимое — по magic внутри folio).
-func printFolioImage(src string, raw []byte) (*folioimage.Image, error) {
-	if lower := strings.ToLower(src); strings.HasSuffix(lower, ".jpg") || strings.HasSuffix(lower, ".jpeg") {
+// printFolioImage декодирует картинку блока (формат — по magic, как в
+// валидации загрузки; содержимое ещё раз проверяется внутри folio).
+func printFolioImage(raw []byte) (*folioimage.Image, error) {
+	if mime, ok := fileMimeByMagic(raw); ok && mime == "image/jpeg" {
 		return folioimage.NewJPEG(raw)
 	}
 	return folioimage.NewPNG(raw)
@@ -404,13 +404,18 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 				doc.Add(lst)
 			}
 		case "image":
-			img, ok := images[b.Src]
+			img, ok := images[b.imageKey()]
 			if !ok {
-				return nil, fmt.Errorf("print template: image %q not loaded", b.Src)
+				// Поле-логотип пустое — пропускаем молча, как пустой
+				// field-блок. Битая src — 500 ещё на загрузке.
+				if b.Src != "" {
+					return nil, fmt.Errorf("print template: image %q not loaded", b.Src)
+				}
+				continue
 			}
-			fimg, err := printFolioImage(b.Src, img)
+			fimg, err := printFolioImage(img)
 			if err != nil {
-				return nil, fmt.Errorf("print template: image %q: %w", b.Src, err)
+				return nil, fmt.Errorf("print template: image %q: %w", b.imageKey(), err)
 			}
 			hMm := printImageHeight(img, b.Width)
 			elem := layout.NewImageElement(fimg)

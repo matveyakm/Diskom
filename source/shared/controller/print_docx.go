@@ -330,11 +330,16 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 		if b.Type != "image" {
 			continue
 		}
-		if _, dup := imgRids[b.Src]; dup {
+		// Пропущенный field-логотип (пустое поле) в пакет не попадает —
+		// ниже такой блок молча пропускается, как пустой field-блок.
+		if _, ok := images[b.imageKey()]; !ok {
 			continue
 		}
-		imgOrder = append(imgOrder, b.Src)
-		imgRids[b.Src] = fmt.Sprintf("rIdImg%d", len(imgOrder))
+		if _, dup := imgRids[b.imageKey()]; dup {
+			continue
+		}
+		imgOrder = append(imgOrder, b.imageKey())
+		imgRids[b.imageKey()] = fmt.Sprintf("rIdImg%d", len(imgOrder))
 	}
 
 	var body strings.Builder
@@ -374,19 +379,25 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				body.WriteString(printDocxPara(prefix+rendered, b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 			}
 		case "image":
-			img, ok := images[b.Src]
+			img, ok := images[b.imageKey()]
 			if !ok {
-				return nil, fmt.Errorf("print template: image %q not loaded", b.Src)
+				// Поле-логотип пустое — пропускаем блок молча, как пустой
+				// field-блок. Битая src-картинка сюда не попадает никогда:
+				// её отсутствие — 500 ещё на загрузке (ошибка оператора).
+				if b.Src != "" {
+					return nil, fmt.Errorf("print template: image %q not loaded", b.Src)
+				}
+				continue
 			}
 			num := 0
 			for i, src := range imgOrder {
-				if src == b.Src {
+				if src == b.imageKey() {
 					num = i + 1
 					break
 				}
 			}
 			if num == 0 {
-				return nil, fmt.Errorf("print template: image %q not registered", b.Src)
+				return nil, fmt.Errorf("print template: image %q not registered", b.imageKey())
 			}
 			if b.Float {
 				// Якорь вставляется сырым XML: через printDocxPara его бы
@@ -396,9 +407,9 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				// и места в потоке не занимает; иначе весь текст ниже уезжает
 				// на строку вниз и подпись относительно него выглядит выше
 				// (в PDF div-контейнер и так нулевой — там всё сходилось).
-				body.WriteString(`<w:p><w:pPr><w:spacing w:after="0" w:before="0" w:line="1" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr><w:r>` + printDocxFloatingDrawing(num, imgRids[b.Src], b.Width, b.X, b.Y, img) + `</w:r></w:p>`)
+				body.WriteString(`<w:p><w:pPr><w:spacing w:after="0" w:before="0" w:line="1" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr><w:r>` + printDocxFloatingDrawing(num, imgRids[b.imageKey()], b.Width, b.X, b.Y, img) + `</w:r></w:p>`)
 			} else {
-				body.WriteString(printDocxImagePara(printDocxDrawing(num, imgRids[b.Src], b.Width, img), b.Align))
+				body.WriteString(printDocxImagePara(printDocxDrawing(num, imgRids[b.imageKey()], b.Width, img), b.Align))
 			}
 		case "table":
 			tblFam := printDocxFont(printFontFamily(tpl, b.printTextStyle))

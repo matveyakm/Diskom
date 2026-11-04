@@ -140,8 +140,43 @@ const executeStep = async (
     const url = `/api/${step.end_point}`;
     const params: Record<string, string> = {};
 
-    if (step.filter && context[step.filter] !== undefined) {
+    // Строковый фильтр — same-name (?id=<ctx.id>).
+    if (typeof step.filter === "string" && context[step.filter] !== undefined) {
         params[step.filter] = String(context[step.filter]);
+    }
+
+    // Объектный фильтр — переименование (?id=<ctx.id_employee>).
+    // Отсутствующий ключ и нулевой FK пропускаются молча (идемпотентный
+    // no-op чистки непроведённого — та же семантика, что у map-ключей).
+    if (step.filter && typeof step.filter === "object" && !Array.isArray(step.filter)) {
+        for (const [target, source] of Object.entries(step.filter as Record<string, unknown>)) {
+            if (typeof source === "string") {
+                if (!Object.prototype.hasOwnProperty.call(context, source)) continue;
+                const v = context[source];
+                if (v === null || v === undefined || v === "" || v === 0 || v === "0") continue;
+                params[target] = String(v);
+            } else if (source !== undefined && source !== null) {
+                params[target] = String(source);
+            }
+        }
+    }
+
+    // DELETE: query строится ещё и из map (target←source из контекста;
+    // отсутствующий ключ/нулевой FK пропускаются, литералы идут как есть).
+    // PUT/POST map уезжает в тело (там его читает бэкенд).
+    if (method === "delete" && step.map) {
+        const mappings = Array.isArray(step.map) ? step.map : [step.map];
+        for (const mapping of mappings) {
+            const [target, source] = Object.entries(mapping as Record<string, unknown>)[0];
+            if (typeof source === "string") {
+                if (!Object.prototype.hasOwnProperty.call(context, source)) continue;
+                const v = context[source];
+                if (v === null || v === undefined || v === "" || v === 0 || v === "0") continue;
+                params[target] = String(v);
+            } else if (source !== undefined && source !== null) {
+                params[target] = String(source);
+            }
+        }
     }
 
     const queryString = Object.keys(params).length
@@ -168,10 +203,11 @@ const executeStep = async (
                 }
             }
         } else if (method === "delete") {
-            const filterId = step.filter === "id" ? context.id : undefined;
-            const delUrl = filterId != null ? `${url}/${encodeURIComponent(String(filterId))}` : url;
-            console.log(`[actionPipeline] DELETE ${delUrl}`);
-            await api.delete(delUrl);
+            // Query — единственный рабочий путь: path-style бэкенд не
+            // маршрутизирует (падает в заглушку / с тихим 200 — молчаливый
+            // no-op вместо удаления). Пустой DELETE — честный 400 с бэка.
+            console.log(`[actionPipeline] DELETE ${url}${queryString}`);
+            await api.delete(`${url}${queryString}`);
             console.log(`[actionPipeline] DELETE success`);
         } else {
             const body = buildBody(step, context);

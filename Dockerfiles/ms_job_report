@@ -23,12 +23,14 @@ COPY ./source/document/ms_document/go.mod ./document/ms_document/
 COPY ./source/document/ms_create_counterparty_document/go.mod ./document/ms_create_counterparty_document/
 COPY ./source/document/ms_create_organization_document/go.mod ./document/ms_create_organization_document/
 COPY ./source/document/ms_create_regulations_clauses_document/go.mod ./document/ms_create_regulations_clauses_document/
+COPY ./source/document/ms_symbolism_document/go.mod ./document/ms_symbolism_document/
 
 COPY ./source/ledger/ms_employee_data_ledger/go.mod ./ledger/ms_employee_data_ledger/
 COPY ./source/ledger/ms_staff_placement_ledger/go.mod ./ledger/ms_staff_placement_ledger/
 COPY ./source/ledger/ms_department_data_ledger/go.mod ./ledger/ms_department_data_ledger/
 COPY ./source/ledger/ms_job_title_data_ledger/go.mod ./ledger/ms_job_title_data_ledger/
 COPY ./source/ledger/ms_organization_data_ledger/go.mod ./ledger/ms_organization_data_ledger/
+COPY ./source/ledger/ms_symbolism_data_ledger/go.mod ./ledger/ms_symbolism_data_ledger/
 
 COPY ./source/report/ms_job_report/go.mod ./report/ms_job_report/
 
@@ -60,6 +62,7 @@ COPY ./source/document/ms_document/ ./document/ms_document/
 COPY ./source/document/ms_create_counterparty_document/ ./document/ms_create_counterparty_document/
 COPY ./source/document/ms_create_organization_document/ ./document/ms_create_organization_document/
 COPY ./source/document/ms_create_regulations_clauses_document/ ./document/ms_create_regulations_clauses_document/
+COPY ./source/document/ms_symbolism_document/ ./document/ms_symbolism_document/
 
 
 COPY ./source/ledger/ms_employee_data_ledger/ ./ledger/ms_employee_data_ledger/
@@ -67,6 +70,7 @@ COPY ./source/ledger/ms_staff_placement_ledger/ ./ledger/ms_staff_placement_ledg
 COPY ./source/ledger/ms_department_data_ledger/ ./ledger/ms_department_data_ledger/
 COPY ./source/ledger/ms_job_title_data_ledger/ ./ledger/ms_job_title_data_ledger/
 COPY ./source/ledger/ms_organization_data_ledger/ ./ledger/ms_organization_data_ledger/
+COPY ./source/ledger/ms_symbolism_data_ledger/ ./ledger/ms_symbolism_data_ledger/
 
 COPY ./source/report/ms_job_report/ ./report/ms_job_report/
 

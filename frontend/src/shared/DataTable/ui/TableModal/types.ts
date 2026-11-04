@@ -18,4 +18,6 @@ export type FieldRowProps = {
     isEditing: boolean;
     error?: boolean;
     bare?: boolean;
+    /** ref текущей сущности (docName === ref) для файловых URL /api/<ref>/files */
+    serviceRef?: string;
 };

@@ -9,9 +9,11 @@ interface UseTableProps<T extends TableRow = TableRow> {
     columns: TableColumnConfig[];
     rows: T[];
     fields?: FormField[];
+    /** ref текущей сущности (docName === ref) для файловых URL /api/<ref>/files */
+    serviceRef?: string;
 }
 
-export const useTable = <T extends TableRow = TableRow>({columns, rows, fields}: UseTableProps<T>) => {
+export const useTable = <T extends TableRow = TableRow>({columns, rows, fields, serviceRef}: UseTableProps<T>) => {
     const dateFieldKeys = useMemo(() => {
         if (!fields) return new Set<string>();
         return new Set(fields.filter(isDateField).map(f => f.field));
@@ -28,6 +30,13 @@ export const useTable = <T extends TableRow = TableRow>({columns, rows, fields}:
                 header: col.label || columnKey,
                 cell: ({getValue, row}) => {
                     if (col.type === "status") return <StatusIcon value={getValue()}/>;
+                    if (col.type === "file") {
+                        const v = getValue();
+                        if (v === undefined || v === null || v === "") return "—";
+                        if (!serviceRef) return String(v);
+                        const url = `/api/${serviceRef}/files?content=${encodeURIComponent(String(v))}`;
+                        return <a href={url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>📎</a>;
+                    }
                     // Prefer backend-resolved display name (see ?expand=),
                     // fall back to the raw value when absent.
                     const resolved = row.original[`${String(columnKey)}_name`];
@@ -39,7 +48,7 @@ export const useTable = <T extends TableRow = TableRow>({columns, rows, fields}:
                 }
             };
         });
-    }, [columns, dateFieldKeys]);
+    }, [columns, dateFieldKeys, serviceRef]);
 
     const table = useReactTable({
         data: rows as Record<string, unknown>[],

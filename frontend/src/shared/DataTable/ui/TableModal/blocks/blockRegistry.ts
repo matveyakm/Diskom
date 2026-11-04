@@ -14,6 +14,8 @@ export type BlockRenderProps = {
     getValue: (name: string) => unknown;
     isEditing: boolean;
     errors: Record<string, boolean>;
+    /** ref текущей сущности (docName === ref) для файловых URL /api/<ref>/files */
+    serviceRef?: string;
 };
 
 const registry: Record<string, ComponentType<BlockRenderProps>> = {
