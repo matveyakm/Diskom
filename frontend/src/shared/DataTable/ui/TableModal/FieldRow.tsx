@@ -5,7 +5,7 @@ import styles from "./TableModal.module.scss";
 import {useEffect, useState, useRef, useCallback, useMemo} from "react";
 import {isDateField, formatDateForDisplay, toDateInputValue, getTodayDate} from "./utils";
 
-export const FieldRow = ({field, value, isEditing, error, bare, serviceRef}: FieldRowProps) => {
+export const FieldRow = ({field, value, isEditing, error, bare, serviceRef, docId}: FieldRowProps) => {
     const [currentValue, setCurrentValue] = useState(String(value ?? ""));
 
     useEffect(() => {
@@ -25,7 +25,7 @@ export const FieldRow = ({field, value, isEditing, error, bare, serviceRef}: Fie
     }
 
     if (field.type === "file") {
-        return <FileField field={field} value={value} isEditing={isEditing} error={error} bare={bare} serviceRef={serviceRef}/>;
+        return <FileField field={field} value={value} isEditing={isEditing} error={error} bare={bare} serviceRef={serviceRef} docId={docId}/>;
     }
 
     const isRequired = field.required ?? false;
@@ -241,13 +241,22 @@ const formatFileSize = (bytes: number): string => {
 const asFileId = (value: unknown): string =>
     value === null || value === undefined || value === "" ? "" : String(value);
 
-const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) => {
+interface AttachedFile {
+    id: number | string;
+    file_name: string;
+    mime: string;
+    size: number;
+}
+
+const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowProps) => {
     const [fileId, setFileId] = useState(() => asFileId(value));
     const [fileName, setFileName] = useState("");
     const [fileSize, setFileSize] = useState<number | null>(null);
     const [status, setStatus] = useState<FileUploadStatus>("idle");
     const [errorMsg, setErrorMsg] = useState("");
     const [isDragging, setIsDragging] = useState(false);
+    const [attached, setAttached] = useState<AttachedFile[] | null>(null);
+    const [listFailed, setListFailed] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isRequired = field.required ?? false;
@@ -255,6 +264,35 @@ const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) =
     useEffect(() => {
         setFileId(asFileId(value));
     }, [value]);
+
+    // Просмотр: явный список прикреплённых файлов с метаданными
+    // (один запрос по документу, а не N по файлам).
+    useEffect(() => {
+        if (isEditing) return;
+        if (!serviceRef || docId === null || docId === undefined || docId === "") {
+            setAttached(null);
+            return;
+        }
+        let cancelled = false;
+        setAttached(null);
+        setListFailed(false);
+        api.get<{ data?: AttachedFile[] } | AttachedFile[]>(
+            `/api/${serviceRef}/files?id_document=${encodeURIComponent(String(docId))}`
+        ).then(
+            (resp) => {
+                if (cancelled) return;
+                const raw = resp as unknown as { data?: unknown };
+                const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data as AttachedFile[] : [];
+                setAttached(list.filter((f) => f && f.id !== null && f.id !== undefined));
+            },
+            () => {
+                if (!cancelled) setListFailed(true);
+            },
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [isEditing, serviceRef, docId]);
 
     const downloadUrl =
         fileId && serviceRef
@@ -265,13 +303,35 @@ const FileField = ({field, value, isEditing, bare, serviceRef}: FieldRowProps) =
         return (
             <>
                 {!bare && <label>{field.label}</label>}
-                {downloadUrl ? (
-                    <div className={styles.viewValue}>
+                <div className={styles.viewValue}>
+                    {attached === null && !listFailed ? (
+                        <span>…</span>
+                    ) : attached !== null && attached.length > 0 ? (
+                        <ul className={styles.fileList}>
+                            {attached.map((f) => (
+                                <li key={String(f.id)} className={styles.fileListItem}>
+                                    <span className={styles.fileListName}>{f.file_name || `Файл ${f.id}`}</span>
+                                    {typeof f.size === "number" && (
+                                        <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
+                                    )}
+                                    {serviceRef && (
+                                        <a
+                                            href={`/api/${serviceRef}/files?content=${encodeURIComponent(String(f.id))}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Скачать
+                                        </a>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : listFailed && downloadUrl ? (
                         <a href={downloadUrl} target="_blank" rel="noreferrer">Скачать</a>
-                    </div>
-                ) : (
-                    <div className={styles.viewValue}>—</div>
-                )}
+                    ) : (
+                        <span>—</span>
+                    )}
+                </div>
             </>
         );
     }

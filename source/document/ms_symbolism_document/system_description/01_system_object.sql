@@ -40,8 +40,7 @@
         { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
-        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "organization_directory" },
-        { "field": "id_logo", "label": "Логотип", "hidden": false, "type": "file" }
+        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "organization_directory" }
       ]
     }',
     'Журнал приказов об установлении символики',

@@ -506,3 +506,27 @@
 .fileInputHidden {
   display: none;
 }
+
+.fileList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fileListItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.fileListName {
+  font-weight: 500;
+}
+
+.fileListSize {
+  color: var(--text-secondary);
+  font-size: 12px;
+}

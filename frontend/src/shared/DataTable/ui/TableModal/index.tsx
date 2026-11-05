@@ -114,6 +114,7 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                 isEditing={isEditing}
                 error={errors[field.field]}
                 serviceRef={docName}
+                docId={selectedRow?.id}
             />
         </div>
     );
@@ -288,14 +289,15 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                                 return (
                                     <section key={blockKey} className={styles.blockSection}>
                                         <h4 className={styles.blockTitle}>{block.title}</h4>
-                                        <Renderer
-                                            block={block}
-                                            fields={block.fields.map(name => visibleByName.get(name)!)}
-                                            getValue={name => getRowValue(selectedRow, name)}
-                                            isEditing={isEditing}
-                                            errors={errors}
-                                            serviceRef={docName}
-                                        />
+                        <Renderer
+                            block={block}
+                            fields={block.fields.map(name => visibleByName.get(name)!)}
+                            getValue={name => getRowValue(selectedRow, name)}
+                            isEditing={isEditing}
+                            errors={errors}
+                            serviceRef={docName}
+                            docId={selectedRow?.id}
+                        />
                                     </section>
                                 );
                             })}

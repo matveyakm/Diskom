@@ -16,6 +16,8 @@ export type BlockRenderProps = {
     errors: Record<string, boolean>;
     /** ref текущей сущности (docName === ref) для файловых URL /api/<ref>/files */
     serviceRef?: string;
+    /** id строки — для списка файлов документа */
+    docId?: number | string;
 };
 
 const registry: Record<string, ComponentType<BlockRenderProps>> = {

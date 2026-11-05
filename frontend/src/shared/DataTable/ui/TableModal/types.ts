@@ -20,4 +20,6 @@ export type FieldRowProps = {
     bare?: boolean;
     /** ref текущей сущности (docName === ref) для файловых URL /api/<ref>/files */
     serviceRef?: string;
+    /** id просматриваемой/редактируемой строки — для списка файлов документа */
+    docId?: number | string;
 };
