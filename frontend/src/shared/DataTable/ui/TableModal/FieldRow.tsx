@@ -230,6 +230,8 @@ const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
 
 type FileUploadStatus = "idle" | "uploading" | "done" | "error";
 
+// Клиентский пред-чек размера (источник истины — backend FILE_MAX_MB, там же
+// итоговая валидация; сообщение выводим из той же константы, чтобы не врать).
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 const formatFileSize = (bytes: number): string => {
@@ -370,7 +372,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         }
         if (file.size > MAX_FILE_SIZE) {
             setStatus("error");
-            setErrorMsg("Файл больше 25 МБ");
+            setErrorMsg(`Файл больше ${formatFileSize(MAX_FILE_SIZE)}`);
             return;
         }
         setFileName(file.name);

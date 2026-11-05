@@ -319,6 +319,17 @@ type docxPart struct {
 	body string
 }
 
+// printDocxImageExt — расширение media-части по magic байтов, а не по суффиксу
+// имени: картинки из полей (ключи "field:<имя>") суффикса не имеют и с
+// суффиксной логикой всегда падали в png, ломая jpeg. Доверяем байтам,
+// как везде в печати (fileMimeByMagic).
+func printDocxImageExt(raw []byte) string {
+	if mime, ok := fileMimeByMagic(raw); ok && mime == "image/jpeg" {
+		return "jpeg"
+	}
+	return "png"
+}
+
 // renderPrintDOCX строит .docx байты из шаблона и строки документа.
 // images: src → байты (уже проверенные loadPrintImage).
 func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[string][]byte) ([]byte, error) {
@@ -482,12 +493,14 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 	}
 	// Default на расширение — один (дубли одного Extension путают строгие
 	// читалки; раньше при двух png картинках писалось дважды).
+	// Расширение — по magic байтов, а не по суффиксу имени: картинки из полей
+	// (ключи "field:<имя>") суффикса не имеют и всегда падали в png, ломая jpeg.
 	seenExt := make(map[string]bool)
 	for src := range images {
-		ext := "png"
+		ext := printDocxImageExt(images[src])
 		ctype := "image/png"
-		if strings.HasSuffix(strings.ToLower(src), ".jpg") || strings.HasSuffix(strings.ToLower(src), ".jpeg") {
-			ext, ctype = "jpeg", "image/jpeg"
+		if ext == "jpeg" {
+			ctype = "image/jpeg"
 		}
 		if seenExt[ext] {
 			continue
@@ -513,10 +526,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 		docRels.WriteString(`<Relationship Id="` + footerRel + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>`)
 	}
 	for _, src := range imgOrder {
-		ext := "png"
-		if strings.HasSuffix(strings.ToLower(src), ".jpg") || strings.HasSuffix(strings.ToLower(src), ".jpeg") {
-			ext = "jpeg"
-		}
+		ext := printDocxImageExt(images[src])
 		docRels.WriteString(`<Relationship Id="` + imgRids[src] + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/` + imgRids[src] + `.` + ext + `"/>`)
 	}
 	docRels.WriteString(`</Relationships>`)
@@ -585,10 +595,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 	}
 	// Картинки — байтами, не строками. Имя media-файла = rid (детерминировано).
 	for _, src := range imgOrder {
-		ext := "png"
-		if strings.HasSuffix(strings.ToLower(src), ".jpg") || strings.HasSuffix(strings.ToLower(src), ".jpeg") {
-			ext = "jpeg"
-		}
+		ext := printDocxImageExt(images[src])
 		fw, err := w.Create("word/media/" + imgRids[src] + "." + ext)
 		if err != nil {
 			return nil, fmt.Errorf("print docx: %w", err)

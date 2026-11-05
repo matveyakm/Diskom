@@ -137,6 +137,7 @@
                 "hide_in_preview": true,
                 "end_point": "symbolism_document",
                 "query": {"status": 2},
+                "filter": "id_committee",
                 "merge": false,
                 "FK":
                 [
@@ -288,6 +289,7 @@
                 [
                     {"id": "id"},
                     {"ddate":"ddate"},
+                    {"effective_date":"effective_date"},
                     {"dnumber":"dnumber"},
                     {"id_committee":"id_committee"},
                     {"id_logo":"id_logo"},

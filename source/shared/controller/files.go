@@ -51,6 +51,9 @@ const (
 	fileGCStartupDelay          = time.Minute
 	maxFileNameLen              = 255
 	fileBodySlackBytes    int64 = 2 << 20 // запас поверх base64-раздувания
+	// attachMaxBodyBytes — кап тела привязки (три скалярных поля, файлам
+	// отдельный endpoint; как updateMaxBodyBytes в restController).
+	attachMaxBodyBytes int64 = 1 << 16
 )
 
 // FileObject — строка таблицы files (одна таблица на БД каждого сервиса).
@@ -163,7 +166,13 @@ func sanitizeFileName(name string) string {
 		return ""
 	}
 	name = strings.ReplaceAll(name, "\\", "/")
-	return strings.TrimSpace(filepath.Base(name))
+	base := strings.TrimSpace(filepath.Base(name))
+	// Точки-ссылки на каталог — не имена ("." уже ловится вызывающим,
+	// ".." отдавал бы Content-Disposition с именем каталога).
+	if base == "." || base == ".." || base == "/" {
+		return ""
+	}
+	return base
 }
 
 // HandleRequest роутит /api/files (мультиплекс по query — как ?print=
@@ -344,6 +353,9 @@ func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		IdDocument *int64 `json:"id_document"`
 		Replace    bool   `json:"replace"`
 	}
+	// Тело — крошечный JSON привязки (id/id_document/replace); кап как у PUT,
+	// чтобы безлимитный Decode не держал соединение (там же MaxBytesReader).
+	req.Body = http.MaxBytesReader(w, req.Body, attachMaxBodyBytes)
 	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
 		r.writeError(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -478,6 +490,11 @@ func (h *FileHandler) remove(w http.ResponseWriter, req *http.Request, r *CRUDRe
 // с номером несуществующего документа (JOIN с основной таблицей).
 // Возвращает число удалённых строк.
 func (h *FileHandler) CollectGarbage(ttl time.Duration) (int64, error) {
+	// parentTable — из конфига сервиса, но летит в сырой SQL: валидируем
+	// тем же регекспом колонок (ядро — strict-first даже на своих).
+	if !reFilterColumn.MatchString(h.parentTable) {
+		return 0, fmt.Errorf("invalid parent table %q", h.parentTable)
+	}
 	cutoff := time.Now().Add(-ttl)
 	res := h.db.Table(FileObject{}.TableName()).Where(
 		"created_at < ? AND (id_document IS NULL OR NOT EXISTS (SELECT 1 FROM "+h.parentTable+" p WHERE p.id = "+FileObject{}.TableName()+".id_document))",

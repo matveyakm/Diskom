@@ -36,6 +36,9 @@ func TestSanitizeFileName(t *testing.T) {
 		{"/tmp/../x.png", "x.png"},
 		{`..\\..\\e.exe`, "e.exe"},
 		{"", ""},
+		{".", ""},
+		{"..", ""},
+		{"/", ""},
 	} {
 		if got := sanitizeFileName(tc.in); got != tc.want {
 			t.Fatalf("sanitize(%q) = %q, want %q", tc.in, got, tc.want)

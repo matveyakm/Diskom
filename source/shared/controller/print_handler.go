@@ -103,9 +103,15 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 			// а не рвём сборку: логотип может появиться позже.
 			continue
 		}
-		img, _, err := fileBytesForPrint(r.db, fileID, id)
+		img, mime, err := fileBytesForPrint(r.db, fileID, id)
 		if err != nil {
 			r.writeError(w, "Failed to load print image: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if mime == "application/pdf" {
+			// Блок image умеет только растр (png/jpg): PDF прикрепили не туда.
+			// Громкая 500 с именем поля вместо битого документа (философия).
+			r.writeError(w, "Failed to load print image: field "+b.Field+" is PDF, want png|jpg", http.StatusInternalServerError)
 			return
 		}
 		images[b.imageKey()] = img
