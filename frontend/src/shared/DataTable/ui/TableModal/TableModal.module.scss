@@ -507,6 +507,11 @@
   display: none;
 }
 
+.fileHint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .fileList {
   list-style: none;
   margin: 0;
@@ -516,10 +521,25 @@
   gap: 6px;
 }
 
-.fileListItem {
-  display: flex;
+.fileCard {
+  display: inline-flex;
   align-items: baseline;
   gap: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+span.fileCard {
+  cursor: default;
+}
+
+.fileCard:hover {
+  background: var(--hover);
+  border-color: var(--primary);
 }
 
 .fileListName {
@@ -530,3 +550,5 @@
   color: var(--text-secondary);
   font-size: 12px;
 }
+
+

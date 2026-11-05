@@ -7,6 +7,8 @@ export interface FormField {
     readonly?: boolean;
     default?: unknown;
     end_point?: string;
+    /** Ограничение числа файлов для type: "file" (пока только отображение: подсказка + поведение замены). */
+    max_count?: number;
 }
 
 export interface RawColumnItem {

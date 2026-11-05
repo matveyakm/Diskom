@@ -87,7 +87,8 @@
       "label": "Логотип",
       "hidden": false,
       "required": true,
-      "type": "file"
+      "type": "file",
+      "max_count": 1
     },
     {
       "field": "id_logo_old",

@@ -2,7 +2,7 @@ import {useReferenceOptions, ReferenceOption} from "@/shared/api/useReferenceOpt
 import {api} from "@/shared/api/AxiosClient";
 import {FieldRowProps} from "./types";
 import styles from "./TableModal.module.scss";
-import {useEffect, useState, useRef, useCallback, useMemo} from "react";
+import {useEffect, useState, useRef, useCallback, useMemo, type ReactNode} from "react";
 import {isDateField, formatDateForDisplay, toDateInputValue, getTodayDate} from "./utils";
 
 export const FieldRow = ({field, value, isEditing, error, bare, serviceRef, docId}: FieldRowProps) => {
@@ -248,6 +248,14 @@ interface AttachedFile {
     size: number;
 }
 
+const pluralFiles = (n: number): string => {
+    const m10 = n % 10;
+    const m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return "файл";
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return "файла";
+    return "файлов";
+};
+
 const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowProps) => {
     const [fileId, setFileId] = useState(() => asFileId(value));
     const [fileName, setFileName] = useState("");
@@ -260,16 +268,20 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isRequired = field.required ?? false;
+    const maxCount =
+        typeof field.max_count === "number" && field.max_count > 0 ? Math.floor(field.max_count) : undefined;
+    const canList =
+        !!serviceRef && docId !== null && docId !== undefined && docId !== "";
 
     useEffect(() => {
         setFileId(asFileId(value));
     }, [value]);
 
-    // Просмотр: явный список прикреплённых файлов с метаданными
-    // (один запрос по документу, а не N по файлам).
+    // Список прикреплённых файлов с метаданными (один запрос по документу,
+    // а не N по файлам). Нужен и в просмотре (карточки), и в редактировании
+    // (подсказка про лимит и замену).
     useEffect(() => {
-        if (isEditing) return;
-        if (!serviceRef || docId === null || docId === undefined || docId === "") {
+        if (!canList || !serviceRef) {
             setAttached(null);
             return;
         }
@@ -292,46 +304,60 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         return () => {
             cancelled = true;
         };
-    }, [isEditing, serviceRef, docId]);
+    }, [serviceRef, docId, canList]);
 
-    const downloadUrl =
-        fileId && serviceRef
-            ? `/api/${serviceRef}/files?content=${encodeURIComponent(fileId)}`
+    const fileUrl = (id: string | number | unknown): string | null =>
+        serviceRef && id !== null && id !== undefined && id !== ""
+            ? `/api/${serviceRef}/files?content=${encodeURIComponent(String(id))}`
             : null;
 
+    const renderFileCards = (files: AttachedFile[], genericName?: string) => (
+        <ul className={styles.fileList}>
+            {files.map((f) => {
+                const url = fileUrl(f.id);
+                const inner = (
+                    <>
+                        <span className={styles.fileListName}>
+                            {f.file_name || genericName || `Файл ${f.id}`}
+                        </span>
+                    {typeof f.size === "number" && Number.isFinite(f.size) && (
+                        <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
+                    )}
+                    </>
+                );
+                return (
+                    <li key={String(f.id)}>
+                        {url ? (
+                            <a className={styles.fileCard} href={url} target="_blank" rel="noreferrer">
+                                {inner}
+                            </a>
+                        ) : (
+                            <span className={styles.fileCard}>{inner}</span>
+                        )}
+                    </li>
+                );
+            })}
+        </ul>
+    );
+
     if (!isEditing) {
+        // Серверный список — истина (висячий id в поле не показываем);
+        // запасная карточка по id поля — только при обрыве запроса.
+        let body: ReactNode;
+        if (canList && attached === null && !listFailed) {
+            body = <span>…</span>;
+        } else if (attached !== null && attached.length > 0) {
+            body = renderFileCards(attached);
+        } else if (fileId && (!canList || listFailed)) {
+            const url = fileUrl(fileId);
+            body = url ? renderFileCards([{id: fileId, file_name: "", mime: "", size: NaN}], `Файл ${fileId}`) : <span>—</span>;
+        } else {
+            body = <span>—</span>;
+        }
         return (
             <>
                 {!bare && <label>{field.label}</label>}
-                <div className={styles.viewValue}>
-                    {attached === null && !listFailed ? (
-                        <span>…</span>
-                    ) : attached !== null && attached.length > 0 ? (
-                        <ul className={styles.fileList}>
-                            {attached.map((f) => (
-                                <li key={String(f.id)} className={styles.fileListItem}>
-                                    <span className={styles.fileListName}>{f.file_name || `Файл ${f.id}`}</span>
-                                    {typeof f.size === "number" && (
-                                        <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
-                                    )}
-                                    {serviceRef && (
-                                        <a
-                                            href={`/api/${serviceRef}/files?content=${encodeURIComponent(String(f.id))}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            Скачать
-                                        </a>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    ) : listFailed && downloadUrl ? (
-                        <a href={downloadUrl} target="_blank" rel="noreferrer">Скачать</a>
-                    ) : (
-                        <span>—</span>
-                    )}
-                </div>
+                <div className={styles.viewValue}>{body}</div>
             </>
         );
     }
@@ -389,6 +415,9 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         uploadFile(file);
     };
 
+    const attachedCount = attached?.length ?? 0;
+    const limitReached = maxCount !== undefined && attached !== null && attachedCount >= maxCount;
+
     return (
         <>
             {!bare && (
@@ -396,10 +425,8 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                     {field.label} {isRequired && <span style={{color: "red"}}>*</span>}
                 </label>
             )}
-            {fileId && status !== "uploading" && downloadUrl && (
-                <div className={styles.viewValue}>
-                    <a href={downloadUrl} target="_blank" rel="noreferrer">Скачать</a>
-                </div>
+            {attached !== null && attached.length > 0 && (
+                <div className={styles.viewValue}>{renderFileCards(attached)}</div>
             )}
             <div
                 className={`${styles.fileDropZone} ${isDragging ? styles.fileDropZoneActive : ""}`}
@@ -429,6 +456,12 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                 >
                     Выбрать файл
                 </button>
+                {maxCount !== undefined && (
+                    <div className={styles.fileHint}>
+                        Максимум: {maxCount} {pluralFiles(maxCount)}
+                        {limitReached ? " — новый файл заменит текущий при сохранении" : ""}
+                    </div>
+                )}
                 {fileName && (
                     <div className={styles.autocompleteLoading}>
                         {fileName}{fileSize !== null ? ` (${formatFileSize(fileSize)})` : ""}
