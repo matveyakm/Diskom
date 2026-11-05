@@ -141,6 +141,7 @@ type printBlock struct {
 	Items   []string           `json:"items,omitempty"`
 	Ordered bool               `json:"ordered,omitempty"`
 	Src     string             `json:"src,omitempty"`
+	Files   *printBlockFiles   `json:"files,omitempty"`
 	Width   float64            `json:"width,omitempty"`
 	// Float: картинка поверх текста: в DOCX — wp:anchor, в PDF — folio
 	// Div.AddOverlay (настоящий оверлей, не поток). x — мм от левого края
@@ -159,11 +160,24 @@ func printBlockShow(v *bool) bool {
 	return v == nil || *v
 }
 
+// printBlockFiles — картинка из файлов документа: новейший файл этого
+// документа с меткой tag (роль внутри документа; документ своей таблицы
+// файлов не знает, указателя в строке нет). Нет такого — блок молча
+// пропускается (как пустой field-блок); несколько — детерминированно
+// новейший (max id). PDF с меткой — громкая 500 (блок image только растр).
+type printBlockFiles struct {
+	Tag string `json:"tag"`
+}
+
 // imageKey — ключ картинки в map байтов: src для файлов шаблона,
-// "field:<имя>" для картинок из строки (id файла из таблицы files).
+// "field:<имя>" для картинок из строки (id файла из таблицы files),
+// "tag:<метка>" для картинок из файлов документа (селектор files).
 func (b printBlock) imageKey() string {
 	if b.Src != "" {
 		return b.Src
+	}
+	if b.Files != nil {
+		return "tag:" + strings.TrimSpace(b.Files.Tag)
 	}
 	return "field:" + b.Field
 }
@@ -385,11 +399,24 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 				}
 			}
 		case "image":
-			// Картинка — либо файл из папки шаблона (src), либо байты
-			// из поля строки (field = id файла из таблицы files того же
-			// сервиса). Ровно один из двух — иначе не понять, что рисовать.
-			if (b.Src == "") == (b.Field == "") {
-				return nil, fmt.Errorf("%s: image needs either src or field (not both/neither)", where)
+			// Картинка — ровно один источник из трёх: файл из папки шаблона
+			// (src), байты из поля строки (field = id файла из таблицы files
+			// того же сервиса) или файлы документа по метке (files.tag =
+			// роль внутри документа; указателя в строке нет — документ своей
+			// таблицы файлов не знает). Метка валидируется тем же регекспом.
+			hasFiles := b.Files != nil && strings.TrimSpace(b.Files.Tag) != ""
+			nSrc := 0
+			if b.Src != "" {
+				nSrc++
+			}
+			if b.Field != "" {
+				nSrc++
+			}
+			if hasFiles {
+				nSrc++
+			}
+			if nSrc != 1 {
+				return nil, fmt.Errorf("%s: image needs exactly one of src|field|files.tag", where)
 			}
 			if b.Src != "" {
 				if strings.TrimSpace(b.Src) == "" || b.Src != filepath.Base(b.Src) {
@@ -399,8 +426,12 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 				if ext != "png" && ext != "jpg" && ext != "jpeg" {
 					return nil, fmt.Errorf("%s: image must be png|jpg", where)
 				}
-			} else if !reFilterColumn.MatchString(b.Field) {
-				return nil, fmt.Errorf("%s: invalid image field %q", where, b.Field)
+			} else if b.Field != "" {
+				if !reFilterColumn.MatchString(b.Field) {
+					return nil, fmt.Errorf("%s: invalid image field %q", where, b.Field)
+				}
+			} else if !reFileTag.MatchString(strings.TrimSpace(b.Files.Tag)) {
+				return nil, fmt.Errorf("%s: invalid image files.tag %q", where, b.Files.Tag)
 			}
 			if b.Width < 5 || b.Width > 190 {
 				return nil, fmt.Errorf("%s: image width 5..190 mm required", where)

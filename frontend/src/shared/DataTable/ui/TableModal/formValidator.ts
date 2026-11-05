@@ -1,4 +1,4 @@
-import { FormField } from "@/entities/document/types";
+import { FormField, FILE_DETACHED_SUFFIX } from "@/entities/document/types";
 import { TableRow } from "@/shared/DataTable/types";
 import { isDateField } from "./utils";
 
@@ -33,13 +33,29 @@ export const collectFormData = (
     const typedFields: Record<string, unknown> = {};
 
     for (const field of fields) {
+        if (field.type === "file") {
+            // Файловое поле — виртуальное (колонки в строке нет): выборка id
+            // файлов для шага привязки пайплайна. Пусто — [] (шаг — no-op).
+            // Рядом — снятые крестиком (шаг detach; строка не удаляется).
+            const all = formData.getAll(field.field)
+                .map((v) => String(v))
+                .filter((s) => s !== "")
+                .map((s) => coerceSelectValue(s));
+            typedFields[field.field] = all;
+            const off = formData.getAll(`${field.field}${FILE_DETACHED_SUFFIX}`)
+                .map((v) => String(v))
+                .filter((s) => s !== "")
+                .map((s) => coerceSelectValue(s));
+            typedFields[`${field.field}${FILE_DETACHED_SUFFIX}`] = off;
+            continue;
+        }
         const value = formData.get(field.field);
         if (value === null || value === "") {
             typedFields[field.field] = null;
             continue;
         }
         typedFields[field.field] =
-            (field.type === "select" && field.end_point) || field.type === "file"
+            field.type === "select" && field.end_point
                 ? coerceSelectValue(String(value))
                 : String(value);
     }

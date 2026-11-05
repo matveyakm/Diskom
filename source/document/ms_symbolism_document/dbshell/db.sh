@@ -16,8 +16,6 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     effective_date			timestamp,
     dnumber			text,
     id_committee			bigint,
-    id_logo			bigint,
-    id_logo_old			bigint,
     comment			text,
     id_basis			smallint,
     status			smallint default 1,
@@ -33,7 +31,6 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN public.${DB_TABLENAME}.effective_date IS 'Effective Date';
   COMMENT ON COLUMN public.${DB_TABLENAME}.dnumber IS 'Dnumber';
   COMMENT ON COLUMN public.${DB_TABLENAME}.id_committee IS 'Id Committee';
-  COMMENT ON COLUMN public.${DB_TABLENAME}.id_logo IS 'Id Logo';
   COMMENT ON COLUMN public.${DB_TABLENAME}.comment IS 'Comment';
   COMMENT ON COLUMN public.${DB_TABLENAME}.id_basis IS 'Id Basis';
   COMMENT ON COLUMN public.${DB_TABLENAME}.status IS 'Status';

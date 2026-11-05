@@ -92,6 +92,45 @@ func TestFileLimitsEnv(t *testing.T) {
 	}
 }
 
+func TestValidFileTag(t *testing.T) {
+	for _, tc := range []struct {
+		in string
+		ok bool
+	}{
+		{"logo", true},
+		{"logo_old", true},
+		{"a-b_9", true},
+		{"", true}, // без роли
+		{"a b", false},
+		{"x/y", false},
+		{"лого", false},
+		{strings.Repeat("a", 32), true},
+		{strings.Repeat("a", 33), false},
+	} {
+		if got := validFileTag(tc.in); got != tc.ok {
+			t.Fatalf("validFileTag(%q) = %v, want %v", tc.in, got, tc.ok)
+		}
+	}
+}
+
+func TestParseFileIDs(t *testing.T) {
+	// Один + пачка сливаются с дедупом; плейсхолдеры ("_prev_doc" без
+	// значения), нули и мусор — мимо, а не ошибка (no-op выше по стеку).
+	got := parseFileIDs(7, []any{float64(7), "9", "_prev_doc", 0, "0", nil, float64(1.5), ""})
+	want := []int64{7, 9}
+	if len(got) != len(want) {
+		t.Fatalf("parseFileIDs = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("parseFileIDs = %v, want %v", got, want)
+		}
+	}
+	if got := parseFileIDs("_prev_doc", nil); len(got) != 0 {
+		t.Fatalf("parseFileIDs(placeholder) = %v, want []", got)
+	}
+}
+
 func TestParseActualDate(t *testing.T) {
 	for _, tc := range []struct {
 		in   string

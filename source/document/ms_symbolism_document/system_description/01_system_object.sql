@@ -83,18 +83,13 @@
       "end_point": "organization_directory"
     },
     {
-      "field": "id_logo",
+      "field": "logo",
       "label": "Логотип",
       "hidden": false,
       "required": true,
       "type": "file",
-      "max_count": 1
-    },
-    {
-      "field": "id_logo_old",
-      "label": "",
-      "hidden": true,
-      "required": false
+      "max_count": 1,
+      "tag": "logo"
     },
     {
       "field": "comment",
@@ -141,7 +136,7 @@
                 "merge": false,
                 "FK":
                 [
-                    {"_old_logo": "id_logo"}
+                    {"_prev_doc": "id"}
                 ]
             },
             {
@@ -173,7 +168,6 @@
                     {"effective_date": "effective_date"},
                     {"dnumber": "dnumber"},
                     {"id_committee": "id_committee"},
-                    {"id_logo": "id_logo"},
                     {"comment": "comment"},
                     {"status": 1},
                     {"id_user": 1},
@@ -187,39 +181,42 @@
                 "end_point": "symbolism_document/files",
                 "map":
                 [
-                    {"id": "id_logo"},
-                    {"id_document": "id"},
-                    {"replace": true}
-                ]
+                    {"ids": "logo"},
+                    {"id_document": "id"}
+                ],
+                "fields":
+                {
+                    "tag": "logo"
+                }
             },
             {
                 "Step": 5,
+                "method": "put",
+                "hide_in_preview": true,
+                "end_point": "symbolism_document/files",
+                "map":
+                [
+                    {"ids": "logo_detached"}
+                ],
+                "fields":
+                {
+                    "id_document": null
+                }
+            },
+            {
+                "Step": 6,
                 "method": "post",
                 "end_point": "symbolism_document/files",
                 "map":
                 [
-                    {"copy_from": "_old_logo"},
+                    {"copy_from_doc": "_prev_doc"},
                     {"id_document": "id"}
                 ],
-                "FK":
-                [
-                    {"id_logo_old": "id"},
-                    {"copied": "copied"}
-                ]
-            },
-            {
-                "Step": 6,
-                "method": "put",
-                "hide_in_preview": true,
-                "end_point": "symbolism_document",
-                "filter": "id",
-                "conditions": [
-                    {"copied": true}
-                ],
-                "map":
-                [
-                    {"id_logo_old": "id_logo_old"}
-                ]
+                "fields":
+                {
+                    "copy_tag": "logo",
+                    "tag": "logo_old"
+                }
             }
         ]
     }',
@@ -264,10 +261,27 @@
                 "end_point": "symbolism_document/files",
                 "map":
                 [
-                    {"id": "id_logo"},
-                    {"id_document": "id"},
-                    {"replace": true}
-                ]
+                    {"ids": "logo"},
+                    {"id_document": "id"}
+                ],
+                "fields":
+                {
+                    "tag": "logo"
+                }
+            },
+            {
+                "Step": 4,
+                "method": "put",
+                "hide_in_preview": true,
+                "end_point": "symbolism_document/files",
+                "map":
+                [
+                    {"ids": "logo_detached"}
+                ],
+                "fields":
+                {
+                    "id_document": null
+                }
             }
         ]
     }',
@@ -292,7 +306,6 @@
                     {"effective_date":"effective_date"},
                     {"dnumber":"dnumber"},
                     {"id_committee":"id_committee"},
-                    {"id_logo":"id_logo"},
                     {"comment":"comment"},
                     {"prefix":"prefix"},
                     {"id_transaction":"id_transaction"}
@@ -323,7 +336,6 @@
                     {"ddate":            "ddate"},
                     {"effective_date":   "effective_date"},
                     {"id_committee":     "id_committee"},
-                    {"id_logo":          "id_logo"},
                     {"comment":          "comment"},
                     {"prefix":           "prefix"},
                     {"id_transaction":   "id_transaction"}

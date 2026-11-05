@@ -7,9 +7,17 @@ export interface FormField {
     readonly?: boolean;
     default?: unknown;
     end_point?: string;
-    /** Ограничение числа файлов для type: "file" (пока только отображение: подсказка + поведение замены). */
+    /** Ограничение числа файлов для type: "file" (жёсткий гейт выборки: сверх лимита загрузить нельзя). */
     max_count?: number;
+    /** Метка роли файлов type: "file" (дефолт — имя поля). Поле управляет
+        только файлами документа с этим тегом; документ таблицы файлов не знает. */
+    tag?: string;
 }
+
+/** Суффикс виртуального поля «снятые с выборки»: FileField пишет туда id
+    файлов, убранных крестиком (для шага detach пайплайна); строка файлов
+    при этом НЕ удаляется — станет сиротой, подберёт GC. */
+export const FILE_DETACHED_SUFFIX = "_detached";
 
 export interface RawColumnItem {
     field: string;

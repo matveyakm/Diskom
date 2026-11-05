@@ -191,6 +191,58 @@ func TestPrintEmptyFieldSkipped(t *testing.T) {
 	}
 }
 
+func TestPrintImageFilesTag(t *testing.T) {
+	// Селектор files.tag: картинка из файлов документа по роли (документ
+	// своей таблицы файлов не знает). Пилотный шаблон символики обязан
+	// парситься: шапка — tag logo_old, тело — tag logo.
+	raw, err := os.ReadFile("../../document/ms_symbolism_document/templates/print.json")
+	if err != nil {
+		t.Fatalf("symbolism template unreadable: %v", err)
+	}
+	tpl, err := parsePrintTemplate(raw)
+	if err != nil {
+		t.Fatalf("symbolism template invalid: %v", err)
+	}
+	var tags []string
+	for _, b := range tpl.Blocks {
+		if b.Type == "image" {
+			if b.Files == nil {
+				t.Fatalf("symbolism image block must use files selector, got %+v", b)
+			}
+			tags = append(tags, b.Files.Tag)
+			if b.imageKey() != "tag:"+b.Files.Tag {
+				t.Fatalf("imageKey = %q", b.imageKey())
+			}
+		}
+	}
+	if len(tags) != 2 || tags[0] != "logo_old" || tags[1] != "logo" {
+		t.Fatalf("symbolism image tags = %v, want [logo_old logo]", tags)
+	}
+	// Ровно один источник: src+files.tag и пустота — мимо.
+	for _, bad := range []string{
+		`{"blocks": [{"type": "image", "src": "a.png", "files": {"tag": "logo"}, "width": 10}]}`,
+		`{"blocks": [{"type": "image", "width": 10}]}`,
+		`{"blocks": [{"type": "image", "field": "id_logo", "files": {"tag": "logo"}, "width": 10}]}`,
+		`{"blocks": [{"type": "image", "files": {"tag": "a b"}, "width": 10}]}`,
+		`{"blocks": [{"type": "image", "files": {}, "width": 10}]}`,
+	} {
+		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
+			t.Fatalf("must fail: %s", bad)
+		}
+	}
+	// Валидный files-блок парсится, рендерам без байтов — пропуск молча.
+	ok, err := parsePrintTemplate([]byte(`{"blocks": [{"type": "image", "files": {"tag": "logo"}, "width": 10}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := renderPrintDOCX(ok, map[string]any{}, map[string][]byte{}); err != nil {
+		t.Fatalf("docx without tag bytes must skip: %v", err)
+	}
+	if _, err := renderPrintPDF(ok, map[string]any{}, map[string][]byte{}); err != nil {
+		t.Fatalf("pdf without tag bytes must skip: %v", err)
+	}
+}
+
 func TestPrintStore(t *testing.T) {
 	s := newPrintStore()
 	token := s.put(printFile{Bytes: []byte("x"), Filename: "a.pdf", Mime: printPdfMime})

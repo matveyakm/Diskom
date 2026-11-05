@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -79,7 +80,10 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	// Картинки шаблона — заранее (битый файл — 500, операторская ошибка).
 	// src: файл из папки шаблона; field: байты из таблицы files того же
 	// сервиса (id файла из строки документа, принадлежность документу
-	// проверяется — чужие файлы в чужую печать не текут).
+	// проверяется — чужие файлы в чужую печать не текут); files.tag:
+	// новейший файл ЭТОГО документа с меткой (документ своей таблицы файлов
+	// не знает, указателя в строке нет). Пустое поле / нет файла с меткой —
+	// картинку пропускаем (как пустой field-блок), а не рвём сборку.
 	images := make(map[string][]byte)
 	for _, b := range tpl.Blocks {
 		if b.Type != "image" {
@@ -97,11 +101,29 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 			images[b.imageKey()] = img
 			continue
 		}
-		fileID, ok := printID64(record[b.Field])
-		if !ok {
-			// Поле пустое — картинку пропускаем (как пустой field-блок),
-			// а не рвём сборку: логотип может появиться позже.
-			continue
+		var fileID int64
+		what := ""
+		if b.Field != "" {
+			fid, ok := printID64(record[b.Field])
+			if !ok {
+				// Поле пустое — пропускаем, логотип может появиться позже.
+				continue
+			}
+			fileID, what = fid, "field "+b.Field
+		} else {
+			tag := strings.TrimSpace(b.Files.Tag)
+			var f FileObject
+			q := r.db.Table(f.TableName()).Select("id").
+				Where("id_document = ? AND tag = ?", id, tag).Order("id DESC")
+			if err := q.First(&f).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					// Нет файла с меткой — пропускаем, как пустое поле.
+					continue
+				}
+				r.writeError(w, "Failed to load print image: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			fileID, what = f.Id, "files.tag "+tag
 		}
 		img, mime, err := fileBytesForPrint(r.db, fileID, id)
 		if err != nil {
@@ -110,8 +132,8 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 		}
 		if mime == "application/pdf" {
 			// Блок image умеет только растр (png/jpg): PDF прикрепили не туда.
-			// Громкая 500 с именем поля вместо битого документа (философия).
-			r.writeError(w, "Failed to load print image: field "+b.Field+" is PDF, want png|jpg", http.StatusInternalServerError)
+			// Громкая 500 с источником вместо битого документа (философия).
+			r.writeError(w, "Failed to load print image: "+what+" is PDF, want png|jpg", http.StatusInternalServerError)
 			return
 		}
 		images[b.imageKey()] = img

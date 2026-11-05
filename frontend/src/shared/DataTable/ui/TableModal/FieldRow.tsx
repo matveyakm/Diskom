@@ -1,5 +1,6 @@
 import {useReferenceOptions, ReferenceOption} from "@/shared/api/useReferenceOptions";
 import {api} from "@/shared/api/AxiosClient";
+import {FILE_DETACHED_SUFFIX} from "@/entities/document/types";
 import {FieldRowProps} from "./types";
 import styles from "./TableModal.module.scss";
 import {useEffect, useState, useRef, useCallback, useMemo, type ReactNode} from "react";
@@ -228,8 +229,6 @@ const SelectField = ({field, value, isEditing, bare}: FieldRowProps) => {
     );
 };
 
-type FileUploadStatus = "idle" | "uploading" | "done" | "error";
-
 // Клиентский пред-чек размера (источник истины — backend FILE_MAX_MB, там же
 // итоговая валидация; сообщение выводим из той же константы, чтобы не врать).
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -248,6 +247,13 @@ interface AttachedFile {
     file_name: string;
     mime: string;
     size: number;
+    tag?: string;
+}
+
+interface FreshFile {
+    id: string;
+    name: string;
+    size: number;
 }
 
 const pluralFiles = (n: number): string => {
@@ -258,15 +264,27 @@ const pluralFiles = (n: number): string => {
     return "файлов";
 };
 
+// FileField — выборка файлов роли tag (дефолт — имя поля), а не указатель
+// на один файл. Документ таблицы файлов не знает: поле виртуальное, в строку
+// не пишется; пайплайн сверяет точное множество (attach выбранных — шаг
+// привязки, detach снятых — отдельный шаг с <имя>_detached).
+// Крестик НЕ удаляет строку files: снятый остаётся сиротой, его подбирает
+// GC. Поэтому список строится только из действий пользователя, а не из
+// «всего, чего нет»: несвежий/упавший список не сносит чужие привязки.
 const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowProps) => {
-    const [fileId, setFileId] = useState(() => asFileId(value));
-    const [fileName, setFileName] = useState("");
-    const [fileSize, setFileSize] = useState<number | null>(null);
-    const [status, setStatus] = useState<FileUploadStatus>("idle");
+    void value;
+    const tag = field.tag ?? field.field;
+    // Файлы документа с этой ролью (сервер — истина для существующих).
+    const [serverFiles, setServerFiles] = useState<AttachedFile[] | null>(null);
+    const [listFailed, setListFailed] = useState(false);
+    const [listRetry, setListRetry] = useState(0);
+    // Свежие загрузки этой сессии (сироты до сохранения).
+    const [fresh, setFresh] = useState<FreshFile[]>([]);
+    // Снятые с выборки (крестик): уйдут шагом detach, строкой не удаляются.
+    const [detached, setDetached] = useState<string[]>([]);
+    const [uploading, setUploading] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [isDragging, setIsDragging] = useState(false);
-    const [attached, setAttached] = useState<AttachedFile[] | null>(null);
-    const [listFailed, setListFailed] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const isRequired = field.required ?? false;
@@ -275,29 +293,25 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
     const canList =
         !!serviceRef && docId !== null && docId !== undefined && docId !== "";
 
-    useEffect(() => {
-        setFileId(asFileId(value));
-    }, [value]);
 
-    // Список прикреплённых файлов с метаданными (один запрос по документу,
-    // а не N по файлам). Нужен и в просмотре (карточки), и в редактировании
-    // (подсказка про лимит и замену).
+    // Файлы своей роли одним запросом (не N по файлам). Нужен и в просмотре
+    // (карточки), и в редактировании (истина для инициализации выборки).
     useEffect(() => {
         if (!canList || !serviceRef) {
-            setAttached(null);
+            setServerFiles(null);
             return;
         }
         let cancelled = false;
-        setAttached(null);
+        setServerFiles(null);
         setListFailed(false);
         api.get<{ data?: AttachedFile[] } | AttachedFile[]>(
-            `/api/${serviceRef}/files?id_document=${encodeURIComponent(String(docId))}`
+            `/api/${serviceRef}/files?id_document=${encodeURIComponent(String(docId))}&tag=${encodeURIComponent(tag)}`
         ).then(
             (resp) => {
                 if (cancelled) return;
                 const raw = resp as unknown as { data?: unknown };
                 const list = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data as AttachedFile[] : [];
-                setAttached(list.filter((f) => f && f.id !== null && f.id !== undefined));
+                setServerFiles(list.filter((f) => f && f.id !== null && f.id !== undefined));
             },
             () => {
                 if (!cancelled) setListFailed(true);
@@ -306,24 +320,61 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         return () => {
             cancelled = true;
         };
-    }, [serviceRef, docId, canList]);
+    }, [serviceRef, docId, canList, tag, listRetry]);
+
+    const detachedSet = useMemo(() => new Set(detached), [detached]);
+    // Выборка: серверные минус снятые + свежие. Именно она едет скрытыми
+    // инпутами шагу привязки; снятые — отдельным списком шагу detach.
+    const activeServer = useMemo(
+        () => (serverFiles ?? []).filter((f) => !detachedSet.has(String(f.id))),
+        [serverFiles, detachedSet],
+    );
+    const selectedIds = useMemo(
+        () => [...activeServer.map((f) => String(f.id)), ...fresh.map((f) => f.id)],
+        [activeServer, fresh],
+    );
+    const limitReached = maxCount !== undefined && selectedIds.length >= maxCount;
 
     const fileUrl = (id: string | number | unknown): string | null =>
         serviceRef && id !== null && id !== undefined && id !== ""
             ? `/api/${serviceRef}/files?content=${encodeURIComponent(String(id))}`
             : null;
 
-    const renderFileCards = (files: AttachedFile[], genericName?: string) => (
+    const unselectServer = useCallback((id: string | number) => {
+        const key = String(id);
+        setDetached((prev) => (prev.includes(key) ? prev : [...prev, key]));
+    }, []);
+
+    const unselectFresh = useCallback((id: string | number) => {
+        // Свежая загрузка: просто убираем из выборки (сирота, подберёт GC)
+        // и фиксируем в detached-списке для единообразия шага detach.
+        const key = String(id);
+        setFresh((prev) => prev.filter((f) => f.id !== key));
+        setDetached((prev) => (prev.includes(key) ? prev : [...prev, key]));
+    }, []);
+
+    const renderFileCards = (files: AttachedFile[], opts?: {onRemove?: (id: string | number) => void; freshMark?: boolean}) => (
         <ul className={styles.fileList}>
             {files.map((f) => {
                 const url = fileUrl(f.id);
                 const inner = (
                     <>
                         <span className={styles.fileListName}>
-                            {f.file_name || genericName || `Файл ${f.id}`}
+                            {f.file_name || `Файл ${f.id}`}
                         </span>
                     {typeof f.size === "number" && Number.isFinite(f.size) && (
                         <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
+                    )}
+                    {opts?.freshMark && <span className={styles.fileListSize}>новый</span>}
+                    {opts?.onRemove && (
+                        <button
+                            type="button"
+                            className={styles.filePickBtn}
+                            title="Убрать из выборки (файл не удаляется)"
+                            onClick={() => opts.onRemove!(f.id)}
+                        >
+                            ×
+                        </button>
                     )}
                     </>
                 );
@@ -343,16 +394,13 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
     );
 
     if (!isEditing) {
-        // Серверный список — истина (висячий id в поле не показываем);
-        // запасная карточка по id поля — только при обрыве запроса.
+        // Просмотр: серверный список своей роли; висячих id в поле больше
+        // нет (поле виртуальное), придумывать карточки не из чего.
         let body: ReactNode;
-        if (canList && attached === null && !listFailed) {
+        if (canList && serverFiles === null && !listFailed) {
             body = <span>…</span>;
-        } else if (attached !== null && attached.length > 0) {
-            body = renderFileCards(attached);
-        } else if (fileId && (!canList || listFailed)) {
-            const url = fileUrl(fileId);
-            body = url ? renderFileCards([{id: fileId, file_name: "", mime: "", size: NaN}], `Файл ${fileId}`) : <span>—</span>;
+        } else if (serverFiles !== null && serverFiles.length > 0) {
+            body = renderFileCards(serverFiles);
         } else {
             body = <span>—</span>;
         }
@@ -366,18 +414,18 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
 
     const uploadFile = (file: File) => {
         if (!serviceRef) {
-            setStatus("error");
             setErrorMsg("Неизвестная сущность");
             return;
         }
+        if (limitReached) {
+            setErrorMsg(`Максимум: ${maxCount} ${pluralFiles(maxCount ?? 0)} — уберите лишний, чтобы загрузить другой`);
+            return;
+        }
         if (file.size > MAX_FILE_SIZE) {
-            setStatus("error");
             setErrorMsg(`Файл больше ${formatFileSize(MAX_FILE_SIZE)}`);
             return;
         }
-        setFileName(file.name);
-        setFileSize(file.size);
-        setStatus("uploading");
+        setUploading(true);
         setErrorMsg("");
         const reader = new FileReader();
         reader.onload = () => {
@@ -387,7 +435,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                     const base64 = result.includes(",") ? result.slice(result.indexOf(",") + 1) : result;
                     const resp = await api.post<Record<string, unknown>>(
                         `/api/${serviceRef}/files`,
-                        {file_name: file.name, data: base64},
+                        {file_name: file.name, data: base64, tag},
                     );
                     const rec = resp as Record<string, unknown>;
                     const wrapped = rec.data as Record<string, unknown> | undefined;
@@ -395,16 +443,19 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                     if (rawId === null || rawId === undefined || rawId === "") {
                         throw new Error("empty id");
                     }
-                    setFileId(String(rawId));
-                    setStatus("done");
+                    const newId = String(rawId);
+                    setFresh((prev) => [...prev, {id: newId, name: file.name, size: file.size}]);
+                    // Перевыбор ранее снятого: снимаем пометку detach.
+                    setDetached((prev) => prev.filter((d) => d !== newId));
                 } catch {
-                    setStatus("error");
                     setErrorMsg("Не удалось загрузить файл");
+                } finally {
+                    setUploading(false);
                 }
             })();
         };
         reader.onerror = () => {
-            setStatus("error");
+            setUploading(false);
             setErrorMsg("Не удалось прочитать файл");
         };
         reader.readAsDataURL(file);
@@ -417,9 +468,6 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         uploadFile(file);
     };
 
-    const attachedCount = attached?.length ?? 0;
-    const limitReached = maxCount !== undefined && attached !== null && attachedCount >= maxCount;
-
     return (
         <>
             {!bare && (
@@ -427,9 +475,26 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                     {field.label} {isRequired && <span style={{color: "red"}}>*</span>}
                 </label>
             )}
-            {attached !== null && attached.length > 0 && (
-                <div className={styles.viewValue}>{renderFileCards(attached)}</div>
+            {listFailed && (
+                <div style={{color: "red", fontSize: "12px"}}>
+                    Не удалось загрузить список файлов{" "}
+                    <button type="button" className={styles.filePickBtn} onClick={() => setListRetry((n) => n + 1)}>
+                        Повторить
+                    </button>
+                </div>
             )}
+            {activeServer.length > 0 && (
+                <div className={styles.viewValue}>{renderFileCards(activeServer, {onRemove: unselectServer})}</div>
+            )}
+            {fresh.length > 0 && (
+                <div className={styles.viewValue}>
+                    {renderFileCards(
+                        fresh.map((f) => ({id: f.id, file_name: f.name, mime: "", size: f.size})),
+                        {onRemove: unselectFresh, freshMark: true},
+                    )}
+                </div>
+            )}
+            {!limitReached && (
             <div
                 className={`${styles.fileDropZone} ${isDragging ? styles.fileDropZoneActive : ""}`}
                 onDragOver={(e) => {
@@ -461,21 +526,25 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                 {maxCount !== undefined && (
                     <div className={styles.fileHint}>
                         Максимум: {maxCount} {pluralFiles(maxCount)}
-                        {limitReached ? " — новый файл заменит текущий при сохранении" : ""}
                     </div>
                 )}
-                {fileName && (
-                    <div className={styles.autocompleteLoading}>
-                        {fileName}{fileSize !== null ? ` (${formatFileSize(fileSize)})` : ""}
-                    </div>
-                )}
-                {status === "uploading" && <div className={styles.autocompleteLoading}>Загрузка...</div>}
-                {status === "done" && <div className={styles.autocompleteLoading}>Загружено</div>}
-                {status === "error" && errorMsg && (
+                {uploading && <div className={styles.autocompleteLoading}>Загрузка...</div>}
+                {errorMsg && (
                     <div style={{color: "red", fontSize: "12px"}}>{errorMsg}</div>
                 )}
             </div>
-            <input type="hidden" name={field.field} value={fileId} required={isRequired}/>
+            )}
+            {limitReached && maxCount !== undefined && (
+                <div className={styles.fileHint}>
+                    Максимум: {maxCount} {pluralFiles(maxCount)} — уберите лишний, чтобы загрузить другой
+                </div>
+            )}
+            {selectedIds.map((id) => (
+                <input key={`sel-${id}`} type="hidden" name={field.field} value={id} />
+            ))}
+            {detached.map((id) => (
+                <input key={`det-${id}`} type="hidden" name={`${field.field}${FILE_DETACHED_SUFFIX}`} value={id} />
+            ))}
         </>
     );
 };
