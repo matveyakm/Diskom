@@ -7,34 +7,29 @@ package restController
 // сирота: загружен, но ни к чему не привязан). Документ своей таблицы
 // файлов НЕ знает: никаких id_file-колонок в сущностях; файловое поле формы —
 // виртуальное (живёт только в контексте пайплайна, в строку не пишется).
-// Несколько файлов одного документа различаются меткой tag (роль внутри
-// документа: "logo", "logo_old"...). Конвенция: поле формы управляет файлами
-// с тегом = field.tag (дефолт — имя поля).
 //
 // Поток (договорённость):
-//  1. POST /api/files {file_name, data(base64), tag?} → orphan-строка.
+//  1. POST /api/files {file_name, data(base64)} → orphan-строка {id...}.
 //     Отдельный запрос (файл НЕ едет внутри JSON документа).
-//     Вариант {"copy_from_doc": <doc>, "copy_tag"?: <tag>, "tag"?: <tag>,
-//     "id_document"?: <doc>} — дублирует НОВЕЙШИЙ файл документа с меткой
-//     (заморозка версии для нового хозяина). Нечего копировать — тихий
-//     no-op {"copied": false} (первый приказ серии).
+//     Вариант {"copy_from": <id>, "id_document"?: <doc>} — дублирует файл
+//     новой строкой. Нечего копировать — тихий no-op {"copied": false}.
 //  2. Сохранение документа: пайплайн PUT /api/files {ids: [...],
-//     id_document: <id>, tag, replace?} — сверка ТОЧНОГО множества:
-//     выбранные прикрепить, остальные файлы документа с тем же тегом отцепить
-//     (становятся сиротами, НЕ удаляются). Прикрепить можно только сироту
-//     (чужой файл увести нельзя); повтор — тихий no-op (идемпотентный re-save).
-//     id_document=null — отцепить перечисленные (становятся сиротами).
+//     id_document: <id>} — прикрепить выбранные (только сирот; чужой файл
+//     увести нельзя — 409; повтор — тихий no-op, идемпотентный re-save).
+//     Отдельный шаг PUT {ids: [...снятые...], id_document: null} — отцепить
+//     ранее привязанные, снятые крестиком (становятся сиротами, НЕ удаляются;
+//     строка files при этом не трогается). Свежие загрузки, снятые до
+//     сохранения, никуда не отправляются вообще: они и так сироты.
 //     Без валидных id — тихий no-op 200 (шаг обязан пропускаться, когда
 //     файлов нет).
-//  3. GET /api/files?id_document=[&tag=] — МЕТАДАННЫЕ без байтов.
+//  3. GET /api/files?id_document= — МЕТАДАННЫЕ без байтов (грид и формы).
 //     GET /api/files?content= — байты с Content-Type/Disposition.
 //  4. DELETE /api/files?id= — удаление строки. Привязанные файлы чистятся
 //     шагом on_delete сущности (DELETE /api/files?id_document=).
 //  5. Сироты: created_at + TTL (env FILE_ORPHAN_TTL_HOURS, дефолт 168).
 //     Чистит фоновый сборщик в App (тихий DELETE по таймеру, дефолт 6ч).
 //     Сирота = id_document IS NULL ИЛИ номер документа исчез из основной
-//     таблицы. Отцепленные старые файлы чистятся быстро (created_at у них
-//     старый) — так задумано: снят с выборки = больше не нужен.
+//     таблицы (проверка JOIN при чистке, руками файл не теряется).
 //
 // Байты в списках не отдаются никогда (правило); кап размера —
 // env FILE_MAX_MB (дефолт 25); magic allowlist png/jpg/pdf (как в печати).
@@ -47,7 +42,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -71,10 +65,6 @@ const (
 // FileObject — строка таблицы files (одна таблица на БД каждого сервиса).
 // Data в JSON наружу не отдаётся никогда (json:"-"; метаданные —
 // отдельным запросом без колонки).
-// Tag — свободная метка роли файла внутри документа ("logo", "logo_old"...).
-// Один документ может держать несколько файлов с разными ролями; связь 1:N —
-// только files.id_document, документ своей таблицы файлов не знает
-// (никаких id_file-колонок в сущностях). Пустой тег = без роли.
 type FileObject struct {
 	Id         int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	FileName   string    `gorm:"column:file_name" json:"file_name"`
@@ -82,7 +72,6 @@ type FileObject struct {
 	Size       int64     `gorm:"column:size" json:"size"`
 	Data       []byte    `gorm:"column:data" json:"-"`
 	IdDocument *int64    `gorm:"column:id_document" json:"id_document"`
-	Tag        string    `gorm:"column:tag;default:''" json:"tag"`
 	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 }
 
@@ -96,39 +85,25 @@ type fileMeta struct {
 	Mime       string    `json:"mime"`
 	Size       int64     `json:"size"`
 	IdDocument *int64    `json:"id_document"`
-	Tag        string    `json:"tag"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
 // fileUpload — тело загрузки (отдельный запрос, не часть документа):
-// либо {file_name, data: base64, tag?}, либо {copy_from: id, ...},
-// либо {copy_from_doc: doc, copy_tag?: tag, ...} — дублировать новейший
-// файл документа (заморозка версии; нечего копировать — тихий no-op).
-// tag — метка результата (пусто = унаследовать от источника).
+// либо {file_name, data: base64}, либо {copy_from: id, id_document?}.
 type fileUpload struct {
-	FileName    string `json:"file_name"`
-	Data        string `json:"data"`
-	CopyFrom    any    `json:"copy_from"`
-	CopyFromDoc any    `json:"copy_from_doc"`
-	CopyTag     string `json:"copy_tag"`
-	Tag         string `json:"tag"`
-	IdDocument  *int64 `json:"id_document"`
+	FileName   string `json:"file_name"`
+	Data       string `json:"data"`
+	CopyFrom   any    `json:"copy_from"`
+	IdDocument *int64 `json:"id_document"`
 }
 
-// reFileTag — charset метки (та же строгость, что у имён колонок;
-// единый регексп для endpoint-валидации и валидации шаблонов печати).
-var reFileTag = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
-
-// validFileTag — пусто (без роли) или строгий charset.
-func validFileTag(tag string) bool {
-	tag = strings.TrimSpace(tag)
-	return tag == "" || reFileTag.MatchString(tag)
-}
+// Меток ролей больше нет (связь — только id_document, печать с ролями
+// решается отдельно, без хардкода в shared).
 
 // parseFileIDs собирает id файлов из тела (id — один, ids — пачка):
-// годные (>0) — в работу; мусор мимо. Неразрешённый плейсхолдер пайплайна
-// ("copy_from_doc": "_prev_doc" без значения в контексте прилетает строкой)
-// printID64 не проходит — и это no-op выше по стеку, а не ошибка.
+// годные (>0) — в работу, мусор мимо. Неразрешённый плейсхолдер пайплайна
+// (строка без значения в контексте) printID64 не проходит — и это пропуск
+// шага выше по стеку, а не ошибка.
 // Ноль валидных — не ошибка разбора, вызывающий решает (обычно no-op).
 func parseFileIDs(single any, multi []any) []int64 {
 	var out []int64
@@ -255,14 +230,10 @@ func (h *FileHandler) HandleRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 // upload принимает файл отдельным запросом (сирота, без id_document).
-// Метка tag едет сразу (роль внутри будущего документа).
-// Вариант {"copy_from": <id>, ...} — дублирует указанный файл;
-// вариант {"copy_from_doc": <doc>, "copy_tag"?: <tag>, ...} — дублирует
-// НОВЕЙШИЙ файл документа (заморозка версии для нового хозяина).
-// Нечего копировать (первый приказ серии / нет файла с меткой /
-// плейсхолдер без значения) — тихий no-op {"copied": false}.
-// id_document в запросе — сразу прикрепить копию (проверяется существование
-// документа; чужие файлы копировать можно — это копия, не угон).
+// Вариант {"copy_from": <id>, "id_document"?: <doc>} — дублирует файл новой
+// строкой (чужой файл копировать можно — это копия, не угон).
+// Нечего копировать (плейсхолдер без значения) — тихий no-op {"copied": false}.
+// id_document в запросе — сразу прикрепить копию (документ обязан существовать).
 func (h *FileHandler) upload(w http.ResponseWriter, req *http.Request, r *CRUDRepository[FileObject]) {
 	maxBody := fileMaxBytes()*4/3 + fileBodySlackBytes
 	req.Body = http.MaxBytesReader(w, req.Body, maxBody)
@@ -281,11 +252,6 @@ func (h *FileHandler) upload(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		r.writeError(w, "Invalid file_name", http.StatusBadRequest)
 		return
 	}
-	tag := strings.TrimSpace(up.Tag)
-	if !validFileTag(tag) {
-		r.writeError(w, "Invalid tag: want [A-Za-z0-9_-]{1,32}", http.StatusBadRequest)
-		return
-	}
 	raw, err := base64.StdEncoding.DecodeString(up.Data)
 	if err != nil {
 		r.writeError(w, "Invalid base64 data", http.StatusBadRequest)
@@ -300,63 +266,33 @@ func (h *FileHandler) upload(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		r.writeError(w, "File must be png|jpg|pdf (magic mismatch)", http.StatusBadRequest)
 		return
 	}
-	row := FileObject{FileName: name, Mime: mime, Size: int64(len(raw)), Data: raw, Tag: tag}
+	row := FileObject{FileName: name, Mime: mime, Size: int64(len(raw)), Data: raw}
 	if err := h.db.Table(row.TableName()).Create(&row).Error; err != nil {
 		r.writeError(w, "Failed to store file: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	r.writeJSONResponse(w, fileMeta{
 		Id: row.Id, FileName: row.FileName, Mime: row.Mime,
-		Size: row.Size, IdDocument: nil, Tag: row.Tag, CreatedAt: row.CreatedAt,
+		Size: row.Size, IdDocument: nil, CreatedAt: row.CreatedAt,
 	}, http.StatusCreated)
 }
 
 // copy дублирует файл новой строкой (те же байты/имя/mime).
-// Источник — либо copy_from (id файла), либо copy_from_doc (id документа +
-// опциональный copy_tag: новейший файл документа с меткой).
 // id_document в запросе — сразу прикрепить копию (проверяется существование
-// документа). Метка результата — tag (пусто = унаследовать от источника).
+// документа; чужие файлы копировать можно — это копия, не угон).
 func (h *FileHandler) copy(w http.ResponseWriter, req *http.Request, r *CRUDRepository[FileObject], up fileUpload) {
-	tag := strings.TrimSpace(up.Tag)
-	if !validFileTag(tag) {
-		r.writeError(w, "Invalid tag: want [A-Za-z0-9_-]{1,32}", http.StatusBadRequest)
-		return
-	}
-	copyTag := strings.TrimSpace(up.CopyTag)
-	if !validFileTag(copyTag) {
-		r.writeError(w, "Invalid copy_tag: want [A-Za-z0-9_-]{1,32}", http.StatusBadRequest)
-		return
-	}
-	var src FileObject
-	if srcID, ok := printID64(up.CopyFrom); ok {
-		if err := h.db.Table(src.TableName()).Where("id = ?", srcID).First(&src).Error; err != nil {
-			r.writeError(w, "Source file not found", http.StatusNotFound)
-			return
-		}
-	} else if docID, ok := printID64(up.CopyFromDoc); ok {
-		q := h.db.Table(src.TableName()).Where("id_document = ?", docID)
-		if copyTag != "" {
-			q = q.Where("tag = ?", copyTag)
-		}
-		if err := q.Order("id DESC").First(&src).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				// Некого копировать (первый приказ / нет файла с меткой).
-				r.writeJSONResponse(w, map[string]any{"copied": false}, http.StatusOK)
-				return
-			}
-			r.writeError(w, "Failed to find source file: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-	} else {
+	srcID, ok := printID64(up.CopyFrom)
+	if !ok {
 		// Некого копировать (плейсхолдер без значения в контексте) — no-op.
 		r.writeJSONResponse(w, map[string]any{"copied": false}, http.StatusOK)
 		return
 	}
-	newTag := tag
-	if newTag == "" {
-		newTag = src.Tag
+	var src FileObject
+	if err := h.db.Table(src.TableName()).Where("id = ?", srcID).First(&src).Error; err != nil {
+		r.writeError(w, "Source file not found", http.StatusNotFound)
+		return
 	}
-	row := FileObject{FileName: src.FileName, Mime: src.Mime, Size: src.Size, Data: src.Data, Tag: newTag}
+	row := FileObject{FileName: src.FileName, Mime: src.Mime, Size: src.Size, Data: src.Data}
 	if up.IdDocument != nil {
 		if *up.IdDocument <= 0 {
 			r.writeError(w, "Invalid id_document", http.StatusBadRequest)
@@ -379,12 +315,11 @@ func (h *FileHandler) copy(w http.ResponseWriter, req *http.Request, r *CRUDRepo
 	}
 	r.writeJSONResponse(w, map[string]any{
 		"id": row.Id, "file_name": row.FileName, "mime": row.Mime,
-		"size": row.Size, "id_document": row.IdDocument, "tag": row.Tag, "copied": true,
+		"size": row.Size, "id_document": row.IdDocument, "copied": true,
 	}, http.StatusCreated)
 }
 
 // list отдаёт МЕТАДАННЫЕ файлов документа (байтов нет никогда).
-// Опциональный ?tag= — только файлы с ролью (поле формы показывает свои).
 func (h *FileHandler) list(w http.ResponseWriter, req *http.Request, r *CRUDRepository[FileObject]) {
 	idDoc := strings.TrimSpace(req.URL.Query().Get("id_document"))
 	if idDoc == "" {
@@ -396,17 +331,9 @@ func (h *FileHandler) list(w http.ResponseWriter, req *http.Request, r *CRUDRepo
 		r.writeError(w, "Invalid id_document parameter", http.StatusBadRequest)
 		return
 	}
-	tag := strings.TrimSpace(req.URL.Query().Get("tag"))
-	if !validFileTag(tag) {
-		r.writeError(w, "Invalid tag: want [A-Za-z0-9_-]{1,32}", http.StatusBadRequest)
-		return
-	}
 	q := h.db.Table(FileObject{}.TableName()).
-		Select("id, file_name, mime, size, id_document, tag, created_at").
+		Select("id, file_name, mime, size, id_document, created_at").
 		Where("id_document = ?", docID)
-	if tag != "" {
-		q = q.Where("tag = ?", tag)
-	}
 	var rows []FileObject
 	if err := q.Order("id").Find(&rows).Error; err != nil {
 		r.writeError(w, "Failed to list files: "+err.Error(), http.StatusInternalServerError)
@@ -416,7 +343,7 @@ func (h *FileHandler) list(w http.ResponseWriter, req *http.Request, r *CRUDRepo
 	for _, row := range rows {
 		out = append(out, fileMeta{
 			Id: row.Id, FileName: row.FileName, Mime: row.Mime,
-			Size: row.Size, IdDocument: row.IdDocument, Tag: row.Tag, CreatedAt: row.CreatedAt,
+			Size: row.Size, IdDocument: row.IdDocument, CreatedAt: row.CreatedAt,
 		})
 	}
 	r.writeJSONResponse(w, map[string]any{"data": out}, http.StatusOK)
@@ -441,18 +368,17 @@ func (h *FileHandler) content(w http.ResponseWriter, req *http.Request, r *CRUDR
 	_, _ = w.Write(row.Data)
 }
 
-// attach сверяет ТОЧНОЕ множество файлов документа (шаг пайплайна сохранения).
-// Тело: {ids: [...], id_document: <id>, tag?, replace?} (id — один, для
-// совместимости). Правила:
+// attach привязывает выбранные файлы к документу (шаг пайплайна сохранения).
+// Тело: {ids: [...], id_document: <id>} (id — один, для совместимости). Правила:
 //   - прикрепить можно только сироту (чужой файл увести нельзя — 409);
 //     уже привязан к тому же документу — тихий no-op (идемпотентный re-save);
 //   - replace — отцепить остальные файлы документа (становятся сиротами,
-//     НЕ удаляются); с tag — только с той же меткой (точное множество роли),
-//     без tag — все остальные;
-//   - id_document=null — отцепить перечисленные (станут сиротами);
-//   - без валидных id (поле файла не заполнено, плейсхолдер без значения) —
-//     тихий no-op 200, а не 400: шаг обязан молча пропускаться;
-//   - tag — метка, проставляемая прикреплённым (пусто = не менять).
+//     НЕ удаляются);
+//   - id_document=null — отцепить перечисленные (снятые крестиком ранее
+//     привязанные; строка files при этом не удаляется);
+//   - без валидных id — тихий no-op 200, а не 400: шаг обязан молча
+//     пропускаться, когда файлов нет (поле не заполнено, плейсхолдер
+//     без значения в контексте).
 // Документ-хозяин обязан существовать (иначе — будущий труп для GC).
 func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRepository[FileObject]) {
 	var body struct {
@@ -463,7 +389,6 @@ func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		Ids        any    `json:"ids"`
 		IdDocument *int64 `json:"id_document"`
 		Replace    bool   `json:"replace"`
-		Tag        string `json:"tag"`
 	}
 	// Тело — крошечный JSON привязки (id/id_document/replace); кап как у PUT,
 	// чтобы безлимитный Decode не держал соединение (там же MaxBytesReader).
@@ -473,11 +398,6 @@ func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		return
 	}
 	defer req.Body.Close()
-	tag := strings.TrimSpace(body.Tag)
-	if !validFileTag(tag) {
-		r.writeError(w, "Invalid tag: want [A-Za-z0-9_-]{1,32}", http.StatusBadRequest)
-		return
-	}
 	replace := req.URL.Query().Get("replace") != "" || body.Replace
 	// Ids нормализуем к пачке: массив как есть, скаляр — как один id
 	// (строка-плейсхолдер дальше молча отфильтруется в parseFileIDs).
@@ -520,7 +440,8 @@ func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRe
 			return
 		}
 	}
-	// Отцепление — всегда разрешено (файлы станут сиротами, метки храним).
+	// Отцепление ранее привязанных, снятых крестиком (файлы станут сиротами,
+	// строка files не удаляется — подберёт GC, если файл так и не вернут).
 	if body.IdDocument == nil {
 		if err := h.db.Table(FileObject{}.TableName()).Where("id IN ?", ids).
 			Update("id_document", nil).Error; err != nil {
@@ -557,13 +478,9 @@ func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		r.writeError(w, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
-	// Сверка множества: чужие файлы документа вне выборки — в сироты
-	// (с tag — только та же роль; снят с выборки = больше не нужен).
+	// Точное множество: файлы документа вне выборки — в сироты.
 	if replace {
 		q := tx.Table(FileObject{}.TableName()).Where("id_document = ? AND id NOT IN ?", docID, ids)
-		if tag != "" {
-			q = q.Where("tag = ?", tag)
-		}
 		if err := q.Update("id_document", nil).Error; err != nil {
 			tx.Rollback()
 			r.writeError(w, "Failed to replace files: "+err.Error(), http.StatusInternalServerError)
@@ -571,15 +488,6 @@ func (h *FileHandler) attach(w http.ResponseWriter, req *http.Request, r *CRUDRe
 		}
 	}
 	for _, id := range ids {
-		if tag != "" {
-			if err := tx.Table(FileObject{}.TableName()).Where("id = ?", id).
-				Updates(map[string]any{"id_document": docID, "tag": tag}).Error; err != nil {
-				tx.Rollback()
-				r.writeError(w, "Failed to attach file: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-			continue
-		}
 		if err := tx.Table(FileObject{}.TableName()).Where("id = ?", id).
 			Update("id_document", docID).Error; err != nil {
 			tx.Rollback()

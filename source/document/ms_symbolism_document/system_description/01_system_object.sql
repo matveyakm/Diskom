@@ -88,8 +88,7 @@
       "hidden": false,
       "required": true,
       "type": "file",
-      "max_count": 1,
-      "tag": "logo"
+      "max_count": 1
     },
     {
       "field": "comment",
@@ -128,19 +127,6 @@
         [
             {
                 "Step": 1,
-                "method": "get",
-                "hide_in_preview": true,
-                "end_point": "symbolism_document",
-                "query": {"status": 2},
-                "filter": "id_committee",
-                "merge": false,
-                "FK":
-                [
-                    {"_prev_doc": "id"}
-                ]
-            },
-            {
-                "Step": 2,
                 "method": "post",
                 "end_point": "document",
                 "map":
@@ -158,7 +144,7 @@
                 ]
             },
             {
-                "Step": 3,
+                "Step": 2,
                 "method": "post",
                 "end_point": "symbolism_document",
                 "map":
@@ -176,47 +162,14 @@
                 ]
             },
             {
-                "Step": 4,
+                "Step": 3,
                 "method": "put",
                 "end_point": "symbolism_document/files",
                 "map":
                 [
                     {"ids": "logo"},
                     {"id_document": "id"}
-                ],
-                "fields":
-                {
-                    "tag": "logo"
-                }
-            },
-            {
-                "Step": 5,
-                "method": "put",
-                "hide_in_preview": true,
-                "end_point": "symbolism_document/files",
-                "map":
-                [
-                    {"ids": "logo_detached"}
-                ],
-                "fields":
-                {
-                    "id_document": null
-                }
-            },
-            {
-                "Step": 6,
-                "method": "post",
-                "end_point": "symbolism_document/files",
-                "map":
-                [
-                    {"copy_from_doc": "_prev_doc"},
-                    {"id_document": "id"}
-                ],
-                "fields":
-                {
-                    "copy_tag": "logo",
-                    "tag": "logo_old"
-                }
+                ]
             }
         ]
     }',
@@ -263,11 +216,7 @@
                 [
                     {"ids": "logo"},
                     {"id_document": "id"}
-                ],
-                "fields":
-                {
-                    "tag": "logo"
-                }
+                ]
             },
             {
                 "Step": 4,

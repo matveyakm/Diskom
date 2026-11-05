@@ -92,27 +92,6 @@ func TestFileLimitsEnv(t *testing.T) {
 	}
 }
 
-func TestValidFileTag(t *testing.T) {
-	for _, tc := range []struct {
-		in string
-		ok bool
-	}{
-		{"logo", true},
-		{"logo_old", true},
-		{"a-b_9", true},
-		{"", true}, // без роли
-		{"a b", false},
-		{"x/y", false},
-		{"лого", false},
-		{strings.Repeat("a", 32), true},
-		{strings.Repeat("a", 33), false},
-	} {
-		if got := validFileTag(tc.in); got != tc.ok {
-			t.Fatalf("validFileTag(%q) = %v, want %v", tc.in, got, tc.ok)
-		}
-	}
-}
-
 func TestParseFileIDs(t *testing.T) {
 	// Один + пачка сливаются с дедупом; плейсхолдеры ("_prev_doc" без
 	// значения), нули и мусор — мимо, а не ошибка (no-op выше по стеку).

@@ -3,7 +3,6 @@
   "pageNum": "header",
   "margins": {"left": 30, "top": 17.5, "right": 15, "bottom": 20},
   "blocks": [
-    {"type": "image", "files": {"tag": "logo_old"}, "width": 22, "align": "center"},
     {"type": "heading", "text": "ПРИКАЗ", "align": "center", "bold": true, "size": 20},
     {"type": "table", "header": false, "borders": false, "columns": [
       {"text": "{{ddate}}", "align": "left", "underline": true, "size": 14},
@@ -11,7 +10,6 @@
     ]},
     {"type": "heading", "text": "ПРИКАЗЫВАЮ:", "align": "left", "bold": true, "size": 15, "firstLine": 12.7, "spaceBefore": 10.59, "spaceAfter": 2.1},
     {"type": "text", "text": "Утвердить с {{effective_date}} следующее изображение в качестве символики Дисциплинарного комитета Студенческого совета СПбГУ.", "align": "justify", "size": 14, "line": 1.5},
-    {"type": "image", "files": {"tag": "logo"}, "width": 55, "align": "center", "spaceBefore": 4.2},
     {"type": "field", "label": "Комитет", "field": "id_committee", "ref": "organization_directory", "align": "justify", "size": 14},
     {"type": "field", "label": "Комментарий", "field": "comment", "align": "justify", "size": 14}
   ]

@@ -521,6 +521,14 @@
   gap: 6px;
 }
 
+// Строка файла: карточка-ссылка + отдельный крестик (крестик НЕ внутри
+// ссылки, иначе клик одновременно скачивает файл и снимает с выборки).
+.fileRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .fileCard {
   display: inline-flex;
   align-items: baseline;
@@ -537,9 +545,26 @@ span.fileCard {
   cursor: default;
 }
 
-.fileCard:hover {
+a.fileCard:hover {
   background: var(--hover);
   border-color: var(--primary);
+}
+
+.fileRemoveBtn {
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.fileRemoveBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--primary);
+  background: var(--hover);
 }
 
 .fileListName {

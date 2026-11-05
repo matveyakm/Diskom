@@ -247,7 +247,6 @@ interface AttachedFile {
     file_name: string;
     mime: string;
     size: number;
-    tag?: string;
 }
 
 interface FreshFile {
@@ -264,23 +263,21 @@ const pluralFiles = (n: number): string => {
     return "файлов";
 };
 
-// FileField — выборка файлов роли tag (дефолт — имя поля), а не указатель
-// на один файл. Документ таблицы файлов не знает: поле виртуальное, в строку
-// не пишется; пайплайн сверяет точное множество (attach выбранных — шаг
-// привязки, detach снятых — отдельный шаг с <имя>_detached).
-// Крестик НЕ удаляет строку files: снятый остаётся сиротой, его подбирает
-// GC. Поэтому список строится только из действий пользователя, а не из
-// «всего, чего нет»: несвежий/упавший список не сносит чужие привязки.
+// FileField — выборка файлов документа: серверные минус снятые крестиком
+// + свежие загрузки сессии. Крестик — отдельная кнопка рядом со ссылкой
+// (не внутри неё: иначе клик одновременно скачивает файл и снимает выборку).
+// Снятые серверные уходят шагом detach (строка не удаляется — станет сиротой,
+// подберёт GC); снятые свежие просто исчезают (они и так сироты, слать про них
+// detach-step бессмысленно — новой информации в id_document=null там нет).
 const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowProps) => {
     void value;
-    const tag = field.tag ?? field.field;
-    // Файлы документа с этой ролью (сервер — истина для существующих).
+    // Серверные файлы документа (истина для существующих).
     const [serverFiles, setServerFiles] = useState<AttachedFile[] | null>(null);
     const [listFailed, setListFailed] = useState(false);
     const [listRetry, setListRetry] = useState(0);
     // Свежие загрузки этой сессии (сироты до сохранения).
     const [fresh, setFresh] = useState<FreshFile[]>([]);
-    // Снятые с выборки (крестик): уйдут шагом detach, строкой не удаляются.
+    // Снятые с выборки серверные (крестик): уйдут шагом detach.
     const [detached, setDetached] = useState<string[]>([]);
     const [uploading, setUploading] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
@@ -294,8 +291,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         !!serviceRef && docId !== null && docId !== undefined && docId !== "";
 
 
-    // Файлы своей роли одним запросом (не N по файлам). Нужен и в просмотре
-    // (карточки), и в редактировании (истина для инициализации выборки).
+    // Список файлов документа одним запросом (не N по файлам).
     useEffect(() => {
         if (!canList || !serviceRef) {
             setServerFiles(null);
@@ -305,7 +301,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         setServerFiles(null);
         setListFailed(false);
         api.get<{ data?: AttachedFile[] } | AttachedFile[]>(
-            `/api/${serviceRef}/files?id_document=${encodeURIComponent(String(docId))}&tag=${encodeURIComponent(tag)}`
+            `/api/${serviceRef}/files?id_document=${encodeURIComponent(String(docId))}`
         ).then(
             (resp) => {
                 if (cancelled) return;
@@ -320,7 +316,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
         return () => {
             cancelled = true;
         };
-    }, [serviceRef, docId, canList, tag, listRetry]);
+    }, [serviceRef, docId, canList, listRetry]);
 
     const detachedSet = useMemo(() => new Set(detached), [detached]);
     // Выборка: серверные минус снятые + свежие. Именно она едет скрытыми
@@ -346,47 +342,51 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
     }, []);
 
     const unselectFresh = useCallback((id: string | number) => {
-        // Свежая загрузка: просто убираем из выборки (сирота, подберёт GC)
-        // и фиксируем в detached-списке для единообразия шага detach.
+        // Свежая загрузка: просто убираем из выборки. Она и так сирота —
+        // слать её в detach-step нет смысла (id_document=null там ничего
+        // нового не записывает), подберёт GC по TTL.
         const key = String(id);
         setFresh((prev) => prev.filter((f) => f.id !== key));
-        setDetached((prev) => (prev.includes(key) ? prev : [...prev, key]));
     }, []);
 
-    const renderFileCards = (files: AttachedFile[], opts?: {onRemove?: (id: string | number) => void; freshMark?: boolean}) => (
+    const renderFileCards = (files: AttachedFile[], onRemove?: (id: string | number) => void) => (
         <ul className={styles.fileList}>
             {files.map((f) => {
                 const url = fileUrl(f.id);
-                const inner = (
-                    <>
+                const link = url ? (
+                    <a className={styles.fileCard} href={url} target="_blank" rel="noreferrer">
                         <span className={styles.fileListName}>
                             {f.file_name || `Файл ${f.id}`}
                         </span>
-                    {typeof f.size === "number" && Number.isFinite(f.size) && (
-                        <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
-                    )}
-                    {opts?.freshMark && <span className={styles.fileListSize}>новый</span>}
-                    {opts?.onRemove && (
-                        <button
-                            type="button"
-                            className={styles.filePickBtn}
-                            title="Убрать из выборки (файл не удаляется)"
-                            onClick={() => opts.onRemove!(f.id)}
-                        >
-                            ×
-                        </button>
-                    )}
-                    </>
+                        {typeof f.size === "number" && Number.isFinite(f.size) && (
+                            <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
+                        )}
+                    </a>
+                ) : (
+                    <span className={styles.fileCard}>
+                        <span className={styles.fileListName}>
+                            {f.file_name || `Файл ${f.id}`}
+                        </span>
+                        {typeof f.size === "number" && Number.isFinite(f.size) && (
+                            <span className={styles.fileListSize}>{formatFileSize(f.size)}</span>
+                        )}
+                    </span>
                 );
                 return (
                     <li key={String(f.id)}>
-                        {url ? (
-                            <a className={styles.fileCard} href={url} target="_blank" rel="noreferrer">
-                                {inner}
-                            </a>
-                        ) : (
-                            <span className={styles.fileCard}>{inner}</span>
-                        )}
+                        <div className={styles.fileRow}>
+                            {link}
+                            {onRemove && (
+                                <button
+                                    type="button"
+                                    className={styles.fileRemoveBtn}
+                                    title="Убрать"
+                                    onClick={() => onRemove(f.id)}
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
                     </li>
                 );
             })}
@@ -394,8 +394,8 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
     );
 
     if (!isEditing) {
-        // Просмотр: серверный список своей роли; висячих id в поле больше
-        // нет (поле виртуальное), придумывать карточки не из чего.
+        // Просмотр: серверный список; висячих id в поле больше нет
+        // (поле виртуальное), придумывать карточки не из чего.
         let body: ReactNode;
         if (canList && serverFiles === null && !listFailed) {
             body = <span>…</span>;
@@ -435,7 +435,7 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                     const base64 = result.includes(",") ? result.slice(result.indexOf(",") + 1) : result;
                     const resp = await api.post<Record<string, unknown>>(
                         `/api/${serviceRef}/files`,
-                        {file_name: file.name, data: base64, tag},
+                        {file_name: file.name, data: base64},
                     );
                     const rec = resp as Record<string, unknown>;
                     const wrapped = rec.data as Record<string, unknown> | undefined;
@@ -445,8 +445,6 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                     }
                     const newId = String(rawId);
                     setFresh((prev) => [...prev, {id: newId, name: file.name, size: file.size}]);
-                    // Перевыбор ранее снятого: снимаем пометку detach.
-                    setDetached((prev) => prev.filter((d) => d !== newId));
                 } catch {
                     setErrorMsg("Не удалось загрузить файл");
                 } finally {
@@ -484,13 +482,13 @@ const FileField = ({field, value, isEditing, bare, serviceRef, docId}: FieldRowP
                 </div>
             )}
             {activeServer.length > 0 && (
-                <div className={styles.viewValue}>{renderFileCards(activeServer, {onRemove: unselectServer})}</div>
+                <div className={styles.viewValue}>{renderFileCards(activeServer, unselectServer)}</div>
             )}
             {fresh.length > 0 && (
                 <div className={styles.viewValue}>
                     {renderFileCards(
                         fresh.map((f) => ({id: f.id, file_name: f.name, mime: "", size: f.size})),
-                        {onRemove: unselectFresh, freshMark: true},
+                        unselectFresh,
                     )}
                 </div>
             )}
