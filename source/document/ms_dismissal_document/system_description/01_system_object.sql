@@ -185,6 +185,7 @@
                     {"id_document":      "id"},
                     {"ddate":            "ddate"},
                     {"id_employee":      "id_employee"},
+                    {"id_committee":     "id_organization"},
                     {"prefix":           "prefix"},
                     {"id_transaction":   "id_transaction"}
                 ]

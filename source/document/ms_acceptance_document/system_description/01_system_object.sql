@@ -328,6 +328,7 @@
                     {"ddate":"ddate"},
                     {"dnumber":"dnumber"},
                     {"note":"note"},
+                    {"id_committee": "id_committee"},
                     {"vk_id":"vk_id"},
                     {"prefix":"prefix"},
                     {"id_transaction":"id_transaction"}
@@ -378,6 +379,7 @@
                     {"id_document":      "id"},
                     {"ddate":            "ddate"},
                     {"id_employee":      "id_employee"},
+                    {"id_committee":     "id_committee"},
                     {"first_name":       "first_name"},
                     {"last_name":        "last_name"},
                     {"middle_name":      "middle_name"},

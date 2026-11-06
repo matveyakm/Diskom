@@ -17,6 +17,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     ddate                timestamp,
 	prefix               smallint,
 	id_employee          bigint NOT NULL,
+    id_committee         bigint,
     first_name           text,
     last_name            text,
     middle_name          text,
@@ -38,6 +39,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.ddate                IS 'Document date';
   COMMENT ON COLUMN ${DB_TABLENAME}.prefix               IS 'Prefix of DB';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_employee          IS 'Employee ID';
+  COMMENT ON COLUMN ${DB_TABLENAME}.id_committee        IS 'Committee ID';
   COMMENT ON COLUMN ${DB_TABLENAME}.first_name           IS 'Name';
   COMMENT ON COLUMN ${DB_TABLENAME}.last_name            IS 'Surname';
   COMMENT ON COLUMN ${DB_TABLENAME}.middle_name          IS 'Patronymic';

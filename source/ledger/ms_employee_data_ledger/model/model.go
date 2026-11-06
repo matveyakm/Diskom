@@ -10,6 +10,7 @@ type Object struct {
 	DDate            time.Time `gorm:"column:ddate" json:"ddate"`
 	Prefix           int16     `gorm:"column:prefix" json:"prefix"`
 	IdEmployee       int64     `gorm:"column:id_employee" json:"id_employee"`
+	IdCommittee      int64     `gorm:"column:id_committee" json:"id_committee"`
 	FirstName        string    `gorm:"column:first_name" json:"first_name"`
 	LastName         string    `gorm:"column:last_name" json:"last_name"`
 	MiddleName       string    `gorm:"column:middle_name" json:"middle_name"`

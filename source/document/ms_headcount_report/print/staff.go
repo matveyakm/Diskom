@@ -17,8 +17,9 @@ import (
 var Slots = report.Slots{"staff": staffSlot}
 
 // staffSlot — таблица «Дата | Численность»: только дни периода, в которые
-// численность менялась. Источник — staff_placement_ledger (проводки +1/-1
-// с датами и комитетом). Пустой итог — валиден: рисуется только шапка.
+// численность менялась. Источник — employee_data_ledger (+1 приём, -1
+// увольнение) с фильтром по комитету. Пустой итог —
+// валиден: рисуется только шапка.
 func staffSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	rec := ctx.Record()
 	org, ok := report.Int(rec["id_committee"])
@@ -37,11 +38,11 @@ func staffSlot(ctx report.Ctx, _ report.Params) (any, error) {
 		return nil, fmt.Errorf("staff: date_from %s позже date_to %s",
 			from.Format("02.01.2006"), to.Format("02.01.2006"))
 	}
-	rows, err := ctx.Fetch("staff_placement_ledger", map[string]string{
-		"id_organization": report.Str(org),
-		"ddate__lte":      to.Format(time.RFC3339),
-		"sort":            "ddate",
-		"order":           "asc",
+	rows, err := ctx.Fetch("employee_data_ledger", map[string]string{
+		"id_committee": report.Str(org),
+		"ddate__lte":   to.Format(time.RFC3339),
+		"sort":         "ddate",
+		"order":        "asc",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("staff: ledger: %w", err)
