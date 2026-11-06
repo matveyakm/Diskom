@@ -118,6 +118,13 @@ func (tpl *printTemplate) printPageNum() string {
 // printColumnValue резолвит ячейку: литерал text (с подстановками)
 // либо значение поля строки. Пустое — пропускается вызывающим.
 func printColumnValue(c printBlockColumn, row map[string]any) string {
+	return printColumnValueFor(c, row)
+}
+
+// printColumnValueFor — то же для произвольной строки (запись документа
+// или материализованный ряд слот-таблицы: Text-шаблон резолвится против
+// переданной строки).
+func printColumnValueFor(c printBlockColumn, row map[string]any) string {
 	if c.Text != "" {
 		return renderPrintText(c.Text, row)
 	}
@@ -147,6 +154,10 @@ type printBlock struct {
 	// другом блоке — ошибка валидации (table-слоты — следующий пилот).
 	Slot       string            `json:"slot,omitempty"`
 	SlotParams map[string]string `json:"params,omitempty"`
+	// RowsData — материализованные строки слот-таблицы (ставит только
+	// materialize; из JSON никогда — тег json:"-"). Пустой не-nil список =
+	// валидный ответ «изменений нет»: рисуется только шапка.
+	RowsData []map[string]any `json:"-"`
 	// If-ветка: задаётся тройкой Equals/Then/Else при Type=="if"
 	// (плоские ключи — как columns у table, items у list).
 	// Equals — равенства с литералами-скалярами; Then — непустой;
@@ -325,10 +336,11 @@ func validatePrintBlock(where string, b printBlock, tplFont string) error {
 	if err := validatePrintStyle(where, b.printTextStyle, family); err != nil {
 		return err
 	}
-	// Дырки слотов — только для image (table-слоты — следующий пилот;
-	// молча игнорировать чужой slot запрещено: fail-closed на своём синтаксисе).
-	if b.Slot != "" && b.Type != "image" {
-		return fmt.Errorf("%s: slot is only supported for image blocks yet (table slots: next pilot)", where)
+	// Дырки слотов — только для image (картинка из байтов) и table
+	// (строки из filler-а). Молча игнорировать чужой slot запрещено:
+	// fail-closed на своём синтаксисе.
+	if b.Slot != "" && b.Type != "image" && b.Type != "table" {
+		return fmt.Errorf("%s: slot is only supported for image|table blocks", where)
 	}
 	if b.Type == "if" {
 		if b.Ref != "" {
@@ -363,7 +375,18 @@ func validatePrintBlock(where string, b printBlock, tplFont string) error {
 	case "table":
 		hasColumns := len(b.Columns) > 0
 		hasRows := len(b.Rows) > 0
-		if hasColumns == hasRows {
+		if b.Slot != "" {
+			// Слот-таблица: колонки задают стиль (шапка/ширины), строки
+			// приезжают из filler-а. Ссылки и плейсхолдеры в колонках
+			// запрещены: ref — про поля строки документа, а Text-ячейки
+			// целиком готовит filler (иначе неясно, чьё поле подставлять).
+			if !hasColumns {
+				return fmt.Errorf("%s: slot table needs columns for styling", where)
+			}
+			if hasRows {
+				return fmt.Errorf("%s: table takes columns+slot, not rows", where)
+			}
+		} else if hasColumns == hasRows {
 			return fmt.Errorf("%s: table needs either columns or rows (not both/neither)", where)
 		}
 		if hasColumns {
@@ -371,6 +394,18 @@ func validatePrintBlock(where string, b printBlock, tplFont string) error {
 				return fmt.Errorf("%s: table needs 1..12 columns", where)
 			}
 			for _, c := range b.Columns {
+				if b.Slot != "" {
+					if c.Ref != "" {
+						return fmt.Errorf("%s: slot table column takes no ref (refs resolve record fields, rows come from filler)", where)
+					}
+					// Плейсхолдеры резолвятся по строке ряда при рендере;
+					// строгие запрещены: проверить их заранее не на чем.
+					for _, m := range rePrintPlaceholder.FindAllStringSubmatch(c.Text, -1) {
+						if m[2] == "!" {
+							return fmt.Errorf("%s: slot table column takes no strict placeholders", where)
+						}
+					}
+				}
 				// Label нужен только при видимой шапке таблицы.
 				if printBlockShow(b.Header) && strings.TrimSpace(c.Label) == "" {
 					return fmt.Errorf("%s: table column needs label", where)

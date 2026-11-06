@@ -480,25 +480,33 @@ func renderPrintPDF(tpl *printTemplate, record map[string]any, images map[string
 						applyFolioCellStyle(cell, noborder)
 					}
 				}
-				dr := tbl.AddRow()
-				for _, c := range b.Columns {
-					style := printColumnStyle(tpl, b.printTextStyle, c)
-					csize := size
-					if style.Size != 0 {
-						csize = style.Size
+				// Обычная таблица — одна строка из записи; слот-таблица —
+				// по строке на каждый материализованный ряд.
+				rowSets := []map[string]any{record}
+				if b.RowsData != nil {
+					rowSets = b.RowsData
+				}
+				for _, row := range rowSets {
+					dr := tbl.AddRow()
+					for _, c := range b.Columns {
+						style := printColumnStyle(tpl, b.printTextStyle, c)
+						csize := size
+						if style.Size != 0 {
+							csize = style.Size
+						}
+						ef := fonts.face(printFontFamily(tpl, style), style.Bold, style.Italic)
+						run := layout.NewRunEmbedded(printColumnValueFor(c, row), ef, csize)
+						if style.Underline {
+							run = run.WithUnderline()
+						}
+						if style.Color != "" {
+							run = run.WithColor(layout.Hex(style.Color))
+						}
+						cp := layout.NewStyledParagraph(run)
+						cp.SetAlign(printFolioAlign(style.Align, layout.AlignLeft))
+						cell := dr.AddCellElement(cp)
+						applyFolioCellStyle(cell, noborder)
 					}
-					ef := fonts.face(printFontFamily(tpl, style), style.Bold, style.Italic)
-					run := layout.NewRunEmbedded(printColumnValue(c, record), ef, csize)
-					if style.Underline {
-						run = run.WithUnderline()
-					}
-					if style.Color != "" {
-						run = run.WithColor(layout.Hex(style.Color))
-					}
-					cp := layout.NewStyledParagraph(run)
-					cp.SetAlign(printFolioAlign(style.Align, layout.AlignLeft))
-					cell := dr.AddCellElement(cp)
-					applyFolioCellStyle(cell, noborder)
 				}
 				doc.Add(tbl)
 			} else {

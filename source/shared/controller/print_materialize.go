@@ -34,10 +34,7 @@ func templateNeedsAssembly(tpl *printTemplate) bool {
 			if b.Type == "if" {
 				return true
 			}
-			if b.Type == "image" && b.Slot != "" {
-				return true
-			}
-			if b.Type == "if" && (walk(b.Then) || (b.Else != nil && walk(*b.Else))) {
+			if b.Slot != "" {
 				return true
 			}
 		}
@@ -114,9 +111,56 @@ func (r *CRUDRepository[T]) materializeBlocks(
 				filled[b.Slot] = true
 			}
 		}
+		if b.Type == "table" && b.Slot != "" {
+			// Слот-таблица: строки готовит filler, колонки (стиль) — из
+			// шаблона. Дырка с тем же именем переиспользуется как есть
+			// (детерминированность сборки важнее экономии вызова).
+			fn, ok := slots[b.Slot]
+			if !ok {
+				return nil, fmt.Errorf("%s: no filler registered for slot %q", here, b.Slot)
+			}
+			val, err := fn(r.reportContext(record), report.Params(b.SlotParams))
+			if err != nil {
+				return nil, fmt.Errorf("%s: slot %q: %w", here, b.Slot, err)
+			}
+			rows, err := normalizeSlotRows(val)
+			if err != nil {
+				return nil, fmt.Errorf("%s: slot %q: %w", here, b.Slot, err)
+			}
+			nb := b
+			nb.RowsData = rows
+			out = append(out, nb)
+			continue
+		}
 		out = append(out, b)
 	}
 	return out, nil
+}
+
+// normalizeSlotRows приводит значение table-слота к строкам:
+// []map[string]any как есть (пустой/nil — валидное «нет данных», рисуется
+// только шапка); []any из map — нормализуется; всё остальное — громкая 500
+// (молчаливый пропуск строк запрещён, как и пропуск байтов у картинок).
+func normalizeSlotRows(val any) ([]map[string]any, error) {
+	if val == nil {
+		return nil, nil
+	}
+	if rows, ok := val.([]map[string]any); ok {
+		return rows, nil
+	}
+	arr, ok := val.([]any)
+	if !ok {
+		return nil, fmt.Errorf("must return rows ([]map[string]any)")
+	}
+	rows := make([]map[string]any, 0, len(arr))
+	for i, item := range arr {
+		rec, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("row %d is not an object", i+1)
+		}
+		rows = append(rows, rec)
+	}
+	return rows, nil
 }
 
 // evalPrintIf вычисляет ветку: все равенства сошлись — true.

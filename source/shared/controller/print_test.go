@@ -224,7 +224,7 @@ func TestPrintImageSrcOrFieldOnly(t *testing.T) {
 func TestPrintAcceptancePilot(t *testing.T) {
 	// Пилотный шаблон приёма: шапка в if (статус 2), эмблема из слота,
 	// spacer для непроведённого, подпись статикой (ролей нет).
-	raw, err := os.ReadFile("../../document/ms_acceptance_document/templates/print.json")
+	raw, err := os.ReadFile("../../document/ms_acceptance_document/print/print.json")
 	if err != nil {
 		t.Fatalf("acceptance template unreadable: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestPrintStore(t *testing.T) {
 func TestPrintRequiredPlaceholder(t *testing.T) {
 	// Пилотный шаблон приёма обязан парситься: именно его битый JSON
 	// однажды дал 500 в проде вместо документа.
-	raw, err := os.ReadFile("../../document/ms_acceptance_document/templates/print.json")
+	raw, err := os.ReadFile("../../document/ms_acceptance_document/print/print.json")
 	if err != nil {
 		t.Fatalf("pilot template unreadable: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestPrintPDFParaSplits(t *testing.T) {
 func TestPrintPilotTemplate(t *testing.T) {
 	// Пилотный шаблон обязан парситься и валидироваться: именно его битый
 	// JSON однажды дал 500 в проде вместо документа.
-	raw, err := os.ReadFile("../../document/ms_acceptance_document/templates/print.json")
+	raw, err := os.ReadFile("../../document/ms_acceptance_document/print/print.json")
 	if err != nil {
 		t.Fatalf("pilot template unreadable: %v", err)
 	}

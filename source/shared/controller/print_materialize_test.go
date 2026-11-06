@@ -1,11 +1,14 @@
 package restController
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"shared/report"
+	"strings"
 	"testing"
 )
 
@@ -168,6 +171,115 @@ func TestMaterializeSlot(t *testing.T) {
 	}
 }
 
+func TestPrintTableSlotValidation(t *testing.T) {
+	mustParsePrint(t, `{"blocks": [
+	  {"type": "table", "slot": "staff", "header": false, "borders": false,
+	   "columns": [{"field": "d", "label": "Дата"}, {"field": "n", "label": "N"}]}
+	]}`)
+	for _, bad := range []string{
+		// Слот без колонок и слот+строки.
+		`{"blocks": [{"type": "table", "slot": "s", "rows": [{"label": "A", "field": "a"}]}]}`,
+		`{"blocks": [{"type": "table", "slot": "s"}]}`,
+		// ref и строгие плейсхолдеры в колонках слот-таблицы запрещены.
+		`{"blocks": [{"type": "table", "slot": "s", "columns": [{"field": "a", "label": "A", "ref": "x"}]}]}`,
+		`{"blocks": [{"type": "table", "slot": "s", "columns": [{"text": "{{a!}}", "label": "A"}]}]}`,
+	} {
+		if _, err := parsePrintTemplate([]byte(bad)); err == nil {
+			t.Fatalf("must fail: %s", bad)
+		}
+	}
+}
+
+func TestMaterializeTableSlot(t *testing.T) {
+	raw := `{"blocks": [
+	  {"type": "table", "slot": "staff", "header": true, "borders": false,
+	   "columns": [{"field": "d", "label": "Дата"}, {"field": "n", "label": "N"}]}
+	]}`
+	rows := []map[string]any{
+		{"d": "21.10.2026", "n": float64(10)},
+		{"d": "12.10.2026", "n": float64(9)},
+	}
+	r := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"staff": func(ctx report.Ctx, p report.Params) (any, error) { return rows, nil },
+	}}
+	got, _, err := r.materializePrint(mustParsePrint(t, raw), map[string]any{}, r.ReportSlots)
+	if err != nil {
+		t.Fatalf("materialize: %v", err)
+	}
+	if len(got.Blocks) != 1 || len(got.Blocks[0].RowsData) != 2 {
+		t.Fatalf("rows not materialized: %+v", got.Blocks)
+	}
+	// Шаблон без if/slot не требует сборки; со слотом — требует.
+	plain := mustParsePrint(t, `{"blocks": [{"type": "table", "columns": [{"field": "a", "label": "A"}]}]}`)
+	if templateNeedsAssembly(plain) {
+		t.Fatal("plain table must not need assembly")
+	}
+	// Не-строки — громко; пусто — валидно (только шапка).
+	r2 := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"s": func(ctx report.Ctx, p report.Params) (any, error) { return "nope", nil },
+	}}
+	slotRaw := mustParsePrint(t, `{"blocks": [
+	  {"type": "table", "slot": "s", "columns": [{"field": "a", "label": "A"}]}]}`)
+	if _, _, err := r2.materializePrint(slotRaw, map[string]any{}, r2.ReportSlots); err == nil {
+		t.Fatal("non-rows must fail")
+	}
+	r3 := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"s": func(ctx report.Ctx, p report.Params) (any, error) { return []map[string]any{}, nil },
+	}}
+	got3, _, err3 := r3.materializePrint(slotRaw, map[string]any{}, r3.ReportSlots)
+	if err3 != nil {
+		t.Fatalf("empty materialize: %v", err3)
+	}
+	if len(got3.Blocks) != 1 || got3.Blocks[0].RowsData == nil || len(got3.Blocks[0].RowsData) != 0 {
+		t.Fatalf("empty must stay empty-non-nil: %+v", got3.Blocks)
+	}
+	// Рендеры собирают слот-таблицу (шапка + 2 строки, плейсхолдеры по ряду).
+	tpl, _, err := r.materializePrint(mustParsePrint(t, `{"blocks": [
+	  {"type": "table", "slot": "s", "header": true, "borders": false,
+	   "columns": [{"field": "d", "label": "Дата"}, {"text": "N={{n}}", "label": "N"}]}
+	]}`), map[string]any{}, report.Slots{
+		"s": func(ctx report.Ctx, p report.Params) (any, error) { return rows, nil },
+	})
+	if err != nil {
+		t.Fatalf("materialize: %v", err)
+	}
+	docx, err := renderPrintDOCX(tpl, map[string]any{}, map[string][]byte{})
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	doc := mustZipDoc(t, docx)
+	for _, want := range []string{"21.10.2026", "N=10", "N=9", "Дата"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("docx lacks %q", want)
+		}
+	}
+	pdf, err := renderPrintPDF(tpl, map[string]any{}, map[string][]byte{})
+	if err != nil {
+		t.Fatalf("pdf: %v", err)
+	}
+	if len(pdf) < 1000 {
+		t.Fatalf("pdf too small: %d", len(pdf))
+	}
+}
+
+func mustZipDoc(t *testing.T, raw []byte) string {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		t.Fatalf("not a zip: %v", err)
+	}
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			rc, _ := f.Open()
+			buf := new(bytes.Buffer)
+			_, _ = buf.ReadFrom(rc)
+			rc.Close()
+			return buf.String()
+		}
+	}
+	t.Fatal("no document.xml")
+	return ""
+}
 func TestMaterializeSlotLazy(t *testing.T) {
 	// Дырка в невзятой ветке не вызывается вообще (черновик без логотипа
 	// не должен падать из-за невидимой шапки).

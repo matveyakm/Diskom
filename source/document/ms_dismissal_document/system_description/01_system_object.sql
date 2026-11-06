@@ -96,18 +96,184 @@
             }
         ]
     }',
-    '',
-    '',
-    '',
+    '{
+        "action": "onSaveEdit",
+        "processing":
+        [
+            {
+                "Step": 1,
+                "method": "put",
+                "end_point": "document",
+                "filter": "id",
+                "conditions": [
+                    {"status": 1}
+                ],
+                "map":
+                [
+                    {"ddate":"ddate"},
+                    {"dnumber":"dnumber"},
+                    {"note":"note"},
+                    {"status":1},
+                    {"id_user":1},
+                    {"prefix":0},
+                    {"id_transaction":"id_transaction"}
+                ]
+            },
+            {
+                "Step": 2,
+                "method": "put",
+                "end_point": "dismissal_document",
+                "fields":
+                [
+                    {"status": 1}
+                ]
+            }
+        ]
+    }',
+    '{
+    "action": "onAcceptance",
+        "processing":
+        [
+            {
+                "Step": 1,
+                "method": "get",
+                "hide_in_preview": true,
+                "end_point": "dismissal_document",
+                "filter": "id",
+                "conditions":
+                [
+                    {"status": 1}
+                ],
+                "FK":
+                [
+                    {"id": "id"},
+                    {"ddate": "ddate"},
+                    {"dnumber": "dnumber"},
+                    {"note": "note"},
+                    {"id_employee": "id_employee"},
+                    {"id_organization": "id_organization"},
+                    {"id_department": "id_department"},
+                    {"id_job_title": "id_job_title"},
+                    {"justification": "justification"},
+                    {"prefix": "prefix"},
+                    {"id_transaction": "id_transaction"}
+                ]
+            },
+            {
+                "Step": 2,
+                "method": "put",
+                "hide_in_preview": true,
+                "end_point": "document",
+                "filter": "id",
+                "map":
+                [
+                    {"ddate":"ddate"},
+                    {"dnumber":"dnumber"},
+                    {"note":"note"},
+                    {"status":2},
+                    {"id_user":1},
+                    {"prefix":0},
+                    {"id_transaction":"id_transaction"}
+                ]
+            },
+            {
+                "Step": 3,
+                "method": "post",
+                "end_point": "staff_placement_ledger",
+                "map": [
+                    {"balance":           -1},
+                    {"id_document":      "id"},
+                    {"ddate":            "ddate"},
+                    {"id_employee":      "id_employee"},
+                    {"id_organization":  "id_organization"},
+                    {"id_department":    "id_department"},
+                    {"id_job_title":     "id_job_title"},
+                    {"justification":    "justification"},
+                    {"prefix":           "prefix"},
+                    {"id_transaction":   "id_transaction"}
+                ]
+            },
+            {
+                "Step": 4,
+                "method": "post",
+                "end_point": "employee_data_ledger",
+                "map": [
+                    {"balance":          -1},
+                    {"id_document":      "id"},
+                    {"ddate":            "ddate"},
+                    {"id_employee":      "id_employee"},
+                    {"prefix":           "prefix"},
+                    {"id_transaction":   "id_transaction"}
+                ]
+            },
+            {
+                "Step": 5,
+                "method": "put",
+                "hide_in_preview": true,
+                "end_point": "dismissal_document",
+                "filter": "id",
+                "fields": {
+                    "status": 2
+                }
+            }
+        ]
+    }',
+    '{
+    "action":"onDelete",
+    "processing":[
+        {
+            "step": 1,
+            "method": "get",
+            "hide_in_preview": true,
+            "end_point": "dismissal_document",
+            "filter": "id",
+            "FK": [
+                {"id_document": "id"}
+            ]
+        },
+        {
+            "step": 2,
+            "method": "delete",
+            "end_point": "staff_placement_ledger",
+            "filter": "id_document"
+        },
+        {
+            "step": 3,
+            "method": "delete",
+            "end_point": "employee_data_ledger",
+            "filter": "id_document"
+        },
+        {
+            "step": 4,
+            "method": "put",
+            "hide_in_preview": true,
+            "end_point": "document",
+            "filter": "id",
+            "fields": {
+                "status": 0
+            }
+        },
+        {
+            "step": 5,
+            "method": "put",
+            "hide_in_preview": true,
+            "end_point": "dismissal_document",
+            "filter": "id",
+            "fields": {
+                "status": 0
+            }
+        }
+    ]
+    }',
     '{
       "privileges": [
         { "open_list": "true" },
         { "open_item": "true" },
-        { "create": "false" },
-        { "edit": "false" },
-        { "delete": "false" },
-        { "accept": "false" },
-        { "create_related_documents": "false" }
+        { "create": "true" },
+        { "edit": "true" },
+        { "delete": "true" },
+        { "accept": "true" },
+        { "create_related_documents": "true" }
       ]
     }',
     '',

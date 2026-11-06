@@ -1,4 +1,7 @@
-package main
+// Package print — индивидуальный код печати приёма: filler-ы слотов
+// шаблона print/print.json + их реестр. Главный движок (shared) документ
+// не смотрит: связь дырки и функции — совпадением имён.
+package print
 
 import (
 	"shared/report"
@@ -19,6 +22,6 @@ func emblemSlot(ctx report.Ctx, _ report.Params) (any, error) {
 		})
 }
 
-// ReportSlots — реестр дырок печати сервиса (shared ничего про документ
+// Slots — реестр дырок печати сервиса (shared ничего про документ
 // не знает: связь — совпадением имён, смысл — в позиции в шаблоне).
-var ReportSlots = report.Slots{"emblem": emblemSlot}
+var Slots = report.Slots{"emblem": emblemSlot}

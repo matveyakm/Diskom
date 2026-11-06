@@ -204,7 +204,8 @@ func printDocxContentTwips(tpl *printTemplate) int {
 	return 11906 - left - right
 }
 
-func printDocxTable(headers []string, values []string, styles []printTextStyle, widths []int, header, borders bool, fam string) string {
+// printDocxTable — шапка + N строк данных (одна строка — вырожденный случай).
+func printDocxTable(headers []string, rows [][]string, styles []printTextStyle, widths []int, header, borders bool, fam string) string {
 	var b strings.Builder
 	// Фиксированная раскладка: колонки строго по gridCol. При auto (дефолт
 	// Word) ширины игнорируются и колонки сжимаются по контенту — ячейки
@@ -225,11 +226,14 @@ func printDocxTable(headers []string, values []string, styles []printTextStyle, 
 		}
 		b.WriteString(`</w:tr>`)
 	}
-	b.WriteString(`<w:tr>`)
-	for i, v := range values {
-		b.WriteString(printDocxCell(v, styles[i], false, 0, styles[i].Align, fam))
+	for _, values := range rows {
+		b.WriteString(`<w:tr>`)
+		for i, v := range values {
+			b.WriteString(printDocxCell(v, styles[i], false, 0, styles[i].Align, fam))
+		}
+		b.WriteString(`</w:tr>`)
 	}
-	b.WriteString(`</w:tr></w:tbl>`)
+	b.WriteString(`</w:tbl>`)
 	return b.String()
 }
 
@@ -438,15 +442,31 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			}
 			if len(b.Columns) > 0 {
 				headers := make([]string, 0, len(b.Columns))
-				values := make([]string, 0, len(b.Columns))
 				styles := make([]printTextStyle, 0, len(b.Columns))
 				colW := printTwipsWidths(b.Columns, printDocxContentTwips(tpl))
 				for _, c := range b.Columns {
 					headers = append(headers, c.Label)
-					values = append(values, printColumnValue(c, record))
 					styles = append(styles, printColumnStyle(tpl, b.printTextStyle, c))
 				}
-				body.WriteString(printDocxTable(headers, values, styles, colW, printBlockShow(b.Header), printBlockShow(b.Borders), tblFam))
+				// Обычная таблица — одна строка из записи; слот-таблица —
+				// по строке на каждый материализованный ряд.
+				var rows [][]string
+				if b.RowsData != nil {
+					for _, entry := range b.RowsData {
+						values := make([]string, 0, len(b.Columns))
+						for _, c := range b.Columns {
+							values = append(values, printColumnValueFor(c, entry))
+						}
+						rows = append(rows, values)
+					}
+				} else {
+					values := make([]string, 0, len(b.Columns))
+					for _, c := range b.Columns {
+						values = append(values, printColumnValue(c, record))
+					}
+					rows = append(rows, values)
+				}
+				body.WriteString(printDocxTable(headers, rows, styles, colW, printBlockShow(b.Header), printBlockShow(b.Borders), tblFam))
 			} else {
 				tblFam := printDocxFont(printFontFamily(tpl, b.printTextStyle))
 				var rows strings.Builder
