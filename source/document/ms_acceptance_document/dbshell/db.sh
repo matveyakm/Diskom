@@ -15,6 +15,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     ddate                timestamp,
 	dnumber              text,
 	note                 text,
+	id_committee         bigint,
 	id_basis             smallint,
 	status               smallint default 1,
 	id_user              bigint,
@@ -39,6 +40,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.ddate                IS 'Document date';
   COMMENT ON COLUMN ${DB_TABLENAME}.dnumber              IS 'Event number';
   COMMENT ON COLUMN ${DB_TABLENAME}.note                 IS 'Note';
+  COMMENT ON COLUMN ${DB_TABLENAME}.id_committee         IS 'Committee ID';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_basis             IS 'Basis Id';
   COMMENT ON COLUMN ${DB_TABLENAME}.status               IS 'Document status (0 - deleted, 1 - saved, 2 - completed)';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_user              IS 'System user';

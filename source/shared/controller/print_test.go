@@ -221,6 +221,56 @@ func TestPrintImageSrcOrFieldOnly(t *testing.T) {
 	}
 }
 
+func TestPrintAcceptancePilot(t *testing.T) {
+	// Пилотный шаблон приёма: шапка в if (статус 2), эмблема из слота,
+	// spacer для непроведённого, подпись статикой (ролей нет).
+	raw, err := os.ReadFile("../../document/ms_acceptance_document/templates/print.json")
+	if err != nil {
+		t.Fatalf("acceptance template unreadable: %v", err)
+	}
+	tpl, err := parsePrintTemplate(raw)
+	if err != nil {
+		t.Fatalf("acceptance template invalid: %v", err)
+	}
+	if len(tpl.Blocks) == 0 || tpl.Blocks[0].Type != "if" {
+		t.Fatalf("first block must be if, got %+v", tpl.Blocks[0])
+	}
+	b := tpl.Blocks[0]
+	if len(b.Equals) != 1 || b.Else == nil || len(b.Then) == 0 {
+		t.Fatalf("bad if shape: %+v", b)
+	}
+	var slots []string
+	var walk func([]printBlock)
+	walk = func(bs []printBlock) {
+		for _, x := range bs {
+			if x.Type == "image" && x.Slot != "" {
+				slots = append(slots, x.Slot)
+			}
+			if x.Type == "if" {
+				walk(x.Then)
+				walk(*x.Else)
+			}
+		}
+	}
+	walk(tpl.Blocks)
+	if len(slots) != 1 || slots[0] != "emblem" {
+		t.Fatalf("slots = %v, want [emblem]", slots)
+	}
+	if !templateNeedsAssembly(tpl) {
+		t.Fatal("acceptance template must need assembly")
+	}
+	// Шапка обязана быть единственным if (пилот маленький и явный).
+	nIf := 0
+	for _, x := range tpl.Blocks {
+		if x.Type == "if" {
+			nIf++
+		}
+	}
+	if nIf != 1 {
+		t.Fatalf("want exactly 1 if block, got %d", nIf)
+	}
+}
+
 func TestPrintStore(t *testing.T) {
 	s := newPrintStore()
 	token := s.put(printFile{Bytes: []byte("x"), Filename: "a.pdf", Mime: printPdfMime})

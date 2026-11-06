@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"shared/report"
 	"strconv"
 	"strings"
 	"time"
@@ -101,6 +102,10 @@ type CRUDRepository[T any] struct {
 	db         *gorm.DB
 	tableName  string
 	httpClient *http.Client
+	// ReportSlots — реестр заполнителей слотов печати (shared/report).
+	// nil = обычная печать без сборки; задаёт main.go сервиса при наличии
+	// слотов/if в шаблоне (без регистрации — громкая 500, а не пропуск).
+	ReportSlots map[string]report.SlotFunc
 }
 
 // NewCRUDRepository creates a new repository instance

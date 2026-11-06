@@ -8,6 +8,7 @@ type Object struct {
 	Ddate            time.Time `gorm:"column:ddate" json:"ddate"`
 	Dnumber          string    `gorm:"column:dnumber" json:"dnumber"`
 	Note             string    `gorm:"column:note" json:"note"`
+	IdCommittee      int64     `gorm:"column:id_committee" json:"id_committee"`
 	IdBasis          int16     `gorm:"column:id_basis" json:"id_basis"`
 	Status           int16     `gorm:"column:status" json:"status"`
 	IdUser           int64     `gorm:"column:id_user" json:"id_user"`

@@ -3,10 +3,14 @@
   "pageNum": "header",
   "margins": {"left": 30, "top": 17.5, "right": 15, "bottom": 20},
   "blocks": [
-    {"type": "image", "src": "emblem.png", "width": 22, "align": "center"},
-    {"type": "text", "text": "ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ВЫСШЕГО ОБРАЗОВАНИЯ\n«САНКТ-ПЕТЕРБУРГСКИЙ ГОСУДАРСТВЕННЫЙ УНИВЕРСИТЕТ» (СПбГУ)", "align": "center", "size": 12},
-    {"type": "text", "text": "СТУДЕНЧЕСКИЙ СОВЕТ (СОВЕТ ОБУЧАЮЩИХСЯ)", "align": "center", "bold": true, "size": 13},
-    {"type": "text", "text": "ДИСЦИПЛИНАРНЫЙ КОМИТЕТ", "align": "center", "bold": true, "size": 14},
+    {"type": "if", "equals": {"status": 2}, "then": [
+      {"type": "image", "slot": "emblem", "width": 22, "align": "center"},
+      {"type": "text", "text": "ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ВЫСШЕГО ОБРАЗОВАНИЯ\n«САНКТ-ПЕТЕРБУРГСКИЙ ГОСУДАРСТВЕННЫЙ УНИВЕРСИТЕТ» (СПбГУ)", "align": "center", "size": 12},
+      {"type": "text", "text": "СТУДЕНЧЕСКИЙ СОВЕТ (СОВЕТ ОБУЧАЮЩИХСЯ)", "align": "center", "bold": true, "size": 13},
+      {"type": "text", "text": "ДИСЦИПЛИНАРНЫЙ КОМИТЕТ", "align": "center", "bold": true, "size": 14}
+    ], "else": [
+      {"type": "text", "text": " ", "size": 12, "spaceAfter": 48}
+    ]},
     {"type": "heading", "text": "ПРИКАЗ", "align": "center", "bold": true, "size": 20},
     {"type": "table", "header": false, "borders": false, "columns": [
       {"text": "{{ddate}}", "align": "left", "underline": true, "size": 14},

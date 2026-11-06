@@ -65,13 +65,27 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 		return
 	}
 
+	// Сборка отчёта ДО refs/validate: ветки if вычисляются по сырой строке,
+	// слоты заполняются лениво — только взятой ветки. Шаблон без if/slot
+	// идёт старым путём побайтово так же, как раньше.
+	plainTpl := tpl
+	var slotImages map[string][]byte
+	if templateNeedsAssembly(tpl) {
+		var merr error
+		plainTpl, slotImages, merr = r.materializePrint(tpl, row, r.ReportSlots)
+		if merr != nil {
+			r.writeError(w, "Cannot assemble report: "+merr.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	// Имена вместо id: подменяем до рендера (fail-open внутри).
-	record := resolvePrintRefs(row, tpl, r.httpClient)
+	record := resolvePrintRefs(row, plainTpl, r.httpClient)
 
 	// Обязательные поля шаблона ({{x!}}): пустое значение — честная ошибка
 	// сборки, а не дыра в документе. Пользователь раньше замечает проблему
 	// и зовёт администратора, чем подписывает неверный приказ.
-	if err := validatePrintRow(tpl, record); err != nil {
+	if err := validatePrintRow(plainTpl, record); err != nil {
 		r.writeError(w, "Cannot print: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -79,13 +93,26 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	// Картинки шаблона — заранее (битый файл — 500, операторская ошибка).
 	// src: файл из папки шаблона; field: байты из таблицы files того же
 	// сервиса (id файла из строки документа, принадлежность документу
-	// проверяется — чужие файлы в чужую печать не текут).
-	images := make(map[string][]byte)
-	for _, b := range tpl.Blocks {
+	// проверяется — чужие файлы в чужую печать не текут); slot: байты уже
+	// лежат в slotImages (положил materialize через filler сервиса).
+	images := slotImages
+	if images == nil {
+		images = make(map[string][]byte)
+	}
+	for _, b := range plainTpl.Blocks {
 		if b.Type != "image" {
 			continue
 		}
 		if _, dup := images[b.imageKey()]; dup {
+			continue
+		}
+		if b.Slot != "" {
+			// Байты обязан был положить materialize; их отсутствие —
+			// баг сборки, а не повод молча пропустить картинку.
+			if _, ok := images[b.imageKey()]; !ok {
+				r.writeError(w, "Failed to load print image: slot "+b.Slot+" has no bytes", http.StatusInternalServerError)
+				return
+			}
 			continue
 		}
 		if b.Src != "" {
@@ -125,13 +152,13 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	switch format {
 	case "pdf":
 		mime, ext = printPdfMime, "pdf"
-		if data, err = renderPrintPDF(tpl, record, images); err != nil {
+		if data, err = renderPrintPDF(plainTpl, record, images); err != nil {
 			r.writeError(w, "Failed to render PDF: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 	case "docx":
 		mime, ext = printDocxMime, "docx"
-		if data, err = renderPrintDOCX(tpl, record, images); err != nil {
+		if data, err = renderPrintDOCX(plainTpl, record, images); err != nil {
 			r.writeError(w, "Failed to render DOCX: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

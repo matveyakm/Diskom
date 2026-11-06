@@ -8,5 +8,6 @@ import (
 func main() {
 	var a app.App[model.Object]
 	a.CreateConnection()
+	a.Repository.ReportSlots = ReportSlots
 	a.CreateRoutes()
 }

@@ -141,7 +141,20 @@ type printBlock struct {
 	Items   []string           `json:"items,omitempty"`
 	Ordered bool               `json:"ordered,omitempty"`
 	Src     string             `json:"src,omitempty"`
-	Width   float64            `json:"width,omitempty"`
+	// Slot — дырка, заполняемая filler-ом сервиса (shared/report.SlotFunc):
+	// "slot": "emblem" + опциональные "params" (данные, не код).
+	// Сейчас поддерживается только для image (байты PNG/JPG); слот на любом
+	// другом блоке — ошибка валидации (table-слоты — следующий пилот).
+	Slot       string            `json:"slot,omitempty"`
+	SlotParams map[string]string `json:"params,omitempty"`
+	// If-ветка: задаётся тройкой Equals/Then/Else при Type=="if"
+	// (плоские ключи — как columns у table, items у list).
+	// Equals — равенства с литералами-скалярами; Then — непустой;
+	// Else — обязателен явно (пустой массив = схлопнуть).
+	Equals map[string]any `json:"equals,omitempty"`
+	Then   []printBlock   `json:"then,omitempty"`
+	Else   *[]printBlock  `json:"else,omitempty"`
+	Width  float64        `json:"width,omitempty"`
 	// Float: картинка поверх текста: в DOCX — wp:anchor, в PDF — folio
 	// Div.AddOverlay (настоящий оверлей, не поток). x — мм от левого края
 	// текстовой колонки, y — мм ниже верха абзаца-якоря (позиция блока
@@ -160,10 +173,14 @@ func printBlockShow(v *bool) bool {
 }
 
 // imageKey — ключ картинки в map байтов: src для файлов шаблона,
-// "field:<имя>" для картинок из строки (id файла из таблицы files).
+// "field:<имя>" для картинок из строки (id файла из таблицы files),
+// "slot:<имя>" для картинок из filler-ов (байты кладёт materialize).
 func (b printBlock) imageKey() string {
 	if b.Src != "" {
 		return b.Src
+	}
+	if b.Slot != "" {
+		return "slot:" + b.Slot
 	}
 	return "field:" + b.Field
 }
@@ -288,138 +305,227 @@ func parsePrintTemplate(raw []byte) (*printTemplate, error) {
 	}
 	for i, b := range tpl.Blocks {
 		where := fmt.Sprintf("print template: block %d", i+1)
-		family := b.Font
-		if family == "" {
-			family = tpl.Font
-		}
-		if family == "" {
-			family = "arial"
-		}
-		if err := validatePrintStyle(where, b.printTextStyle, family); err != nil {
+		if err := validatePrintBlock(where, b, tpl.Font); err != nil {
 			return nil, err
-		}
-		if err := validatePrintRef(where, b.Ref); err != nil {
-			return nil, err
-		}
-		switch b.Type {
-		case "heading", "text":
-			if strings.TrimSpace(b.Text) == "" {
-				return nil, fmt.Errorf("%s: %s needs non-empty text", where, b.Type)
-			}
-		case "field":
-			if strings.TrimSpace(b.Label) == "" {
-				return nil, fmt.Errorf("%s: field needs label", where)
-			}
-			if !reFilterColumn.MatchString(b.Field) {
-				return nil, fmt.Errorf("%s: invalid field %q", where, b.Field)
-			}
-		case "table":
-			hasColumns := len(b.Columns) > 0
-			hasRows := len(b.Rows) > 0
-			if hasColumns == hasRows {
-				return nil, fmt.Errorf("%s: table needs either columns or rows (not both/neither)", where)
-			}
-			if hasColumns {
-				if len(b.Columns) > 12 {
-					return nil, fmt.Errorf("%s: table needs 1..12 columns", where)
-				}
-				for _, c := range b.Columns {
-					// Label нужен только при видимой шапке таблицы.
-					if printBlockShow(b.Header) && strings.TrimSpace(c.Label) == "" {
-						return nil, fmt.Errorf("%s: table column needs label", where)
-					}
-					if c.Text == "" && !reFilterColumn.MatchString(c.Field) {
-						return nil, fmt.Errorf("%s: invalid column field %q", where, c.Field)
-					}
-					if c.Text != "" && c.Field != "" {
-						return nil, fmt.Errorf("%s: column takes either text or field, not both", where)
-					}
-					if c.Text != "" && c.Ref != "" {
-						return nil, fmt.Errorf("%s: column takes either text or ref, not both", where)
-					}
-					if err := validatePrintRef(where, c.Ref); err != nil {
-						return nil, err
-					}
-					if c.Width != 0 && (c.Width <= 0 || c.Width > 12) {
-						return nil, fmt.Errorf("%s: invalid column width %v", where, c.Width)
-					}
-					switch c.Align {
-					case "", "left", "center", "right", "justify":
-					default:
-						return nil, fmt.Errorf("%s: invalid column align %q", where, c.Align)
-					}
-					cFam := c.Font
-					if cFam == "" {
-						cFam = family
-					}
-					if err := validatePrintStyle(where, printTextStyle{
-						Font: cFam, Bold: c.Bold, Italic: c.Italic, Underline: c.Underline,
-						Color: c.Color, Size: c.Size,
-					}, cFam); err != nil {
-						return nil, err
-					}
-				}
-			} else {
-				if len(b.Rows) > 30 {
-					return nil, fmt.Errorf("%s: table needs 1..30 rows", where)
-				}
-				for _, r := range b.Rows {
-					if strings.TrimSpace(r.Label) == "" {
-						return nil, fmt.Errorf("%s: table row needs label", where)
-					}
-					if !reFilterColumn.MatchString(r.Field) {
-						return nil, fmt.Errorf("%s: invalid row field %q", where, r.Field)
-					}
-					if err := validatePrintRef(where, r.Ref); err != nil {
-						return nil, err
-					}
-				}
-			}
-		case "list":
-			if len(b.Items) == 0 || len(b.Items) > 50 {
-				return nil, fmt.Errorf("%s: list needs 1..50 items", where)
-			}
-			for _, item := range b.Items {
-				if len(item) > 500 {
-					return nil, fmt.Errorf("%s: list item too long (max 500 chars)", where)
-				}
-			}
-		case "image":
-			// Картинка — либо файл из папки шаблона (src), либо байты
-			// из поля строки (field = id файла из таблицы files того же
-			// сервиса). Ровно один из двух — иначе не понять, что рисовать.
-			// (Селекторы ролей/версий — отдельной итерацией дизайна печати,
-			// без хардкода в shared.)
-			if (b.Src == "") == (b.Field == "") {
-				return nil, fmt.Errorf("%s: image needs either src or field (not both/neither)", where)
-			}
-			if b.Src != "" {
-				if strings.TrimSpace(b.Src) == "" || b.Src != filepath.Base(b.Src) {
-					return nil, fmt.Errorf("%s: image src must be a plain file name", where)
-				}
-				ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(b.Src), "."))
-				if ext != "png" && ext != "jpg" && ext != "jpeg" {
-					return nil, fmt.Errorf("%s: image must be png|jpg", where)
-				}
-			} else if !reFilterColumn.MatchString(b.Field) {
-				return nil, fmt.Errorf("%s: invalid image field %q", where, b.Field)
-			}
-			if b.Width < 5 || b.Width > 190 {
-				return nil, fmt.Errorf("%s: image width 5..190 mm required", where)
-			}
-			if b.Float {
-				// Координаты обязательны: ноль означает "забыли указать",
-				// а не нулевое смещение. x — от края колонки (уже страницы
-				// не бывает), y — вниз от абзаца-якоря.
-				if b.X <= 0 || b.X > 210 || b.Y <= 0 || b.Y > 297 {
-					return nil, fmt.Errorf("%s: float image needs x in 0..210 and y in 0..297 mm", where)
-				}
-			}
-		default:
-			return nil, fmt.Errorf("%s: unknown type %q (want heading|field|table|list|image|text)", where, b.Type)
 		}
 	}
 	return &tpl, nil
+}
+
+// validatePrintBlock проверяет один блок (рекурсивно — для веток if).
+// tplFont — шрифт шаблона (наследование, если у блока своего нет).
+func validatePrintBlock(where string, b printBlock, tplFont string) error {
+	family := b.Font
+	if family == "" {
+		family = tplFont
+	}
+	if family == "" {
+		family = "arial"
+	}
+	if err := validatePrintStyle(where, b.printTextStyle, family); err != nil {
+		return err
+	}
+	// Дырки слотов — только для image (table-слоты — следующий пилот;
+	// молча игнорировать чужой slot запрещено: fail-closed на своём синтаксисе).
+	if b.Slot != "" && b.Type != "image" {
+		return fmt.Errorf("%s: slot is only supported for image blocks yet (table slots: next pilot)", where)
+	}
+	if b.Type == "if" {
+		if b.Ref != "" {
+			return fmt.Errorf("%s: if takes no ref", where)
+		}
+		return validatePrintIf(where, b, tplFont)
+	}
+	// Ключи ветки на обычном блоке — опечатка, а не игнор (fail-closed).
+	if len(b.Equals) > 0 || len(b.Then) > 0 || b.Else != nil {
+		return fmt.Errorf("%s: equals|then|else only for if blocks", where)
+	}
+	if err := validatePrintRef(where, b.Ref); err != nil {
+		return err
+	}
+	switch b.Type {
+	case "heading", "text":
+		if strings.TrimSpace(b.Text) == "" {
+			// Пустой текст — только осознанный распор: обязан нести высоту
+			// (иначе это забытый текст, а не пустое место). Заголовок
+			// распором быть не может.
+			if b.Type != "text" || (b.SpaceBefore <= 0 && b.SpaceAfter <= 0) {
+				return fmt.Errorf("%s: %s needs non-empty text", where, b.Type)
+			}
+		}
+	case "field":
+		if strings.TrimSpace(b.Label) == "" {
+			return fmt.Errorf("%s: field needs label", where)
+		}
+		if !reFilterColumn.MatchString(b.Field) {
+			return fmt.Errorf("%s: invalid field %q", where, b.Field)
+		}
+	case "table":
+		hasColumns := len(b.Columns) > 0
+		hasRows := len(b.Rows) > 0
+		if hasColumns == hasRows {
+			return fmt.Errorf("%s: table needs either columns or rows (not both/neither)", where)
+		}
+		if hasColumns {
+			if len(b.Columns) > 12 {
+				return fmt.Errorf("%s: table needs 1..12 columns", where)
+			}
+			for _, c := range b.Columns {
+				// Label нужен только при видимой шапке таблицы.
+				if printBlockShow(b.Header) && strings.TrimSpace(c.Label) == "" {
+					return fmt.Errorf("%s: table column needs label", where)
+				}
+				if c.Text == "" && !reFilterColumn.MatchString(c.Field) {
+					return fmt.Errorf("%s: invalid column field %q", where, c.Field)
+				}
+				if c.Text != "" && c.Field != "" {
+					return fmt.Errorf("%s: column takes either text or field, not both", where)
+				}
+				if c.Text != "" && c.Ref != "" {
+					return fmt.Errorf("%s: column takes either text or ref, not both", where)
+				}
+				if err := validatePrintRef(where, c.Ref); err != nil {
+					return err
+				}
+				if c.Width != 0 && (c.Width <= 0 || c.Width > 12) {
+					return fmt.Errorf("%s: invalid column width %v", where, c.Width)
+				}
+				switch c.Align {
+				case "", "left", "center", "right", "justify":
+				default:
+					return fmt.Errorf("%s: invalid column align %q", where, c.Align)
+				}
+				cFam := c.Font
+				if cFam == "" {
+					cFam = family
+				}
+				if err := validatePrintStyle(where, printTextStyle{
+					Font: cFam, Bold: c.Bold, Italic: c.Italic, Underline: c.Underline,
+					Color: c.Color, Size: c.Size,
+				}, cFam); err != nil {
+					return err
+				}
+			}
+		} else {
+			if len(b.Rows) > 30 {
+				return fmt.Errorf("%s: table needs 1..30 rows", where)
+			}
+			for _, r := range b.Rows {
+				if strings.TrimSpace(r.Label) == "" {
+					return fmt.Errorf("%s: table row needs label", where)
+				}
+				if !reFilterColumn.MatchString(r.Field) {
+					return fmt.Errorf("%s: invalid row field %q", where, r.Field)
+				}
+				if err := validatePrintRef(where, r.Ref); err != nil {
+					return err
+				}
+			}
+		}
+	case "list":
+		if len(b.Items) == 0 || len(b.Items) > 50 {
+			return fmt.Errorf("%s: list needs 1..50 items", where)
+		}
+		for _, item := range b.Items {
+			if len(item) > 500 {
+				return fmt.Errorf("%s: list item too long (max 500 chars)", where)
+			}
+		}
+	case "image":
+		// Картинка — ровно один источник из трёх: файл из папки шаблона
+		// (src), байты из поля строки (field = id файла из таблицы files
+		// того же сервиса) или дырка filler-а (slot = имя + params;
+		// байты кладёт materialize, сюда приходит готовый шаблон).
+		nSrc := 0
+		if b.Src != "" {
+			nSrc++
+		}
+		if b.Field != "" {
+			nSrc++
+		}
+		if b.Slot != "" {
+			nSrc++
+		}
+		if nSrc != 1 {
+			return fmt.Errorf("%s: image needs exactly one of src|field|slot", where)
+		}
+		if b.Slot != "" {
+			if !reFilterColumn.MatchString(b.Slot) {
+				return fmt.Errorf("%s: invalid image slot %q", where, b.Slot)
+			}
+			if len(b.SlotParams) > 16 {
+				return fmt.Errorf("%s: image slot takes at most 16 params", where)
+			}
+			for k, v := range b.SlotParams {
+				if !reFilterColumn.MatchString(k) {
+					return fmt.Errorf("%s: invalid image slot param %q", where, k)
+				}
+				if len(v) > 200 {
+					return fmt.Errorf("%s: image slot param %q too long (max 200 chars)", where, k)
+				}
+			}
+		} else if b.Src != "" {
+			if strings.TrimSpace(b.Src) == "" || b.Src != filepath.Base(b.Src) {
+				return fmt.Errorf("%s: image src must be a plain file name", where)
+			}
+			ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(b.Src), "."))
+			if ext != "png" && ext != "jpg" && ext != "jpeg" {
+				return fmt.Errorf("%s: image must be png|jpg", where)
+			}
+		} else if !reFilterColumn.MatchString(b.Field) {
+			return fmt.Errorf("%s: invalid image field %q", where, b.Field)
+		}
+		if b.Width < 5 || b.Width > 190 {
+			return fmt.Errorf("%s: image width 5..190 mm required", where)
+		}
+		if b.Float {
+			// Координаты обязательны: ноль означает "забыли указать",
+			// а не нулевое смещение. x — от края колонки (уже страницы
+			// не бывает), y — вниз от абзаца-якоря.
+			if b.X <= 0 || b.X > 210 || b.Y <= 0 || b.Y > 297 {
+				return fmt.Errorf("%s: float image needs x in 0..210 and y in 0..297 mm", where)
+			}
+		}
+	default:
+		return fmt.Errorf("%s: unknown type %q (want heading|field|table|list|image|text|if)", where, b.Type)
+	}
+	return nil
+}
+
+// validatePrintIf проверяет ветку if (рекурсивно — вложенные ветки):
+// equals — непустой набор равенств с литералами-скалярами, then —
+// непустой, else — обязателен явно (пустой массив = схлопнуть).
+func validatePrintIf(where string, b printBlock, tplFont string) error {
+	if len(b.Equals) == 0 {
+		return fmt.Errorf("%s: if needs non-empty equals", where)
+	}
+	for k, v := range b.Equals {
+		if !reFilterColumn.MatchString(k) {
+			return fmt.Errorf("%s: invalid if field %q", where, k)
+		}
+		switch v.(type) {
+		case string, float64, bool:
+		default:
+			return fmt.Errorf("%s: if equals value must be a scalar (string|number|bool)", where)
+		}
+	}
+	if len(b.Then) == 0 {
+		return fmt.Errorf("%s: if needs non-empty then", where)
+	}
+	if b.Else == nil {
+		return fmt.Errorf("%s: if needs explicit else (may be [])", where)
+	}
+	for i, tb := range b.Then {
+		if err := validatePrintBlock(fmt.Sprintf("%s.then[%d]", where, i+1), tb, tplFont); err != nil {
+			return err
+		}
+	}
+	for i, eb := range *b.Else {
+		if err := validatePrintBlock(fmt.Sprintf("%s.else[%d]", where, i+1), eb, tplFont); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // printTemplatePath — путь к шаблону (env или дефолт от WORKDIR).

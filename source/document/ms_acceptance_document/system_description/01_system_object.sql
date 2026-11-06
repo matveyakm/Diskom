@@ -40,6 +40,7 @@
         { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
+        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "organization_directory" },
         { "field": "note", "label": "Примечание", "hidden": false },
         { "field": "last_name", "label": "Фамилия", "hidden": false },
         { "field": "first_name", "label": "Имя", "hidden": false },
@@ -69,6 +70,14 @@
       "label": "Номер",
       "hidden": false,
       "required": true
+    },
+    {
+      "field": "id_committee",
+      "label": "Комитет",
+      "hidden": false,
+      "required": true,
+      "type": "select",
+      "end_point": "organization_directory"
     },
     {
       "field": "note",
