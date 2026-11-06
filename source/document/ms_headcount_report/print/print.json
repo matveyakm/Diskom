@@ -1,0 +1,20 @@
+{
+  "font": "times",
+  "pageNum": "header",
+  "margins": {"left": 30, "top": 17.5, "right": 15, "bottom": 20},
+  "blocks": [
+    {"type": "heading", "text": "Отчёт о численности сотрудников", "align": "center", "bold": true, "size": 16},
+    {"type": "table", "header": false, "borders": false, "columns": [
+      {"text": "{{ddate}}", "align": "left", "underline": true, "size": 14},
+      {"text": "№ {{dnumber}}", "align": "right", "underline": true, "size": 14}
+    ]},
+    {"type": "field", "label": "Комитет", "field": "id_committee", "ref": "organization_directory", "align": "left", "size": 14},
+    {"type": "text", "text": "Период: {{date_from}} — {{date_to}}", "align": "left", "size": 14},
+    {"type": "table", "slot": "staff", "header": true, "borders": true,
+     "columns": [
+       {"field": "date", "label": "Дата", "width": 6},
+       {"field": "count", "label": "Численность", "align": "right", "width": 6}
+     ]},
+    {"type": "field", "label": "Комментарий", "field": "comment", "align": "left", "size": 14}
+  ]
+}

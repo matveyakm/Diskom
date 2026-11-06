@@ -24,6 +24,7 @@ COPY ./source/document/ms_create_regulations_clauses_document/go.mod ./document/
 COPY ./source/document/ms_dismissal_document/go.mod ./document/ms_dismissal_document/
 COPY ./source/document/ms_document/go.mod ./document/ms_document/
 COPY ./source/document/ms_symbolism_document/go.mod ./document/ms_symbolism_document/
+COPY ./source/document/ms_headcount_report/go.mod ./document/ms_headcount_report/
 
 COPY ./source/ledger/ms_department_data_ledger/go.mod ./ledger/ms_department_data_ledger/
 COPY ./source/ledger/ms_employee_data_ledger/go.mod ./ledger/ms_employee_data_ledger/
@@ -63,6 +64,7 @@ COPY ./source/document/ms_create_regulations_clauses_document/ ./document/ms_cre
 COPY ./source/document/ms_dismissal_document/ ./document/ms_dismissal_document/
 COPY ./source/document/ms_document/ ./document/ms_document/
 COPY ./source/document/ms_symbolism_document/ ./document/ms_symbolism_document/
+COPY ./source/document/ms_headcount_report/ ./document/ms_headcount_report/
 
 COPY ./source/ledger/ms_department_data_ledger/ ./ledger/ms_department_data_ledger/
 COPY ./source/ledger/ms_employee_data_ledger/ ./ledger/ms_employee_data_ledger/
