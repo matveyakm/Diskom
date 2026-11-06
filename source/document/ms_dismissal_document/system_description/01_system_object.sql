@@ -179,23 +179,6 @@
             {
                 "Step": 3,
                 "method": "post",
-                "end_point": "staff_placement_ledger",
-                "map": [
-                    {"balance":           -1},
-                    {"id_document":      "id"},
-                    {"ddate":            "ddate"},
-                    {"id_employee":      "id_employee"},
-                    {"id_organization":  "id_organization"},
-                    {"id_department":    "id_department"},
-                    {"id_job_title":     "id_job_title"},
-                    {"justification":    "justification"},
-                    {"prefix":           "prefix"},
-                    {"id_transaction":   "id_transaction"}
-                ]
-            },
-            {
-                "Step": 4,
-                "method": "post",
                 "end_point": "employee_data_ledger",
                 "map": [
                     {"balance":          -1},
@@ -207,7 +190,7 @@
                 ]
             },
             {
-                "Step": 5,
+                "Step": 4,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "dismissal_document",
@@ -218,6 +201,9 @@
             }
         ]
     }',
+    -- onDelete чистит оба регистра по id_document: employee_data — свои строки,
+    -- staff_placement — только строки, ссылающиеся на этот приказ (наследие
+    -- тестового сида, где увольнение писало и туда; новых circuit нет).
     '{
     "action":"onDelete",
     "processing":[
