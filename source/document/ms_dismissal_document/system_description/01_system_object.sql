@@ -179,7 +179,10 @@
             "step": 3,
             "method": "delete",
             "end_point": "employee_data_ledger",
-            "filter": "id_document"
+            "filter": "id_document",
+            "query": {
+                "endpoint": "dismissal_document"
+            }
         },
         {
             "step": 4,
