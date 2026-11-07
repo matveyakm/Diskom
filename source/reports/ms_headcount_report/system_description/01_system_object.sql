@@ -31,9 +31,9 @@
     'ОЧ-',
     1,
     FALSE,
-    2,
+    3,
     'headcount_report',
-    5,
+    1,
     'document.png',
     '{
       "columns": [
