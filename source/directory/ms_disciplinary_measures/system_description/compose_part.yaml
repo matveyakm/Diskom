@@ -30,7 +30,7 @@
         ipv4_address: 172.25.0.102
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api_ms_disciplinary_measures.rule=Host(`discom.spbgu.localhost`) && PathPrefix(`/api/disciplinary_measures`)"
+      - "traefik.http.routers.api_ms_disciplinary_measures.rule=(Host(`discom.spbgu.90.188.89.63.nip.io`) || Host(`discom.spbgu.localhost`)) && PathPrefix(`/api/disciplinary_measures`)"
       - "traefik.http.services.api_ms_disciplinary_measures.loadbalancer.server.port=8443"
       - "traefik.http.routers.api_ms_disciplinary_measures.entrypoints=websecure"
       - "traefik.http.routers.api_ms_disciplinary_measures.tls=true"
