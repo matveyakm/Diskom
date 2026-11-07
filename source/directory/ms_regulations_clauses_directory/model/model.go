@@ -3,7 +3,6 @@ package model
 // Clauses of local regulations directory
 type Object struct {
 	Id            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	DNumber       string `gorm:"column:dnumber" json:"dnumber"`
 	Name          string `gorm:"column:name" json:"name"`
 	Description   string `gorm:"column:description" json:"description"`
 	Status        int16  `gorm:"column:status" json:"status"`

@@ -3,7 +3,6 @@ package model
 // Job title directory
 type Object struct {
 	Id            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	DNumber       string `gorm:"column:dnumber" json:"dnumber"`
 	Name          string `gorm:"column:name" json:"name"`
 	Description   string `gorm:"column:description" json:"description"`
 	IdBasis       int64  `gorm:"column:id_basis" json:"id_basis"`

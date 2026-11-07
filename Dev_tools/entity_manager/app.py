@@ -41,8 +41,6 @@ BASE_FIELDS_BY_CATEGORY = {
         {"name": "Id", "go_type": "int64", "column": "id", "json_name": "id",
          "is_pk": True, "is_auto_increment": True, "not_null": True,
          "hidden": True},
-        {"name": "DNumber", "go_type": "string", "column": "dnumber", "json_name": "dnumber",
-         "ui_label": "Код", "is_pk": False, "is_auto_increment": False, "not_null": False},
         {"name": "Name", "go_type": "string", "column": "name", "json_name": "name",
          "ui_label": "Наименование", "is_pk": False, "is_auto_increment": False, "not_null": False},
         {"name": "Description", "go_type": "string", "column": "description", "json_name": "description",

@@ -43,11 +43,6 @@
           "hidden": true
         },
         {
-          "field": "dnumber",
-          "label": "Код",
-          "hidden": false
-        },
-        {
           "field": "name",
           "label": "Наименование",
           "hidden": false
@@ -68,12 +63,6 @@
           "label": "",
           "hidden": true,
           "required": true
-        },
-        {
-          "field": "dnumber",
-          "label": "Код",
-          "hidden": false,
-          "required": false
         },
         {
           "field": "name",

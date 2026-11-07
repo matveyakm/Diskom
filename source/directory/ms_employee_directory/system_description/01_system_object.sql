@@ -39,7 +39,6 @@
       "columns": [
         { "field": "id", "label": "", "hidden": true},
         { "field": "status", "label": "", "type": "status", "hidden": false},
-        { "field": "dnumber", "label": "Код", "hidden": false},
         { "field": "name", "label": "ФИО", "hidden": false},
         { "field": "description", "label": "Описание", "hidden": false}
       ]
@@ -49,7 +48,6 @@
     '{
       "fields": [
         { "field": "id", "label": "", "hidden": true, "required": false},
-        { "field": "dnumber", "label": "Код", "hidden": false, "required": false},
         { "field": "name", "label": "ФИО", "hidden": false, "required": true},
         { "field": "description", "label": "Описание", "hidden": false, "required": false}
       ]
