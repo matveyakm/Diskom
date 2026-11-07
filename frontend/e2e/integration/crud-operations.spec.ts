@@ -19,12 +19,18 @@ test.describe('Integration: CRUD Operations', () => {
     }>;
   }
 
+  // Зеркалит правило Sidebar: корни — level 0 из system_object,
+  // пустые группы (без детей) скрыты.
   function getRootButtonIndex(
-    menuItems: Array<{ id: number; level: number; output_order?: number }>,
+    menuItems: Array<{ id: number; level: number; is_group: boolean; id_group: number; ref: string; output_order?: number }>,
     idGroup: number,
   ): number {
     const rootItems = menuItems
-      .filter(item => item.level === 0 && item.id < 4)
+      .filter(item => {
+        if (item.level !== 0) return false;
+        if (!item.is_group) return !!item.ref && item.ref !== '#';
+        return menuItems.some(child => child.id_group === item.id && child.level === item.level + 1);
+      })
       .sort((a, b) => (a.output_order ?? 0) - (b.output_order ?? 0));
     return rootItems.findIndex(item => item.id === idGroup);
   }

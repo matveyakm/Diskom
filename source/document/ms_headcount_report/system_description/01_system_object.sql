@@ -25,7 +25,7 @@
     id_transaction
   ) values (
     'Отчёт о численности сотрудников',
-    'Отчёт о численности сотрудников комитета за период',
+    'Отчёт о численности сотрудников за период',
     1,
     0,
     'ОЧ-',
@@ -40,7 +40,6 @@
         { "field": "status", "label": "", "type": "status", "hidden": false },
         { "field": "ddate", "label": "Дата", "hidden": false },
         { "field": "dnumber", "label": "Номер", "hidden": false },
-        { "field": "id_committee", "label": "Комитет", "hidden": false, "end_point": "organization_directory" },
         { "field": "date_from", "label": "Дата с", "hidden": false },
         { "field": "date_to", "label": "Дата по", "hidden": false }
       ]
@@ -68,14 +67,6 @@
       "label": "Номер",
       "hidden": false,
       "required": true
-    },
-    {
-      "field": "id_committee",
-      "label": "Комитет",
-      "hidden": false,
-      "required": true,
-      "type": "select",
-      "end_point": "organization_directory"
     },
     {
       "field": "date_from",
@@ -153,7 +144,6 @@
                     {"id": "id"},
                     {"ddate": "ddate"},
                     {"dnumber": "dnumber"},
-                    {"id_committee": "id_committee"},
                     {"date_from": "date_from"},
                     {"date_to": "date_to"},
                     {"comment": "comment"},

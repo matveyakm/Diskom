@@ -142,6 +142,15 @@ func (r *CRUDRepository[T]) Create(w http.ResponseWriter, req *http.Request) {
 		r.handlePrintBuild(w, req)
 		return
 	}
+	// Накопление (ACCUMULATE): отдельный путь только когда spec задан и валиден;
+	// без него — старый код ниже без изменений. Кривой spec — громкий 500.
+	if spec, active, err := accumulateActive(); err != nil {
+		r.writeError(w, "Invalid ACCUMULATE configuration", http.StatusInternalServerError)
+		return
+	} else if active {
+		r.createAccumulated(w, req, spec)
+		return
+	}
 	var entity T
 	if err := json.NewDecoder(req.Body).Decode(&entity); err != nil {
 		r.writeError(w, "Invalid request body", http.StatusBadRequest)
@@ -469,6 +478,24 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Накопление: balance руками запрещён (400), пересчёт — после успешной
+	// записи в той же транзакции. Без spec — ничего не меняется.
+	accSpec, accActive, accErr := accumulateActive()
+	if accErr != nil {
+		r.writeError(w, "Invalid ACCUMULATE configuration", http.StatusInternalServerError)
+		return
+	}
+	if accActive {
+		if err := rejectAccumulateBalance(sent, accSpec); err != nil {
+			r.writeError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !r.accumulateModelOK(accSpec) {
+			r.writeError(w, "Accumulate columns not in model", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	// Получаем ID из URL или из тела запроса
 	id := req.URL.Query().Get("id")
 	if id == "" {
@@ -509,6 +536,14 @@ func (r *CRUDRepository[T]) Update(w http.ResponseWriter, req *http.Request) {
 		tx.Rollback()
 		r.writeError(w, "Record not found", http.StatusNotFound)
 		return
+	}
+
+	if accActive {
+		if err := r.refreshAccumulated(tx, accSpec); err != nil {
+			tx.Rollback()
+			r.writeError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
@@ -561,6 +596,19 @@ func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Накопление: пересчёт после успешного удаления в той же транзакции.
+	accSpec, accActive, accErr := accumulateActive()
+	if accErr != nil {
+		tx.Rollback()
+		r.writeError(w, "Invalid ACCUMULATE configuration", http.StatusInternalServerError)
+		return
+	}
+	if accActive && !r.accumulateModelOK(accSpec) {
+		tx.Rollback()
+		r.writeError(w, "Accumulate columns not in model", http.StatusInternalServerError)
+		return
+	}
+
 	// Одиночное удаление (?id=): как раньше — 400/404/204.
 	if id := req.URL.Query().Get("id"); id != "" {
 		idInt, err := strconv.Atoi(id)
@@ -572,6 +620,13 @@ func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
 		if err := deleteWhere(w, r, tx, "id = ?", idInt, true); err != nil {
 			tx.Rollback()
 			return
+		}
+		if accActive {
+			if err := r.refreshAccumulated(tx, accSpec); err != nil {
+				tx.Rollback()
+				r.writeError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		if err := tx.Commit().Error; err != nil {
 			r.writeError(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)
@@ -612,6 +667,13 @@ func (r *CRUDRepository[T]) Delete(w http.ResponseWriter, req *http.Request) {
 		tx.Rollback()
 		r.writeError(w, "Failed to delete records: "+result.Error.Error(), http.StatusInternalServerError)
 		return
+	}
+	if accActive {
+		if err := r.refreshAccumulated(tx, accSpec); err != nil {
+			tx.Rollback()
+			r.writeError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	if err := tx.Commit().Error; err != nil {
 		r.writeError(w, "Failed to commit transaction: "+err.Error(), http.StatusInternalServerError)

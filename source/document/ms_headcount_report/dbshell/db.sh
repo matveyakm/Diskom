@@ -14,7 +14,6 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     id			bigint PRIMARY KEY,
     ddate			timestamp,
     dnumber			text,
-    id_committee			bigint,
     date_from			timestamp,
     date_to			timestamp,
     comment			text,
@@ -30,7 +29,6 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN public.${DB_TABLENAME}.id IS 'Id';
   COMMENT ON COLUMN public.${DB_TABLENAME}.ddate IS 'Ddate';
   COMMENT ON COLUMN public.${DB_TABLENAME}.dnumber IS 'Dnumber';
-  COMMENT ON COLUMN public.${DB_TABLENAME}.id_committee IS 'Id Committee';
   COMMENT ON COLUMN public.${DB_TABLENAME}.date_from IS 'Date From';
   COMMENT ON COLUMN public.${DB_TABLENAME}.date_to IS 'Date To';
   COMMENT ON COLUMN public.${DB_TABLENAME}.comment IS 'Comment';

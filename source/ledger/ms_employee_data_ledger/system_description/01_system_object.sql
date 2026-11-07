@@ -24,8 +24,8 @@
     printing_template,
     id_transaction
   ) values (
-    'Транзакции по реквизитам сотрудников',
-    'Транзакции по реквизитам сотрудников',
+    'Остатки штата',
+    'Остатки штата',
     1,
     0,
     'ТР-',
@@ -39,20 +39,13 @@
       "columns": [
         { "field": "id_document", "label": "Документ", "end_point": "document_directory"},
         { "field": "ddate", "label": "Дата"},
-        { "field": "first_name", "label": "Имя"},
-        { "field": "last_name", "label": "Фамилия"},
-        { "field": "middle_name", "label": "Отчество"},
-        { "field": "first_genitive", "label": "Имя (род. падеж)"},
-        { "field": "last_genitive", "label": "Фамилия (род. падеж)"},
-        { "field": "middle_genitive", "label": "Отчество (род. падеж)"},
-        { "field": "first_accusative", "label": "Имя (вин. падеж)"},
-        { "field": "last_accusative", "label": "Фамилия (вин. падеж)"},
-        { "field": "middle_accusative", "label": "Отчество (вин. падеж)"},
-        { "field": "vk_id", "label": "ID VK"},
-        { "field": "id_employee", "label": "ID сотрудника"}
+        { "field": "endpoint", "label": "Тип документа"},
+        { "field": "id_employee", "label": "Сотрудник", "end_point": "employee_directory"},
+        { "field": "delta", "label": "Изм."},
+        { "field": "balance", "label": "Баланс"}
       ]
     }',
-    'Транзакции по реквизитам сотрудников',
+    'Остатки штата',
     '',
     '',
     '',

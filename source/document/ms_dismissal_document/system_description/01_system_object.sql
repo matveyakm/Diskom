@@ -181,13 +181,11 @@
                 "method": "post",
                 "end_point": "employee_data_ledger",
                 "map": [
-                    {"balance":          -1},
+                    {"delta":            -1},
+                    {"endpoint":         "dismissal_document"},
                     {"id_document":      "id"},
                     {"ddate":            "ddate"},
-                    {"id_employee":      "id_employee"},
-                    {"id_committee":     "id_organization"},
-                    {"prefix":           "prefix"},
-                    {"id_transaction":   "id_transaction"}
+                    {"id_employee":      "id_employee"}
                 ]
             },
             {

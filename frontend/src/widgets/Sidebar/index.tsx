@@ -1,4 +1,4 @@
-import React, {useRef, useState} from "react";
+import React, {useMemo, useRef, useState} from "react";
 import styles from "./Sidebar.module.scss";
 import Profile from "@/assets/icons/account_circle.svg?react";
 import Panel from "./NavPanel";
@@ -34,7 +34,19 @@ const Sidebar = () => {
     const [name] = useState('Фальков Степан');
     const [email] = useState('st112382@student.spbu.ru');
 
-    const rootButtons = menuItems?.filter(item => item.level === 0 && item.id < 4) ?? [];
+    // Корневые кнопки — все сущности level 0 из system_object (данные, не хардкод id).
+    // Группа без детей и без собственной ссылки — пустая (напр. «О программе»),
+    // её прячем, чтобы не открывать пустую панель. Порядок — по output_order
+    // (fetchMenuData уже сортирует). Регистры и отчёты попадают сюда тем же
+    // механизмом, что справочники и документы.
+    const rootButtons = useMemo(() => {
+        const items = menuItems ?? [];
+        return items.filter(item => {
+            if (item.level !== 0) return false;
+            if (!item.is_group) return !!item.ref && item.ref !== "#";
+            return items.some(child => child.id_group === item.id && child.level === item.level + 1);
+        });
+    }, [menuItems]);
 
     return (
         <>

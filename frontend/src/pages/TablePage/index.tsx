@@ -17,23 +17,16 @@ const TablePage = () => {
 };
 
 const TableView = ({docName}: { docName: string | undefined }) => {
-    const {data: menuData} = useMenuData();
+    const {data: menuData, isLoading: menuLoading} = useMenuData();
 
     const tableMeta = useMemo(
         () => menuData?.find(item => item.ref === docName),
         [menuData, docName],
     );
 
-    const tableType = useMemo((): 1 | 2 | null => {
-        if (!tableMeta) return null;
-
-        const groupId = tableMeta.id_group || tableMeta.id;
-
-        if (groupId === 1) return 1;
-        if (groupId === 2) return 2;
-
-        return null;
-    }, [tableMeta]);
+    // Журнал открывается для любой сущности из system_object тем же механизмом
+    // (справочники, документы, регистры, отчёты): гейта по id_group нет.
+    // Раньше tableType 1|2 вешал регистры/отчёты на вечный лоадер.
 
     const [page, setPage] = useState(1);
     const PAGE_SIZE = 50;
@@ -98,12 +91,26 @@ const TableView = ({docName}: { docName: string | undefined }) => {
         document.title = tableMeta?.table_title || "Просмотр таблицы";
     }, [tableMeta?.table_title]);
 
-    if (isLoading || !tableType) {
+    if (menuLoading || isLoading) {
         return (
             <div className={styles.wrapper}>
                 <div className={styles.loader}>
                     <span className={styles.spinner}/>
                     <p className={styles.loaderText}>Загрузка данных...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!tableMeta) {
+        return (
+            <div className={styles.wrapper}>
+                <div className={styles.error}>
+                    <span className={styles.errorIcon}>⚠</span>
+                    <p className={styles.errorText}>Сущность «{docName ?? "—"}» не найдена в system_object</p>
+                    <button className={styles.retryBtn} onClick={() => refetch()}>
+                        Повторить
+                    </button>
                 </div>
             </div>
         );

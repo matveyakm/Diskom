@@ -375,23 +375,11 @@
                 "method": "post",
                 "end_point": "employee_data_ledger",
                 "map": [
-                    {"balance":          1},
+                    {"delta":            1},
+                    {"endpoint":         "acceptance_document"},
                     {"id_document":      "id"},
                     {"ddate":            "ddate"},
-                    {"id_employee":      "id_employee"},
-                    {"id_committee":     "id_committee"},
-                    {"first_name":       "first_name"},
-                    {"last_name":        "last_name"},
-                    {"middle_name":      "middle_name"},
-                    {"first_genitive":   "first_genitive"},
-                    {"last_genitive":    "last_genitive"},
-                    {"middle_genitive":  "middle_genitive"},
-                    {"first_accusative": "first_accusative"},
-                    {"last_accusative":  "last_accusative"},
-                    {"middle_accusative":"middle_accusative"},
-                    {"vk_id":            "vk_id"},
-                    {"prefix":           "prefix"},
-                    {"id_transaction":   "id_transaction"}
+                    {"id_employee":      "id_employee"}
                 ]
             },
             {
