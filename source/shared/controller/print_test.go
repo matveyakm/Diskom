@@ -148,6 +148,61 @@ func TestRenderPrintDOCX(t *testing.T) {
 	}
 }
 
+// Таблица без size у колонок наследует дефолт блока (11пт), а не 0:
+// w:sz=0 делает текст невидимым в Word (данные есть, но не показываются).
+func TestRenderPrintDOCXTableDefaultSize(t *testing.T) {
+	const tplJSON = `{
+  "blocks": [
+    {"type": "table", "header": true, "borders": true,
+     "columns": [
+       {"field": "date", "label": "Дата"},
+       {"field": "count", "label": "Численность", "align": "right"}
+     ]}
+  ]
+}`
+	tpl, err := parsePrintTemplate([]byte(tplJSON))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Слот-таблица: материализованные ряды вместо одной строки записи.
+	tpl.Blocks[0].RowsData = []map[string]any{
+		{"date": "05.01.2026", "count": "1"},
+		{"date": "01.02.2026", "count": "2"},
+	}
+	out, err := renderPrintDOCX(tpl, map[string]any{}, nil)
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(out), int64(len(out)))
+	if err != nil {
+		t.Fatalf("not a zip: %v", err)
+	}
+	var doc string
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			rc, _ := f.Open()
+			buf := new(bytes.Buffer)
+			_, _ = buf.ReadFrom(rc)
+			rc.Close()
+			doc = buf.String()
+		}
+	}
+	if doc == "" {
+		t.Fatal("no word/document.xml")
+	}
+	for _, want := range []string{"05.01.2026", "01.02.2026", "Дата", "Численность"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("document.xml lacks %q", want)
+		}
+	}
+	if strings.Contains(doc, `<w:sz w:val="0"/>`) {
+		t.Fatal("zero font size in table (invisible text in Word)")
+	}
+	if !strings.Contains(doc, `<w:sz w:val="22"/>`) {
+		t.Fatal("no block-default 11pt (w:val=22) in table")
+	}
+}
+
 // Пустой field-блок не печатается: приказы не содержат строк вида "Основание: ".
 func TestPrintEmptyFieldSkipped(t *testing.T) {
 	tpl, err := parsePrintTemplate([]byte(`{

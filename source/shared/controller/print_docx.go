@@ -205,7 +205,9 @@ func printDocxContentTwips(tpl *printTemplate) int {
 }
 
 // printDocxTable — шапка + N строк данных (одна строка — вырожденный случай).
-func printDocxTable(headers []string, rows [][]string, styles []printTextStyle, widths []int, header, borders bool, fam string) string {
+// defSize — размер блока (дефолт 11пт с call site); колонка без своего Size
+// наследует его, а не 0 (иначе текст невидим в Word — w:sz=0).
+func printDocxTable(headers []string, rows [][]string, styles []printTextStyle, widths []int, header, borders bool, fam string, defSize float64) string {
 	var b strings.Builder
 	// Фиксированная раскладка: колонки строго по gridCol. При auto (дефолт
 	// Word) ширины игнорируются и колонки сжимаются по контенту — ячейки
@@ -222,14 +224,14 @@ func printDocxTable(headers []string, rows [][]string, styles []printTextStyle, 
 	if header {
 		b.WriteString(`<w:tr>`)
 		for i, h := range headers {
-			b.WriteString(printDocxCell(h, styles[i], true, 0, styles[i].Align, fam))
+			b.WriteString(printDocxCell(h, styles[i], true, defSize, styles[i].Align, fam))
 		}
 		b.WriteString(`</w:tr>`)
 	}
 	for _, values := range rows {
 		b.WriteString(`<w:tr>`)
 		for i, v := range values {
-			b.WriteString(printDocxCell(v, styles[i], false, 0, styles[i].Align, fam))
+			b.WriteString(printDocxCell(v, styles[i], false, defSize, styles[i].Align, fam))
 		}
 		b.WriteString(`</w:tr>`)
 	}
@@ -466,7 +468,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 					}
 					rows = append(rows, values)
 				}
-				body.WriteString(printDocxTable(headers, rows, styles, colW, printBlockShow(b.Header), printBlockShow(b.Borders), tblFam))
+				body.WriteString(printDocxTable(headers, rows, styles, colW, printBlockShow(b.Header), printBlockShow(b.Borders), tblFam, size))
 			} else {
 				tblFam := printDocxFont(printFontFamily(tpl, b.printTextStyle))
 				var rows strings.Builder
