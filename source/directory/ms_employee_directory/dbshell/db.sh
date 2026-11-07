@@ -15,7 +15,8 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
 	dnumber              text,
     name                 text NOT NULL,
     description          text,
-	id_basis             smallint,
+	id_basis             bigint,
+	endpoint_basis         text NOT NULL DEFAULT '',
     status               smallint default 1,
 	prefix               smallint,
 	vk_id                text NOT NULL,
@@ -28,6 +29,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.name            IS 'Employee name';
   COMMENT ON COLUMN ${DB_TABLENAME}.description     IS 'Employee description';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_basis        IS 'Document Id';
+  COMMENT ON COLUMN ${DB_TABLENAME}.endpoint_basis IS 'Basis endpoint';
   COMMENT ON COLUMN ${DB_TABLENAME}.status          IS 'Directory status (0 - deleted, 1 - saved)';
   COMMENT ON COLUMN ${DB_TABLENAME}.prefix          IS 'Prefix of DB';
   COMMENT ON COLUMN ${DB_TABLENAME}.vk_id           IS 'VK ID';

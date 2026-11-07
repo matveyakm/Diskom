@@ -22,7 +22,6 @@ COPY ./source/document/ms_create_job_title_document/go.mod ./document/ms_create_
 COPY ./source/document/ms_create_organization_document/go.mod ./document/ms_create_organization_document/
 COPY ./source/document/ms_create_regulations_clauses_document/go.mod ./document/ms_create_regulations_clauses_document/
 COPY ./source/document/ms_dismissal_document/go.mod ./document/ms_dismissal_document/
-COPY ./source/document/ms_document/go.mod ./document/ms_document/
 COPY ./source/document/ms_symbolism_document/go.mod ./document/ms_symbolism_document/
 COPY ./source/document/ms_headcount_report/go.mod ./document/ms_headcount_report/
 
@@ -34,10 +33,8 @@ COPY ./source/ledger/ms_staff_placement_ledger/go.mod ./ledger/ms_staff_placemen
 COPY ./source/ledger/ms_symbolism_data_ledger/go.mod ./ledger/ms_symbolism_data_ledger/
 
 
-COPY ./source/report/ms_job_report/go.mod ./report/ms_job_report/
 COPY ./source/shared/go.mod ./shared/
 COPY ./source/shared/go.sum ./shared/
-COPY ./source/report/ms_job_report/assets/ ./report/ms_job_report/assets/
 
 COPY ./source/go.work ./
 COPY ./source/go.work.sum ./
@@ -62,7 +59,6 @@ COPY ./source/document/ms_create_job_title_document/ ./document/ms_create_job_ti
 COPY ./source/document/ms_create_organization_document/ ./document/ms_create_organization_document/
 COPY ./source/document/ms_create_regulations_clauses_document/ ./document/ms_create_regulations_clauses_document/
 COPY ./source/document/ms_dismissal_document/ ./document/ms_dismissal_document/
-COPY ./source/document/ms_document/ ./document/ms_document/
 COPY ./source/document/ms_symbolism_document/ ./document/ms_symbolism_document/
 COPY ./source/document/ms_headcount_report/ ./document/ms_headcount_report/
 
@@ -74,7 +70,6 @@ COPY ./source/ledger/ms_staff_placement_ledger/ ./ledger/ms_staff_placement_ledg
 COPY ./source/ledger/ms_symbolism_data_ledger/ ./ledger/ms_symbolism_data_ledger/
 
 
-COPY ./source/report/ms_job_report/ ./report/ms_job_report/
 
 COPY ./source/shared/ ./shared/
 

@@ -75,29 +75,14 @@
             {
                 "Step": 1,
                 "method": "post",
-                "end_point": "document",
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"note":"note"},
-                    {"status":1},
-                    {"id_user":1},
-                    {"prefix":0},
-                    {"id_transaction":"id_transaction"}
-                ],
-                "FK":
-                [
-                    {"id": "id"}
-                ]
-            },
-            {
-                "Step": 2,
-                "method": "post",
                 "end_point": "create_counterparty_document",
                 "fields":
                 [
                     {"status": 1}
+                ],
+                "FK":
+                [
+                    {"id": "id"}
                 ]
             }
         ]
@@ -109,30 +94,11 @@
             {
                 "Step": 1,
                 "method": "put",
-                "end_point": "document",
+                "end_point": "create_counterparty_document",
                 "filter": "id",
                 "conditions": [
                     {"status": 1}
                 ],
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"note":"note"},
-                    {"status":1},
-                    {"id_user":1},
-                    {"prefix":0},
-                    {"id_transaction":"id_transaction"}
-                ],
-                "FK":
-                [
-                    {"id": "id"}
-                ]
-            },
-            {
-                "Step": 2,
-                "method": "put",
-                "end_point": "create_counterparty_document",
                 "fields":
                 [
                     {"status": 1}
@@ -168,23 +134,6 @@
             },
             {
                 "Step": 2,
-                "method": "put",
-                "hide_in_preview": true,
-                "end_point": "document",
-                "filter":"id",
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"note":"note"},
-                    {"status":2},
-                    {"id_user":1},
-                    {"prefix":"prefix"},
-                    {"id_transaction":"id_transaction"}
-                ]
-            },
-            {
-                "Step": 3,
                 "method": "post",
                 "end_point": "counterparty_directory",
                 "map": [
@@ -192,6 +141,7 @@
                     {"prefix":"prefix"},
                     {"status": 1},
                     {"id_basis": "id"},
+                    {"endpoint_basis": "create_counterparty_document"},
                     {"name": {"CONCAT":
                         ["last_name", " ", "first_name", " ", "middle_name"]
                         }
@@ -202,7 +152,7 @@
                 ]
             },
             {
-                "Step": 4,
+                "Step": 3,
                 "method": "post",
                 "end_point": "counterparty_data_ledger",
                 "map": [
@@ -224,7 +174,7 @@
                 ]
             },
             {
-                "Step": 5,
+                "Step": 4,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "create_counterparty_document",
@@ -263,16 +213,6 @@
         },
         {
             "step": 4,
-            "method": "put",
-            "hide_in_preview": true,
-            "end_point": "document",
-            "filter": "id",
-            "fields": {
-                "status": 0
-            }
-        },
-        {
-            "step": 5,
             "method": "put",
             "hide_in_preview": true,
             "end_point": "create_counterparty_document",

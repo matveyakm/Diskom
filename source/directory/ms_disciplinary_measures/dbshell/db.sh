@@ -17,6 +17,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     description		text,
     status		smallint default 1,
     id_basis		bigint,
+    endpoint_basis         text NOT NULL DEFAULT '',
     prefix		smallint,
     id_transaction		text,
     id_user		bigint,
@@ -30,6 +31,7 @@ UNIQUE (id, id_basis)
   COMMENT ON COLUMN ${DB_TABLENAME}.description IS 'Description';
   COMMENT ON COLUMN ${DB_TABLENAME}.status IS 'Status';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_basis IS 'Id Basis';
+  COMMENT ON COLUMN ${DB_TABLENAME}.endpoint_basis IS 'Basis endpoint';
   COMMENT ON COLUMN ${DB_TABLENAME}.prefix IS 'Prefix';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_transaction IS 'Id Transaction';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_user IS 'Id User';

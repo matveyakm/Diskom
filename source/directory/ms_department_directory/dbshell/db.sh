@@ -17,6 +17,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     description         text,
     status              smallint default 1,
     id_basis            bigint,
+    endpoint_basis         text NOT NULL DEFAULT '',
 	prefix              smallint,
 	id_transaction      text,
 	UNIQUE (id, id_basis)
@@ -28,6 +29,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.description  IS 'Directory description';
   COMMENT ON COLUMN ${DB_TABLENAME}.status       IS 'Directory status (0 - deleted, 1 - saved)';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_basis     IS 'Basis for business operation';
+  COMMENT ON COLUMN ${DB_TABLENAME}.endpoint_basis IS 'Basis endpoint';
   COMMENT ON COLUMN ${DB_TABLENAME}.prefix       IS 'Prefix of DB';
 
 EOSQL

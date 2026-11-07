@@ -128,28 +128,9 @@
             {
                 "Step": 1,
                 "method": "post",
-                "end_point": "document",
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"status":1},
-                    {"id_user":1},
-                    {"prefix":0},
-                    {"id_transaction":"id_transaction"}
-                ],
-                "FK":
-                [
-                    {"id": "id"}
-                ]
-            },
-            {
-                "Step": 2,
-                "method": "post",
                 "end_point": "symbolism_document",
                 "map":
                 [
-                    {"id": "id"},
                     {"ddate": "ddate"},
                     {"effective_date": "effective_date"},
                     {"dnumber": "dnumber"},
@@ -159,10 +140,14 @@
                     {"id_user": 1},
                     {"prefix": 0},
                     {"id_transaction": "id_transaction"}
+                ],
+                "FK":
+                [
+                    {"id": "id"}
                 ]
             },
             {
-                "Step": 3,
+                "Step": 2,
                 "method": "put",
                 "end_point": "symbolism_document/files",
                 "map":
@@ -180,36 +165,18 @@
             {
                 "Step": 1,
                 "method": "put",
-                "end_point": "document",
+                "end_point": "symbolism_document",
                 "filter": "id",
                 "conditions": [
                     {"status": 1}
                 ],
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"status":1},
-                    {"id_user":1},
-                    {"prefix":0},
-                    {"id_transaction":"id_transaction"}
-                ],
-                "FK":
-                [
-                    {"id": "id"}
-                ]
-            },
-            {
-                "Step": 2,
-                "method": "put",
-                "end_point": "symbolism_document",
                 "fields":
                 [
                     {"status": 1}
                 ]
             },
             {
-                "Step": 3,
+                "Step": 2,
                 "method": "put",
                 "end_point": "symbolism_document/files",
                 "map":
@@ -219,7 +186,7 @@
                 ]
             },
             {
-                "Step": 4,
+                "Step": 3,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "symbolism_document/files",
@@ -262,22 +229,6 @@
             },
             {
                 "Step": 2,
-                "method": "put",
-                "hide_in_preview": true,
-                "end_point": "document",
-                "filter": "id",
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"status":2},
-                    {"id_user":1},
-                    {"prefix":"prefix"},
-                    {"id_transaction":"id_transaction"}
-                ]
-            },
-            {
-                "Step": 3,
                 "method": "post",
                 "end_point": "symbolism_data_ledger",
                 "map": [
@@ -291,7 +242,7 @@
                 ]
             },
             {
-                "Step": 4,
+                "Step": 3,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "symbolism_document",
@@ -331,16 +282,6 @@
         },
         {
             "step": 4,
-            "method": "put",
-            "hide_in_preview": true,
-            "end_point": "document",
-            "filter": "id",
-            "fields": {
-                "status": 0
-            }
-        },
-        {
-            "step": 5,
             "method": "put",
             "hide_in_preview": true,
             "end_point": "symbolism_document",

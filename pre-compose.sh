@@ -6,7 +6,6 @@ sudo docker compose down --volumes --rmi local
 # 1. Список модулей (путь и имя модуля через двоеточие)
 # Можно легко добавлять новые или комментировать ненужные
 MODULES=(
-    "source/document/ms_document:ms_document"
     "source/document/ms_appointment_document:ms_appointment_document"
     "source/document/ms_dismissal_document:ms_dismissal_document"
     "source/document/ms_acceptance_document:ms_acceptance_document"
@@ -32,7 +31,6 @@ MODULES=(
     "source/ledger/ms_department_data_ledger:ms_department_data_ledger"
     "source/ledger/ms_job_title_data_ledger:ms_job_title_data_ledger"
     "source/ledger/ms_organization_data_ledger:ms_organization_data_ledger"
-    "source/report/ms_job_report:ms_job_report"
     ""
 )
 

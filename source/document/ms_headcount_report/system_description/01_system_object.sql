@@ -120,28 +120,9 @@
             {
                 "Step": 1,
                 "method": "post",
-                "end_point": "document",
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"status":1},
-                    {"id_user":1},
-                    {"prefix":0},
-                    {"id_transaction":"id_transaction"}
-                ],
-                "FK":
-                [
-                    {"id": "id"}
-                ]
-            },
-            {
-                "Step": 2,
-                "method": "post",
                 "end_point": "headcount_report",
                 "map":
                 [
-                    {"id": "id"},
                     {"ddate": "ddate"},
                     {"dnumber": "dnumber"},
                     {"date_from": "date_from"},
@@ -151,6 +132,10 @@
                     {"id_user": 1},
                     {"prefix": 0},
                     {"id_transaction": "id_transaction"}
+                ],
+                "FK":
+                [
+                    {"id": "id"}
                 ]
             }
         ]
@@ -162,29 +147,11 @@
             {
                 "Step": 1,
                 "method": "put",
-                "end_point": "document",
+                "end_point": "headcount_report",
                 "filter": "id",
                 "conditions": [
                     {"status": 1}
                 ],
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"status":1},
-                    {"id_user":1},
-                    {"prefix":0},
-                    {"id_transaction":"id_transaction"}
-                ],
-                "FK":
-                [
-                    {"id": "id"}
-                ]
-            },
-            {
-                "Step": 2,
-                "method": "put",
-                "end_point": "headcount_report",
                 "fields":
                 [
                     {"status": 1}
@@ -211,22 +178,6 @@
                 "Step": 2,
                 "method": "put",
                 "hide_in_preview": true,
-                "end_point": "document",
-                "filter": "id",
-                "map":
-                [
-                    {"ddate":"ddate"},
-                    {"dnumber":"dnumber"},
-                    {"status":2},
-                    {"id_user":1},
-                    {"prefix":"prefix"},
-                    {"id_transaction":"id_transaction"}
-                ]
-            },
-            {
-                "Step": 3,
-                "method": "put",
-                "hide_in_preview": true,
                 "end_point": "headcount_report",
                 "filter": "id",
                 "fields": {
@@ -250,16 +201,6 @@
         },
         {
             "step": 2,
-            "method": "put",
-            "hide_in_preview": true,
-            "end_point": "document",
-            "filter": "id",
-            "fields": {
-                "status": 0
-            }
-        },
-        {
-            "step": 3,
             "method": "put",
             "hide_in_preview": true,
             "end_point": "headcount_report",

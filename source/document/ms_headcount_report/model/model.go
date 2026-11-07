@@ -7,13 +7,14 @@ import "time"
 // (период; учёт глобальный, без разреза по комитету — регистр копит общий
 // итог). Проводок не пишет (acceptance только меняет статус).
 type Object struct {
-	Id            int64     `gorm:"column:id;primaryKey" json:"id"`
+	Id            int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	DDate         time.Time `gorm:"column:ddate" json:"ddate"`
 	DNumber       string    `gorm:"column:dnumber" json:"dnumber"`
 	DateFrom      time.Time `gorm:"column:date_from" json:"date_from"`
 	DateTo        time.Time `gorm:"column:date_to" json:"date_to"`
 	Comment       string    `gorm:"column:comment" json:"comment"`
-	IdBasis       int16     `gorm:"column:id_basis" json:"id_basis"`
+	IdBasis       int64     `gorm:"column:id_basis" json:"id_basis"`
+	EndpointBasis string    `gorm:"column:endpoint_basis" json:"endpoint_basis"`
 	Status        int16     `gorm:"column:status" json:"status"`
 	Prefix        int16     `gorm:"column:prefix" json:"prefix"`
 	IdUser        int64     `gorm:"column:id_user" json:"id_user"`

@@ -18,7 +18,6 @@ use (
 	./document/ms_create_organization_document
 	./document/ms_create_regulations_clauses_document
 	./document/ms_dismissal_document
-	./document/ms_document
 	./document/ms_headcount_report
 	./document/ms_symbolism_document
 	./ledger/ms_department_data_ledger
@@ -27,6 +26,5 @@ use (
 	./ledger/ms_organization_data_ledger
 	./ledger/ms_staff_placement_ledger
 	./ledger/ms_symbolism_data_ledger
-	./report/ms_job_report
 	./shared
 )

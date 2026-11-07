@@ -4,12 +4,13 @@ import "time"
 
 // Employee acceptance document
 type Object struct {
-	Id               int64     `gorm:"column:id;primaryKey" json:"id"`
+	Id               int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Ddate            time.Time `gorm:"column:ddate" json:"ddate"`
 	Dnumber          string    `gorm:"column:dnumber" json:"dnumber"`
 	Note             string    `gorm:"column:note" json:"note"`
 	IdCommittee      int64     `gorm:"column:id_committee" json:"id_committee"`
-	IdBasis          int16     `gorm:"column:id_basis" json:"id_basis"`
+	IdBasis          int64     `gorm:"column:id_basis" json:"id_basis"`
+	EndpointBasis    string    `gorm:"column:endpoint_basis" json:"endpoint_basis"`
 	Status           int16     `gorm:"column:status" json:"status"`
 	IdUser           int64     `gorm:"column:id_user" json:"id_user"`
 	Prefix           int16     `gorm:"column:prefix" json:"prefix"`
