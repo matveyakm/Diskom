@@ -10,7 +10,7 @@ MODULES=(
     "source/document/ms_dismissal_document:ms_dismissal_document"
     "source/document/ms_acceptance_document:ms_acceptance_document"
     "source/document/ms_symbolism_document:ms_symbolism_document"
-    "source/document/ms_headcount_report:ms_headcount_report"
+    "source/reports/ms_headcount_report:ms_headcount_report"
     "source/document/ms_create_department_document:ms_create_department_document"
     "source/document/ms_create_job_title_document:ms_create_job_title_document"
     "source/document/ms_create_counterparty_document:ms_create_counterparty_document"

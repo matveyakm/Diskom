@@ -7,7 +7,7 @@ DBSHELL_DIR="$BASE_DIR/dbshell"
 TARGET="$DBSHELL_DIR/db.sh"
 
 # Auto-discover all system_description/01_system_object.sql files
-# Order: groups, then directory, document, ledger
+# Order: groups, then directory, document, ledger, reports
 collect_inserts() {
   # Groups from ms_system_object_directory
   for f in "$BASE_DIR"/system_description/*.sql; do
@@ -33,7 +33,7 @@ collect_inserts() {
   done
 
   # Report entities
-  for dir in "$SOURCE_DIR"/report/ms_*/; do
+  for dir in "$SOURCE_DIR"/reports/ms_*/; do
     f="$dir/system_description/01_system_object.sql"
     [ -f "$f" ] && echo "$f"
   done

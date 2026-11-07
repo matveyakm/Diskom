@@ -5,10 +5,10 @@
     command: postgres -c listen_addresses=172.25.0.109 -c port=5434
     restart: always
     env_file:
-      - ./source/document/ms_headcount_report/parameters.env
+      - ./source/reports/ms_headcount_report/parameters.env
     volumes:
       - postgres_ms_headcount_report:/var/lib/postgresql
-      - ./source/document/ms_headcount_report/dbshell:/docker-entrypoint-initdb.d/
+      - ./source/reports/ms_headcount_report/dbshell:/docker-entrypoint-initdb.d/
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -25,7 +25,7 @@
     container_name: api_ms_headcount_report
     restart: always
     env_file:
-      - ./source/document/ms_headcount_report/parameters.env
+      - ./source/reports/ms_headcount_report/parameters.env
     networks:
       vnet:
         ipv4_address: 172.25.0.110

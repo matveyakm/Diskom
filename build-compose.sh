@@ -37,7 +37,7 @@ awk '/# compose:services:begin/ {exit} {print}' "$BASE" > "$TMP"
 
 COUNT=0
 SERVICES=""
-for t in directory document ledger report; do
+for t in directory document ledger reports; do
   for d in "$ROOT"/source/$t/ms_*/; do
     [ -d "$d" ] || continue
     if [ ! -f "$d$FRAG" ]; then
