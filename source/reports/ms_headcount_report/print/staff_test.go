@@ -11,6 +11,13 @@ type stubCtx struct {
 	record  map[string]any
 	rows    []map[string]any
 	rowsErr error
+	one     map[string]any
+	oneErr  error
+	files   []report.FileMeta
+	filesEr error
+	data    []byte
+	mime    string
+	dataErr error
 }
 
 func (s *stubCtx) Record() map[string]any { return s.record }
@@ -27,13 +34,13 @@ func (s *stubCtx) Fetch(ref string, q map[string]string) ([]map[string]any, erro
 	return s.rows, nil
 }
 func (s *stubCtx) FetchOne(ref string, q map[string]string) (map[string]any, error) {
-	return nil, errors.New("not needed")
+	return s.one, s.oneErr
 }
 func (s *stubCtx) FilesOf(ref string, docID int64) ([]report.FileMeta, error) {
-	return nil, errors.New("not needed")
+	return s.files, s.filesEr
 }
 func (s *stubCtx) FileBytes(ref string, fileID, docID int64) ([]byte, string, error) {
-	return nil, "", errors.New("not needed")
+	return s.data, s.mime, s.dataErr
 }
 
 // accumulatedRow — строка регистра: balance уже накопленный (считает сервер).

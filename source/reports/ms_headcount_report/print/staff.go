@@ -14,7 +14,59 @@ import (
 )
 
 // Slots — реестр дырок печати отчёта.
-var Slots = report.Slots{"staff": staffSlot}
+var Slots = report.Slots{"staff": staffSlot, "emblem": emblemSlot, "chart": chartSlot}
+
+// staffPoint — один день истории: итог накопленного balance на конец дня.
+type staffPoint struct {
+	day   time.Time
+	total int64
+}
+
+// staffHistory строит полную историю change-дней с начала данных (по возрастанию):
+// последний накопленный balance каждого дня. Порядок детерминирован —
+// (день, id): сервер копит в том же порядке, итог дня = последний balance дня.
+func staffHistory(rows []map[string]any) ([]staffPoint, error) {
+	ordered := make([]map[string]any, 0, len(rows))
+	ordered = append(ordered, rows...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		di, erri := reportDay(ordered[i]["ddate"])
+		dj, errj := reportDay(ordered[j]["ddate"])
+		if erri != nil || errj != nil {
+			return erri == nil
+		}
+		if !di.Equal(dj) {
+			return di.Before(dj)
+		}
+		ii, _ := report.Int(ordered[i]["id"])
+		ji, _ := report.Int(ordered[j]["id"])
+		return ii < ji
+	})
+	totals := make(map[string]int64)
+	var days []time.Time
+	seen := make(map[string]bool)
+	for _, r := range ordered {
+		d, err := reportDay(r["ddate"])
+		if err != nil {
+			return nil, fmt.Errorf("staff: bad row date: %w", err)
+		}
+		total, err := reportCount(r["balance"])
+		if err != nil {
+			return nil, fmt.Errorf("staff: %w", err)
+		}
+		key := d.Format("2006-01-02")
+		totals[key] = total
+		if !seen[key] {
+			seen[key] = true
+			days = append(days, time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC))
+		}
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i].Before(days[j]) })
+	out := make([]staffPoint, 0, len(days))
+	for _, d := range days {
+		out = append(out, staffPoint{day: d, total: totals[d.Format("2006-01-02")]})
+	}
+	return out, nil
+}
 
 // staffSlot — таблица «Дата | Численность»: только дни периода, в которые
 // численность менялась. Источник — employee_data_ledger, глобальный:
@@ -43,62 +95,27 @@ func staffSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("staff: ledger: %w", err)
 	}
-	// Детерминированный порядок истории: (день, id). Сервер копит в том же
-	// порядке, поэтому последний balance дня — итог на конец дня.
-	ordered := make([]map[string]any, 0, len(rows))
-	ordered = append(ordered, rows...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		di, erri := reportDay(ordered[i]["ddate"])
-		dj, errj := reportDay(ordered[j]["ddate"])
-		if erri != nil || errj != nil {
-			return erri == nil
-		}
-		if !di.Equal(dj) {
-			return di.Before(dj)
-		}
-		ii, _ := report.Int(ordered[i]["id"])
-		ji, _ := report.Int(ordered[j]["id"])
-		return ii < ji
-	})
-	// Последний итог каждого дня; эмитим только дни внутри периода,
-	// где итог изменился. День без чистого изменения (приём+увольнение
-	// в один день) не эмитится — численность та же.
-	byDay := make(map[string]int64)
-	var days []time.Time
-	seen := make(map[string]bool)
-	for _, r := range ordered {
-		d, err := reportDay(r["ddate"])
-		if err != nil {
-			return nil, fmt.Errorf("staff: bad row date: %w", err)
-		}
-		total, err := reportCount(r["balance"])
-		if err != nil {
-			return nil, fmt.Errorf("staff: %w", err)
-		}
-		key := d.Format("2006-01-02")
-		byDay[key] = total
-		if !seen[key] {
-			seen[key] = true
-			days = append(days, time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC))
-		}
+	hist, err := staffHistory(rows)
+	if err != nil {
+		return nil, err
 	}
-	sort.Slice(days, func(i, j int) bool { return days[i].Before(days[j]) })
-	out := make([]map[string]any, 0, len(days))
+	// Эмитим только дни внутри периода, где итог изменился. День без чистого
+	// изменения (приём+увольнение в один день) не эмитится — численность та же.
+	out := make([]map[string]any, 0, len(hist))
 	var last int64
 	started := false
-	for _, d := range days {
-		if d.Before(from) || d.After(to) {
+	for _, p := range hist {
+		if p.day.Before(from) || p.day.After(to) {
 			continue
 		}
-		t := byDay[d.Format("2006-01-02")]
-		if started && t == last {
+		if started && p.total == last {
 			continue
 		}
 		started = true
-		last = t
+		last = p.total
 		out = append(out, map[string]any{
-			"date":  d.Format("02.01.2006"),
-			"count": float64(t),
+			"date":  p.day.Format("02.01.2006"),
+			"count": float64(p.total),
 		})
 	}
 	return out, nil
