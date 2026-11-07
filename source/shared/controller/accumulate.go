@@ -91,10 +91,9 @@ func extractAccumulateDelta(row map[string]any, deltaCol string) (int64, error) 
 // ждёт конца транзакции первого и пересчитывает поверх. Ключ именован
 // таблицей (данные), коллизий с чужими lock нет по построению.
 func lockAccumulateScope(tx *gorm.DB, table string) error {
-	var locked int
 	// table — из env оператора (DB_TABLENAME), не из запроса; параметром,
-	// не интерполяцией.
-	if err := tx.Raw("SELECT pg_advisory_xact_lock(hashtext(?))", "accumulate:"+table).Scan(&locked).Error; err != nil {
+	// не интерполяцией. Функция возвращает void — через Exec, не Scan.
+	if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", "accumulate:"+table).Error; err != nil {
 		return fmt.Errorf("accumulate lock: %w", err)
 	}
 	return nil
