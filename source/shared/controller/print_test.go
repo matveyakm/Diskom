@@ -887,3 +887,43 @@ func TestResolvePrintRefs(t *testing.T) {
 		t.Fatalf("missing env must leave raw id: %v", got["id_employee"])
 	}
 }
+
+func testPrintPNG(t *testing.T, w, h int) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.RGBA{uint8(x % 256), uint8(y % 256), 128, 255})
+		}
+	}
+	var b bytes.Buffer
+	if err := png.Encode(&b, img); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+// Гигантские оригиналы (сидовые эмблемы — 6378px) folio разворачивает
+// в растр целиком: секунды CPU и сотни мегабайт на каждую сборку PDF.
+// Даунскейл до печатных нужд, маленькие — байт-в-байт мимо.
+func TestDownscalePrintImage(t *testing.T) {
+	small := testPrintPNG(t, 400, 200)
+	if out, scaled, err := downscalePrintImage(small); err != nil || scaled || out != nil {
+		t.Fatalf("small must pass through: %v %v", scaled, err)
+	}
+	big := testPrintPNG(t, 2000, 1000)
+	out, scaled, err := downscalePrintImage(big)
+	if err != nil || !scaled {
+		t.Fatalf("big must scale: %v %v", scaled, err)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Width != 1200 || cfg.Height != 600 {
+		t.Fatalf("want 1200x600, got %dx%d", cfg.Width, cfg.Height)
+	}
+	if _, _, err := downscalePrintImage([]byte("not an image at all............")); err == nil {
+		t.Fatal("want error on garbage")
+	}
+}

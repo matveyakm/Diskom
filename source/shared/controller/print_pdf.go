@@ -11,18 +11,22 @@ package restController
 
 import (
 	"bytes"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"image"
 	_ "image/jpeg"
-	_ "image/png"
+	"image/png"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/carlos7ags/folio/document"
 	"github.com/carlos7ags/folio/font"
 	folioimage "github.com/carlos7ags/folio/image"
 	"github.com/carlos7ags/folio/layout"
+	"golang.org/x/image/draw"
 )
 
 //go:embed fonts/ARIAL.TTF
@@ -256,11 +260,82 @@ func printFolioColWidths(cols []printBlockColumn, totalPt float64) []float64 {
 
 // printFolioImage декодирует картинку блока (формат — по magic, как в
 // валидации загрузки; содержимое ещё раз проверяется внутри folio).
+// Гигантские оригиналы (сидовые эмблемы — 6378px) folio разворачивает
+// в растр целиком (buildRGBMaybeAlpha + flate на каждую сборку PDF —
+// секунды CPU и сотни мегабайт): даунскейлим до печатных нужд заранее.
+// Кап 1200px по длинной стороне ≈ 150dpi на всю ширину текстовой зоны
+// (165мм) с запасом; меньшие картинки идут байт-в-байт старым путём
+// (JPEG остаётся JPEG, PNG — PNG).
 func printFolioImage(raw []byte) (*folioimage.Image, error) {
 	if mime, ok := fileMimeByMagic(raw); ok && mime == "image/jpeg" {
+		if scaled, ok, err := downscalePrintImage(raw); err != nil {
+			return nil, err
+		} else if ok {
+			return folioimage.NewPNG(scaled)
+		}
 		return folioimage.NewJPEG(raw)
 	}
+	if scaled, ok, err := downscalePrintImage(raw); err != nil {
+		return nil, err
+	} else if ok {
+		return folioimage.NewPNG(scaled)
+	}
 	return folioimage.NewPNG(raw)
+}
+
+// printImageMaxSide — кап длинной стороны картинки в пикселях.
+const printImageMaxSide = 1200
+
+// printScaledImageCache — готовые даунскейлы по sha256 оригинала: одна и та же
+// эмблема ставится в каждый приказ/отчёт, ресемплить её на каждую сборку PDF
+// незачем. Только даунскейлы (маленькие картинки идут мимо кэша байт-в-байт).
+// Граница — 16 distinct-файлов со сбросом всего (эмблем — единицы; charts
+// сюда не попадают — они меньше капа и не скейлятся вообще).
+var printScaledImageCache sync.Map // string -> []byte
+var printScaledImageCacheN atomic.Int64
+
+const printScaledImageCacheMax = 16
+
+// downscalePrintImage ужимает картинку до печатных нужд (CatmullRom,
+// PNG на выходе). Маленькие возвращает нетронутыми (scaled=false).
+// Чистая, с тестами.
+func downscalePrintImage(raw []byte) (out []byte, scaled bool, err error) {
+	sum := sha256.Sum256(raw)
+	key := hex.EncodeToString(sum[:])
+	if cached, ok := printScaledImageCache.Load(key); ok {
+		return cached.([]byte), true, nil
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return nil, false, fmt.Errorf("print image: bad header: %w", err)
+	}
+	longest := cfg.Width
+	if cfg.Height > longest {
+		longest = cfg.Height
+	}
+	if longest <= printImageMaxSide || longest <= 0 {
+		return nil, false, nil
+	}
+	img, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return nil, false, fmt.Errorf("print image: bad data: %w", err)
+	}
+	factor := float64(printImageMaxSide) / float64(longest)
+	dst := image.NewRGBA(image.Rect(0, 0, int(float64(cfg.Width)*factor+0.5), int(float64(cfg.Height)*factor+0.5)))
+	// ApproxBiLinear, а не CatmullRom: в разы быстрее на мегапикселях,
+	// для ужатия логотипа разницы не видно (проверено глазом на ASCII-арте).
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, dst); err != nil {
+		return nil, false, fmt.Errorf("print image: encode: %w", err)
+	}
+	out = buf.Bytes()
+	if printScaledImageCacheN.Add(1) > printScaledImageCacheMax {
+		printScaledImageCache.Clear()
+		printScaledImageCacheN.Store(1)
+	}
+	printScaledImageCache.Store(key, out)
+	return out, true, nil
 }
 
 // renderPrintPDF строит PDF байты из шаблона и строки документа (folio).
