@@ -8,8 +8,13 @@
       {"text": "{{ddate}}", "align": "left", "underline": true, "size": 14},
       {"text": "№ {{dnumber}}", "align": "right", "underline": true, "size": 14}
     ]},
-    {"type": "heading", "text": "ПРИКАЗЫВАЮ:", "align": "left", "bold": true, "size": 15, "firstLine": 12.7, "spaceBefore": 10.59, "spaceAfter": 2.1},
+    {"type": "heading", "text": "ПРИКАЗЫВАЮ:", "align": "left", "bold": true, "size": 15, "firstLine": 12.7, "spaceBefore": 10.59, "spaceAfter": 10.59},
     {"type": "text", "text": "Утвердить с {{effective_date}} следующее изображение в качестве символики Дисциплинарного комитета Студенческого совета СПбГУ.", "align": "justify", "size": 14, "line": 1.5},
+    {"type": "if", "equals": {"status": 2}, "then": [
+      {"type": "image", "slot": "logo", "width": 55, "align": "center", "spaceBefore": 4.2}
+    ], "else": [
+      {"type": "text", "text": " ", "size": 12, "spaceAfter": 48}
+    ]},
     {"type": "field", "label": "Комитет", "field": "id_committee", "ref": "organization_directory", "align": "justify", "size": 14},
     {"type": "field", "label": "Комментарий", "field": "comment", "align": "justify", "size": 14}
   ]
