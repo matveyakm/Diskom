@@ -10,6 +10,9 @@ export type TableModalProps<T extends TableRow = TableRow> = {
     blocks?: FormBlock[];
     mode: "edit" | "create";
     tableMeta?: MenuItem;
+    /** Куда показать сохранённую/проведённую запись (вместо закрытия).
+     * Родитель обычно переключает модалку в просмотр этой строки. */
+    onSavedRow?: (row: T) => void;
 };
 
 export type FieldRowProps = {

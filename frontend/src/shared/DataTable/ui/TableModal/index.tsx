@@ -59,7 +59,7 @@ const pipelineMessage = (question: string, consequences: string, effects: Pipeli
             </>
         );
 
-const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta}: TableModalProps<T>) => {
+const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docName, fields, blocks, mode, tableMeta, onSavedRow}: TableModalProps<T>) => {
     const [dialog, setDialog] = useState<DialogState>(null);
     const [printOpen, setPrintOpen] = useState(false);
 
@@ -156,13 +156,22 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
         },
     });
 
+    // После сохранения — просмотр записанной строки вместо закрытия модалки:
+    // серверное эхо (id, dnumber, дефолты) честнее формы. Родитель переключает
+    // модалку на эту строку; без обработчика — старое поведение (закрыть).
+    const showSavedRow = (saved: Record<string, unknown>) => {
+        setErrors({});
+        setIsEditing(false);
+        if (onSavedRow && saved != null && typeof saved === "object") {
+            onSavedRow(saved as unknown as T);
+        } else {
+            onClose();
+        }
+    };
+
     const handleSave = (payload: Record<string, unknown>) => {
         saveRow(payload, {
-            onSuccess: () => {
-                setErrors({});
-                setIsEditing(false);
-                onClose();
-            },
+            onSuccess: (saved) => showSavedRow(saved ?? {}),
             onError: () => showAlert("Не удалось сохранить изменения. Проверьте введенные данные."),
         });
     };
@@ -191,8 +200,9 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
             showAlert(`Документ сохранён, но провести не удалось (${describeActionError(err)}). Проверьте данные и проведите позже.`);
             return;
         }
-        setErrors({});
-        onClose();
+        // Проведение ставит status 2 (терминальный шаг всех on_acceptance) —
+        // показываем проведённый документ, а не табличку.
+        showSavedRow({...rowForAccept, status: 2} as unknown as Record<string, unknown>);
     };
 
     const handleCancel = () => {
@@ -213,7 +223,13 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     const handleAccept = () => {
         showConfirm(acceptanceMessage, () => {
             acceptRow(undefined, {
-                onSuccess: () => onClose(),
+                onSuccess: () => {
+                    if (selectedRow && onSavedRow) {
+                        showSavedRow({...selectedRow, status: 2} as unknown as Record<string, unknown>);
+                    } else {
+                        onClose();
+                    }
+                },
                 onError: (err) => showAlert(`Не удалось провести документ (${describeActionError(err)}).`),
             });
         });
@@ -231,6 +247,12 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
     // в правке — по тем же правилам, что у "Провести". Где проводить нечего
     // (справочники, dismissal) — кнопки нет, чтобы не портить данные.
     const showSaveAccept = mode === "create" ? hasAcceptancePipeline : canAccept;
+
+    // Печать — там же, где проведение (документы/отчёты): у справочников
+    // и регистров проводить нечего и печатать нечего. Отдельного флага нет —
+    // capability выводится из того же конфига, без веток по типу сущности.
+    // (У сущностей без шаблона печати кнопка тоже прячется — вместе с пайплайном.)
+    const canPrint = hasAcceptancePipeline;
 
     return (
         <>
@@ -262,9 +284,11 @@ const TableModal = <T extends TableRow = TableRow>({selectedRow, onClose, docNam
                         <button type="button" onClick={handleDelete} className={styles.deleteBtn} disabled={isDeleting}>
                             <div className={styles.icon}><Delete/></div> {isDeleting ? "Удаление..." : "Удалить"}
                         </button>
-                        <button type="button" className={styles.actionBtn} onClick={() => setPrintOpen(true)}>
-                            <div className={styles.icon}><Print/></div> Печать
-                        </button>
+                        {canPrint && (
+                            <button type="button" className={styles.actionBtn} onClick={() => setPrintOpen(true)}>
+                                <div className={styles.icon}><Print/></div> Печать
+                            </button>
+                        )}
                         <button type="button" className={styles.actionBtn}>
                             <div className={styles.icon}><Tree/></div> Дерево
                         </button>

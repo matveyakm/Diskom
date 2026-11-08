@@ -161,6 +161,9 @@ const DataTable = <T extends TableRow = TableRow>({
                 <TableModal
                     selectedRow={selectedRow}
                     onClose={close}
+                    // После сохранения/проведения — просмотр записанной строки
+                    // (openForEdit без флага правок открывается просмотром).
+                    onSavedRow={(row) => openForEdit(row)}
                     docName={docName ?? "Документ"}
                     fields={fields ?? []}
                     blocks={blocks}
