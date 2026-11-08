@@ -71,7 +71,7 @@ func materializeForTest(t *testing.T, raw string, record map[string]any, slots r
 		slots = report.Slots{}
 	}
 	r := &CRUDRepository[struct{}]{ReportSlots: slots}
-	got, images, err := r.materializePrint(tpl, record, r.ReportSlots)
+	got, images, _, err := r.materializePrint(tpl, record, r.ReportSlots)
 	if err != nil {
 		t.Fatalf("materialize: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestMaterializeIf(t *testing.T) {
 	// Отсутствующее поле — громкая ошибка, а не false.
 	tpl := mustParsePrint(t, raw)
 	r := &CRUDRepository[struct{}]{}
-	if _, _, err := r.materializePrint(tpl, map[string]any{}, r.ReportSlots); err == nil {
+	if _, _, _, err := r.materializePrint(tpl, map[string]any{}, r.ReportSlots); err == nil {
 		t.Fatal("missing field must fail loudly")
 	}
 	// Вложенный if.
@@ -157,7 +157,7 @@ func TestMaterializeSlot(t *testing.T) {
 	// Нет filler-а — громко.
 	tpl := mustParsePrint(t, raw)
 	r := &CRUDRepository[struct{}]{ReportSlots: report.Slots{}}
-	if _, _, err := r.materializePrint(tpl, map[string]any{}, r.ReportSlots); err == nil {
+	if _, _, _, err := r.materializePrint(tpl, map[string]any{}, r.ReportSlots); err == nil {
 		t.Fatal("missing filler must fail loudly")
 	}
 	// Не-байты — громко.
@@ -166,7 +166,7 @@ func TestMaterializeSlot(t *testing.T) {
 			return "not-bytes", nil
 		},
 	}}
-	if _, _, err := r2.materializePrint(mustParsePrint(t, raw), map[string]any{}, r2.ReportSlots); err == nil {
+	if _, _, _, err := r2.materializePrint(mustParsePrint(t, raw), map[string]any{}, r2.ReportSlots); err == nil {
 		t.Fatal("non-bytes slot must fail")
 	}
 }
@@ -202,7 +202,7 @@ func TestMaterializeTableSlot(t *testing.T) {
 	r := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
 		"staff": func(ctx report.Ctx, p report.Params) (any, error) { return rows, nil },
 	}}
-	got, _, err := r.materializePrint(mustParsePrint(t, raw), map[string]any{}, r.ReportSlots)
+	got, _, _, err := r.materializePrint(mustParsePrint(t, raw), map[string]any{}, r.ReportSlots)
 	if err != nil {
 		t.Fatalf("materialize: %v", err)
 	}
@@ -220,13 +220,13 @@ func TestMaterializeTableSlot(t *testing.T) {
 	}}
 	slotRaw := mustParsePrint(t, `{"blocks": [
 	  {"type": "table", "slot": "s", "columns": [{"field": "a", "label": "A"}]}]}`)
-	if _, _, err := r2.materializePrint(slotRaw, map[string]any{}, r2.ReportSlots); err == nil {
+	if _, _, _, err := r2.materializePrint(slotRaw, map[string]any{}, r2.ReportSlots); err == nil {
 		t.Fatal("non-rows must fail")
 	}
 	r3 := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
 		"s": func(ctx report.Ctx, p report.Params) (any, error) { return []map[string]any{}, nil },
 	}}
-	got3, _, err3 := r3.materializePrint(slotRaw, map[string]any{}, r3.ReportSlots)
+	got3, _, _, err3 := r3.materializePrint(slotRaw, map[string]any{}, r3.ReportSlots)
 	if err3 != nil {
 		t.Fatalf("empty materialize: %v", err3)
 	}
@@ -234,7 +234,7 @@ func TestMaterializeTableSlot(t *testing.T) {
 		t.Fatalf("empty must stay empty-non-nil: %+v", got3.Blocks)
 	}
 	// Рендеры собирают слот-таблицу (шапка + 2 строки, плейсхолдеры по ряду).
-	tpl, _, err := r.materializePrint(mustParsePrint(t, `{"blocks": [
+	tpl, _, _, err := r.materializePrint(mustParsePrint(t, `{"blocks": [
 	  {"type": "table", "slot": "s", "header": true, "borders": false,
 	   "columns": [{"field": "d", "label": "Дата"}, {"text": "N={{n}}", "label": "N"}]}
 	]}`), map[string]any{}, report.Slots{

@@ -261,7 +261,7 @@ func TestPrintImageSrcOrFieldOnly(t *testing.T) {
 	}
 	// Шаблон символики без картинок обязан парситься (логотипы вернутся
 	// с новым дизайном печати; сейчас — текстовый приказ).
-	raw, err := os.ReadFile("../../document/ms_symbolism_document/templates/print.json")
+	raw, err := os.ReadFile("../../document/ms_symbolism_document/print/print.json")
 	if err != nil {
 		t.Fatalf("symbolism template unreadable: %v", err)
 	}

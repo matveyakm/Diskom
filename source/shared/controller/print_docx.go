@@ -47,6 +47,44 @@ func printDocxFont(fam string) string {
 // \n внутри текста — разрыв строки (<w:br/>), \t — табуляция (<w:tab/>):
 // так шаблоны выражают и жёсткие переносы, и ведущий таб абзаца.
 func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool, fam string) string {
+	return printDocxRunSpans([]printTextSpan{{Text: text}}, s, defSize, defBold, fam)
+}
+
+// printDocxRunSpans — то же по кускам: куски с Error красятся красным
+// (подстановки ОШИБКА вместо отсутствующих данных). Без ошибочных кусков
+// байт-в-байт равен printDocxRun склейки (fast path ниже).
+func printDocxRunSpans(segs []printTextSpan, s printTextStyle, defSize float64, defBold bool, fam string) string {
+	plain := true
+	for _, sg := range segs {
+		if sg.Error {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		var sb strings.Builder
+		for _, sg := range segs {
+			sb.WriteString(sg.Text)
+		}
+		return printDocxRunJoined(sb.String(), s, defSize, defBold, fam)
+	}
+	var b strings.Builder
+	for _, sg := range segs {
+		st := s
+		if sg.Error {
+			st.Color = printErrorColor
+			st.Bold = true
+		}
+		b.WriteString(printDocxRunJoined(sg.Text, st, defSize, defBold, fam))
+	}
+	return b.String()
+}
+
+// printErrorColor — красное для подстановок ОШИБКА (RRGGBB, как в валидации).
+const printErrorColor = "FF0000"
+
+// printDocxRunJoined — тело printDocxRun: единый ран на весь текст.
+func printDocxRunJoined(text string, s printTextStyle, defSize float64, defBold bool, fam string) string {
 	style := ""
 	if defBold || s.Bold {
 		style += `<w:b/>`
@@ -86,7 +124,12 @@ func printDocxRun(text string, s printTextStyle, defSize float64, defBold bool, 
 
 // printDocxPara — абзац. center/right/justify через jc; отступы и интервалы
 // в twips (1 мм = 56.7; line 240/360/480 = single/1.5/double).
+// Куски с Error красятся красным (подстановки ОШИБКА).
 func printDocxPara(text string, s printTextStyle, defSize float64, defBold bool, fam string) string {
+	return printDocxParaSpans([]printTextSpan{{Text: text}}, s, defSize, defBold, fam)
+}
+
+func printDocxParaSpans(segs []printTextSpan, s printTextStyle, defSize float64, defBold bool, fam string) string {
 	jc := ""
 	switch s.Align {
 	case "center":
@@ -120,26 +163,39 @@ func printDocxPara(text string, s printTextStyle, defSize float64, defBold bool,
 	sp += `/>`
 	return fmt.Sprintf(
 		`<w:p><w:pPr>%s%s%s</w:pPr>%s</w:p>`,
-		jc, ind, sp, printDocxRun(text, s, defSize, defBold, fam),
+		jc, ind, sp, printDocxRunSpans(segs, s, defSize, defBold, fam),
 	)
 }
 
 func printDocxCell(text string, s printTextStyle, defBold bool, size float64, align string, fam string) string {
-	style := ""
-	if defBold || s.Bold {
-		style += `<w:b/>`
-	}
-	if s.Italic {
-		style += `<w:i/>`
-	}
-	if s.Underline {
-		style += `<w:u w:val="single"/>`
-	}
-	if s.Color != "" {
-		style += `<w:color w:val="` + strings.ToUpper(s.Color) + `"/>`
-	}
+	return printDocxCellSpans([]printTextSpan{{Text: text}}, s, defBold, size, align, fam)
+}
+
+func printDocxCellSpans(segs []printTextSpan, s printTextStyle, defBold bool, size float64, align string, fam string) string {
+	// Порядок тегов — как был: b, i, u, color. Иначе золотые тесты
+	// и побайтовые сверки поплывут (см. fast path ниже).
 	if s.Size != 0 {
 		size = s.Size
+	}
+	sz := fmt.Sprintf("%d", int(size*2))
+	styleFor := func(extraBold bool, extraColor string) string {
+		style := ""
+		if defBold || s.Bold || extraBold {
+			style += `<w:b/>`
+		}
+		if s.Italic {
+			style += `<w:i/>`
+		}
+		if s.Underline {
+			style += `<w:u w:val="single"/>`
+		}
+		if s.Color != "" {
+			style += `<w:color w:val="` + strings.ToUpper(s.Color) + `"/>`
+		}
+		if extraColor != "" {
+			style += `<w:color w:val="` + extraColor + `"/>`
+		}
+		return style
 	}
 	jc := ""
 	switch align {
@@ -155,9 +211,49 @@ func printDocxCell(text string, s printTextStyle, defBold bool, size float64, al
 	if jc != "" {
 		ppr = `<w:pPr>` + jc + `</w:pPr>`
 	}
+	var runs strings.Builder
+	emit := func(text, color string, bold bool) {
+		st := styleFor(bold, color)
+		for i, part := range strings.Split(text, "\n") {
+			if i > 0 {
+				runs.WriteString(`<w:r><w:rPr>` + st + `<w:sz w:val="` + sz + `"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/></w:rPr><w:br/></w:r>`)
+			}
+			sub := strings.Split(part, "\t")
+			for j, chunk := range sub {
+				if j > 0 {
+					runs.WriteString(`<w:r><w:rPr>` + st + `<w:sz w:val="` + sz + `"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/></w:rPr><w:tab/></w:r>`)
+				}
+				if chunk != "" {
+					runs.WriteString(`<w:r><w:rPr>` + st + `<w:sz w:val="` + sz + `"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/></w:rPr><w:t xml:space="preserve">` + xmlEscape(chunk) + `</w:t></w:r>`)
+				}
+			}
+		}
+	}
+	plain := true
+	for _, sg := range segs {
+		if sg.Error {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		var sb strings.Builder
+		for _, sg := range segs {
+			sb.WriteString(sg.Text)
+		}
+		emit(sb.String(), "", defBold)
+	} else {
+		for _, sg := range segs {
+			color := ""
+			if sg.Error {
+				color = printErrorColor
+			}
+			emit(sg.Text, color, defBold || sg.Error)
+		}
+	}
 	return fmt.Sprintf(
-		`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p>%s<w:r><w:rPr>%s<w:sz w:val="%d"/><w:rFonts w:ascii="%s" w:hAnsi="%s"/></w:rPr><w:t xml:space="preserve">%s</w:t></w:r></w:p></w:tc>`,
-		ppr, style, int(size*2), fam, fam, xmlEscape(text),
+		`<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p>%s%s</w:p></w:tc>`,
+		ppr, runs.String(),
 	)
 }
 
@@ -207,7 +303,7 @@ func printDocxContentTwips(tpl *printTemplate) int {
 // printDocxTable — шапка + N строк данных (одна строка — вырожденный случай).
 // defSize — размер блока (дефолт 11пт с call site); колонка без своего Size
 // наследует его, а не 0 (иначе текст невидим в Word — w:sz=0).
-func printDocxTable(headers []string, rows [][]string, styles []printTextStyle, widths []int, header, borders bool, fam string, defSize float64) string {
+func printDocxTable(headers []string, rows [][][]printTextSpan, styles []printTextStyle, widths []int, header, borders bool, fam string, defSize float64) string {
 	var b strings.Builder
 	// Фиксированная раскладка: колонки строго по gridCol. При auto (дефолт
 	// Word) ширины игнорируются и колонки сжимаются по контенту — ячейки
@@ -230,8 +326,8 @@ func printDocxTable(headers []string, rows [][]string, styles []printTextStyle, 
 	}
 	for _, values := range rows {
 		b.WriteString(`<w:tr>`)
-		for i, v := range values {
-			b.WriteString(printDocxCell(v, styles[i], false, defSize, styles[i].Align, fam))
+		for i, cell := range values {
+			b.WriteString(printDocxCellSpans(cell, styles[i], false, defSize, styles[i].Align, fam))
 		}
 		b.WriteString(`</w:tr>`)
 	}
@@ -362,8 +458,10 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 	var body strings.Builder
 
 	tplFam := printDocxFont(printFontFamily(tpl, printTextStyle{}))
-	if strings.TrimSpace(renderPrintText(tpl.Title, record)) != "" {
-		body.WriteString(printDocxPara(renderPrintText(tpl.Title, record),
+	labels := printFieldLabels(tpl)
+	titleSegs := renderPrintTextSpans(tpl.Title, record, labels)
+	if strings.TrimSpace(joinPrintSpans(titleSegs)) != "" {
+		body.WriteString(printDocxParaSpans(titleSegs,
 			printTextStyle{Bold: true, Align: "center"}, 16, true, tplFam))
 	}
 	for _, b := range tpl.Blocks {
@@ -373,7 +471,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			if b.Size != 0 {
 				size = b.Size
 			}
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, size, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
+			body.WriteString(printDocxParaSpans(renderPrintTextSpans(b.Text, record, labels), b.printTextStyle, size, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 		case "field":
 			if strings.TrimSpace(stringifyPrintValue(record[b.Field])) == "" {
 				continue
@@ -382,18 +480,18 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 			body.WriteString(printDocxPara(
 				b.Label+": "+stringifyPrintValue(record[b.Field]), b.printTextStyle, 11, false, fam))
 		case "text":
-			body.WriteString(printDocxPara(renderPrintText(b.Text, record), b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
+			body.WriteString(printDocxParaSpans(renderPrintTextSpans(b.Text, record, labels), b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 		case "list":
 			for i, item := range b.Items {
-				rendered := renderPrintText(item, record)
-				if rendered == "" {
+				rendered := renderPrintTextSpans(item, record, labels)
+				if joinPrintSpans(rendered) == "" {
 					continue
 				}
 				prefix := "• "
 				if b.Ordered {
 					prefix = fmt.Sprintf("%d. ", i+1)
 				}
-				body.WriteString(printDocxPara(prefix+rendered, b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
+				body.WriteString(printDocxParaSpans(append([]printTextSpan{{Text: prefix}}, rendered...), b.printTextStyle, 11, false, printDocxFont(printFontFamily(tpl, b.printTextStyle))))
 			}
 		case "image":
 			img, ok := images[b.imageKey()]
@@ -439,7 +537,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 				if b.Size != 0 {
 					tsize = b.Size
 				}
-				body.WriteString(printDocxPara(renderPrintText(b.Title, record),
+				body.WriteString(printDocxParaSpans(renderPrintTextSpans(b.Title, record, labels),
 					printTextStyle{Bold: true}, tsize, true, tblFam))
 			}
 			if len(b.Columns) > 0 {
@@ -451,20 +549,21 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 					styles = append(styles, printColumnStyle(tpl, b.printTextStyle, c))
 				}
 				// Обычная таблица — одна строка из записи; слот-таблица —
-				// по строке на каждый материализованный ряд.
-				var rows [][]string
+				// по строке на каждый материализованный ряд. Слот-колонкам
+				// strict запрещён валидацией — там ошибок быть не может.
+				var rows [][][]printTextSpan
 				if b.RowsData != nil {
 					for _, entry := range b.RowsData {
-						values := make([]string, 0, len(b.Columns))
+						values := make([][]printTextSpan, 0, len(b.Columns))
 						for _, c := range b.Columns {
-							values = append(values, printColumnValueFor(c, entry))
+							values = append(values, []printTextSpan{{Text: printColumnValueFor(c, entry)}})
 						}
 						rows = append(rows, values)
 					}
 				} else {
-					values := make([]string, 0, len(b.Columns))
+					values := make([][]printTextSpan, 0, len(b.Columns))
 					for _, c := range b.Columns {
-						values = append(values, printColumnValue(c, record))
+						values = append(values, printColumnValueSpans(c, record, labels))
 					}
 					rows = append(rows, values)
 				}
@@ -490,7 +589,7 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 		}
 	}
 	if tpl.Footer != "" {
-		body.WriteString(printDocxPara(renderPrintText(tpl.Footer, record),
+		body.WriteString(printDocxParaSpans(renderPrintTextSpans(tpl.Footer, record, labels),
 			printTextStyle{Align: "center", Color: "808080"}, 9, false, tplFam))
 	}
 
@@ -598,10 +697,10 @@ func renderPrintDOCX(tpl *printTemplate, record map[string]any, images map[strin
 		{"word/styles.xml", printDocxStyles(tplFam)},
 	}
 	if showFooter {
-		parts = append(parts, docxPart{"word/footer1.xml", printDocxFooter(tpl.Footer, tpl.printPageNum() == "footer", tplFam)})
+		parts = append(parts, docxPart{"word/footer1.xml", printDocxFooterSpans(renderPrintTextSpans(tpl.Footer, record, labels), tpl.printPageNum() == "footer", tplFam)})
 	}
 	if showHeader {
-		parts = append(parts, docxPart{"word/header1.xml", printDocxHeader(tpl.Header, tpl.printPageNum() == "header", tplFam)})
+		parts = append(parts, docxPart{"word/header1.xml", printDocxHeaderSpans(renderPrintTextSpans(tpl.Header, record, labels), tpl.printPageNum() == "header", tplFam)})
 	}
 
 	var buf bytes.Buffer
@@ -641,6 +740,16 @@ func printDocxStyles(fam string) string {
 		`</w:styles>`
 }
 
+// printDocxGrayRun — серый ран колонтитула (ошибочный кусок — красным).
+func printDocxGrayRun(text string, fam string, isErr bool) string {
+	color := "808080"
+	if isErr {
+		color = printErrorColor
+	}
+	return `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="` + color + `"/></w:rPr><w:t xml:space="preserve">` +
+		xmlEscape(text) + `</w:t></w:r>`
+}
+
 // printDocxHeader — колонтитул верха: текст и/или номер страницы.
 // fldSimple содержит кэшированное значение (пустой fldSimple без runs
 // Word считает битым и предлагает восстановить документ).
@@ -658,12 +767,70 @@ func printDocxHeader(text string, withPage bool, fam string) string {
 		`<w:p><w:pPr><w:jc w:val="center"/></w:pPr>` + inner + `</w:p></w:hdr>`
 }
 
+func printDocxHeaderSpans(segs []printTextSpan, withPage bool, fam string) string {
+	plain := true
+	var sb strings.Builder
+	for _, sg := range segs {
+		if sg.Error {
+			plain = false
+			break
+		}
+		sb.WriteString(sg.Text)
+	}
+	if plain {
+		return printDocxHeader(sb.String(), withPage, fam)
+	}
+	inner := ""
+	for _, sg := range segs {
+		if sg.Text == "" {
+			continue
+		}
+		inner += printDocxGrayRun(sg.Text+" ", fam, sg.Error)
+	}
+	if withPage {
+		inner += `<w:fldSimple w:instr=" PAGE "><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">1</w:t></w:r></w:fldSimple>`
+	}
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+		`<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+		`<w:p><w:pPr><w:jc w:val="center"/></w:pPr>` + inner + `</w:p></w:hdr>`
+}
+
 // printDocxFooter — колонтитул низа: текст и/или "Стр. N".
 func printDocxFooter(text string, withPage bool, fam string) string {
 	inner := ""
 	if text != "" {
 		inner = `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">` +
 			xmlEscape(text) + ` </w:t></w:r>`
+	}
+	if withPage {
+		inner += `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr>` +
+			`<w:t xml:space="preserve">Стр. </w:t></w:r>` +
+			`<w:fldSimple w:instr=" PAGE "><w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr><w:t xml:space="preserve">1</w:t></w:r></w:fldSimple>`
+	}
+	return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+		`<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+		`<w:p><w:pPr><w:jc w:val="center"/></w:pPr>` + inner + `</w:p></w:ftr>`
+}
+
+func printDocxFooterSpans(segs []printTextSpan, withPage bool, fam string) string {
+	plain := true
+	var sb strings.Builder
+	for _, sg := range segs {
+		if sg.Error {
+			plain = false
+			break
+		}
+		sb.WriteString(sg.Text)
+	}
+	if plain {
+		return printDocxFooter(sb.String(), withPage, fam)
+	}
+	inner := ""
+	for _, sg := range segs {
+		if sg.Text == "" {
+			continue
+		}
+		inner += printDocxGrayRun(sg.Text+" ", fam, sg.Error)
 	}
 	if withPage {
 		inner += `<w:r><w:rPr><w:sz w:val="18"/><w:rFonts w:ascii="` + fam + `" w:hAnsi="` + fam + `"/><w:color w:val="808080"/></w:rPr>` +

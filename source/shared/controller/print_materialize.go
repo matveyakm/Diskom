@@ -45,22 +45,25 @@ func templateNeedsAssembly(tpl *printTemplate) bool {
 
 // materializePrint resolves if-branches against record and fills slot images
 // via filler funcs. Missing filler for a TAKEN branch — громкая 500;
-// слот в невзятой ветке не трогается вообще. Возвращает статический шаблон
-// и байты слот-картинок (ключ "slot:"+name).
+// слот в невзятой ветке не трогается вообще. Возвращает статический шаблон,
+// байты слот-картинок (ключ "slot:"+name) и несмертельные проблемы данных:
+// DOCX-путь подменяет их заглушками (чёрный квадрат / шапка без строк),
+// PDF-путь роняет сборку списком.
 func (r *CRUDRepository[T]) materializePrint(
 	tpl *printTemplate,
 	record map[string]any,
 	slots map[string]report.SlotFunc,
-) (*printTemplate, map[string][]byte, error) {
+) (*printTemplate, map[string][]byte, []PrintProblem, error) {
 	images := make(map[string][]byte)
 	filled := make(map[string]bool)
-	blocks, err := r.materializeBlocks(tpl.Blocks, "print template", record, slots, images, filled)
+	var problems []PrintProblem
+	blocks, err := r.materializeBlocks(tpl.Blocks, "print template", record, slots, images, filled, &problems)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	out := *tpl
 	out.Blocks = blocks
-	return &out, images, nil
+	return &out, images, problems, nil
 }
 
 func (r *CRUDRepository[T]) materializeBlocks(
@@ -70,6 +73,7 @@ func (r *CRUDRepository[T]) materializeBlocks(
 	slots map[string]report.SlotFunc,
 	images map[string][]byte,
 	filled map[string]bool,
+	problems *[]PrintProblem,
 ) ([]printBlock, error) {
 	out := make([]printBlock, 0, len(blocks))
 	for i, b := range blocks {
@@ -85,7 +89,7 @@ func (r *CRUDRepository[T]) materializeBlocks(
 				which = "else"
 				branch = *b.Else
 			}
-			sub, err := r.materializeBlocks(branch, here+"."+which, record, slots, images, filled)
+			sub, err := r.materializeBlocks(branch, here+"."+which, record, slots, images, filled, problems)
 			if err != nil {
 				return nil, err
 			}
@@ -101,14 +105,23 @@ func (r *CRUDRepository[T]) materializeBlocks(
 				// Параметры — из первого вхождения дырки (имя = те же байты).
 				val, err := fn(r.reportContext(record), report.Params(b.SlotParams))
 				if err != nil {
-					return nil, fmt.Errorf("%s: slot %q: %w", here, b.Slot, err)
+					// Данные битые/нет — не роняем: чёрный квадрат в DOCX,
+					// список в PDF (см. handlePrintBuild).
+					*problems = append(*problems, PrintProblem{
+						Kind:    "image",
+						Ref:     b.Slot,
+						Message: err.Error(),
+					})
+					images["slot:"+b.Slot] = printFallbackSquare()
+					filled[b.Slot] = true
+				} else {
+					raw, ok := val.([]byte)
+					if !ok || len(raw) == 0 {
+						return nil, fmt.Errorf("%s: slot %q must return non-empty image bytes", here, b.Slot)
+					}
+					images["slot:"+b.Slot] = raw
+					filled[b.Slot] = true
 				}
-				raw, ok := val.([]byte)
-				if !ok || len(raw) == 0 {
-					return nil, fmt.Errorf("%s: slot %q must return non-empty image bytes", here, b.Slot)
-				}
-				images["slot:"+b.Slot] = raw
-				filled[b.Slot] = true
 			}
 		}
 		if b.Type == "table" && b.Slot != "" {
@@ -121,7 +134,15 @@ func (r *CRUDRepository[T]) materializeBlocks(
 			}
 			val, err := fn(r.reportContext(record), report.Params(b.SlotParams))
 			if err != nil {
-				return nil, fmt.Errorf("%s: slot %q: %w", here, b.Slot, err)
+				*problems = append(*problems, PrintProblem{
+					Kind:    "table",
+					Ref:     b.Slot,
+					Message: err.Error(),
+				})
+				nb := b
+				nb.RowsData = []map[string]any{}
+				out = append(out, nb)
+				continue
 			}
 			rows, err := normalizeSlotRows(val)
 			if err != nil {

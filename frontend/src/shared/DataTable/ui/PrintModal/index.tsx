@@ -1,7 +1,8 @@
 import {createPortal} from "react-dom";
 import {useEffect, useState} from "react";
+import type {ReactNode} from "react";
 import styles from "./PrintModal.module.scss";
-import {buildPrint, downloadPrint, PrintFormat} from "@/shared/api/printApi";
+import {buildPrint, downloadPrint, extractPrintProblems, PrintFormat} from "@/shared/api/printApi";
 import {describeActionError} from "@/shared/api/actionPipeline";
 
 interface PrintModalProps {
@@ -13,6 +14,31 @@ interface PrintModalProps {
 
 type Phase = "select" | "building" | "ready" | "error";
 
+// Ошибка сборки со списком проблем: PDF роняет сборку списком (править руками
+// PDF нельзя), DOCX-остатки — тоже списком, но файл при этом собирается.
+// Хинт зависит от формата, в котором упало.
+const printBuildMessage = (err: unknown, format: PrintFormat): ReactNode => {
+    const problems = extractPrintProblems(err);
+    if (!problems) {
+        return `Не удалось собрать документ (${describeActionError(err)}).`;
+    }
+    return (
+        <>
+            <div>Не удалось собрать документ в формате {format.toUpperCase()}:</div>
+            <ul>
+                {problems.map((p, i) => (
+                    <li key={`${p.kind}-${p.ref}-${i}`}>
+                        {p.label || p.ref}: {p.message}
+                    </li>
+                ))}
+            </ul>
+            <div>{format === "pdf"
+                ? "Попробуйте распечатать в формате DOCX."
+                : "Используйте аккуратно!"}</div>
+        </>
+    );
+};
+
 // Модалка печати: выбор формата → "Распечатать" (POST ?print= собирает
 // файл на бэкенде) → иконка файла с размером → клик скачивает
 // (PDF открывается в новой вкладке, DOCX — через download).
@@ -21,7 +47,7 @@ export const PrintModal = ({docName, rowId, docTitle, onClose}: PrintModalProps)
     const [format, setFormat] = useState<PrintFormat>("pdf");
     const [phase, setPhase] = useState<Phase>("select");
     const [meta, setMeta] = useState<{ token: string; size: number; filename: string } | null>(null);
-    const [error, setError] = useState("");
+    const [error, setError] = useState<ReactNode>(null);
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -33,13 +59,13 @@ export const PrintModal = ({docName, rowId, docTitle, onClose}: PrintModalProps)
     const handleBuild = async () => {
         if (!docName) return;
         setPhase("building");
-        setError("");
+        setError(null);
         try {
             const m = await buildPrint(docName, format, rowId);
             setMeta({token: m.token, size: m.size, filename: m.filename});
             setPhase("ready");
         } catch (err) {
-            setError(`Не удалось собрать документ (${describeActionError(err)}).`);
+            setError(printBuildMessage(err, format));
             setPhase("error");
         }
     };

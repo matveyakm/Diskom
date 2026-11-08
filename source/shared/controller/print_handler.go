@@ -70,9 +70,10 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	// идёт старым путём побайтово так же, как раньше.
 	plainTpl := tpl
 	var slotImages map[string][]byte
+	var problems []PrintProblem
 	if templateNeedsAssembly(tpl) {
 		var merr error
-		plainTpl, slotImages, merr = r.materializePrint(tpl, row, r.ReportSlots)
+		plainTpl, slotImages, problems, merr = r.materializePrint(tpl, row, r.ReportSlots)
 		if merr != nil {
 			r.writeError(w, "Cannot assemble report: "+merr.Error(), http.StatusInternalServerError)
 			return
@@ -82,12 +83,10 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	// Имена вместо id: подменяем до рендера (fail-open внутри).
 	record := resolvePrintRefs(row, plainTpl, r.httpClient)
 
-	// Обязательные поля шаблона ({{x!}}): пустое значение — честная ошибка
-	// сборки, а не дыра в документе. Пользователь раньше замечает проблему
-	// и зовёт администратора, чем подписывает неверный приказ.
-	if err := validatePrintRow(plainTpl, record); err != nil {
-		r.writeError(w, "Cannot print: "+err.Error(), http.StatusInternalServerError)
-		return
+	// Строгие плейсхолдеры ({{x!}}): пустое значение — несмертельная проблема
+	// (красная ОШИБКА в DOCX, список в PDF), а не аварийный останов.
+	for _, p := range collectPrintProblems(plainTpl, record) {
+		problems = append(problems, p)
 	}
 
 	// Картинки шаблона — заранее (битый файл — 500, операторская ошибка).
@@ -130,18 +129,34 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 			// а не рвём сборку: логотип может появиться позже.
 			continue
 		}
-		img, mime, err := fileBytesForPrint(r.db, fileID, id)
+		img, _, err := fileBytesForPrint(r.db, fileID, id)
 		if err != nil {
-			r.writeError(w, "Failed to load print image: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if mime == "application/pdf" {
-			// Блок image умеет только растр (png/jpg): PDF прикрепили не туда.
-			// Громкая 500 с именем поля вместо битого документа (философия).
-			r.writeError(w, "Failed to load print image: field "+b.Field+" is PDF, want png|jpg", http.StatusInternalServerError)
-			return
+			// Данные битые/нет (включая чужой файл и PDF вместо картинки) —
+			// не роняем: чёрный квадрат в DOCX, список в PDF (см. ниже).
+			// Решение пользователя: устойчивость важнее строгости,
+			// недостающее допишет руками поверх квадрата.
+			label := b.Field
+			if l := printFieldLabels(plainTpl)[b.Field]; l != "" {
+				label = l
+			}
+			problems = append(problems, PrintProblem{
+				Kind:    "image",
+				Ref:     b.Field,
+				Label:   label,
+				Message: err.Error(),
+			})
+			images[b.imageKey()] = printFallbackSquare()
+			continue
 		}
 		images[b.imageKey()] = img
+	}
+
+	// PDF править руками нельзя — при проблемах роняем сборку списком,
+	// а не молчаливым неверным документом. DOCX идёт на рендер как есть:
+	// красные ОШИБКА и чёрные квадраты уже на местах.
+	if format == "pdf" && len(problems) > 0 {
+		r.writePrintProblems(w, format, problems)
+		return
 	}
 
 	var (
@@ -173,6 +188,17 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 		Filename: filename,
 		Mime:     mime,
 	}, http.StatusOK)
+}
+
+// writePrintProblems отвечает 500 со списком несмертельных проблем сборки.
+// Только PDF-путь: PDF править руками нельзя, поэтому вместо молчаливого
+// неверного документа — честный список. DOCX вместо этого подменяет
+// заглушки (красная ОШИБКА, чёрный квадрат) и отдаёт 200.
+func (r *CRUDRepository[T]) writePrintProblems(w http.ResponseWriter, format string, problems []PrintProblem) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	msg := fmt.Sprintf("print %s blocked by %d data problem(s)", format, len(problems))
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": msg, "details": problems})
 }
 
 // handlePrintFile отдаёт готовый файл разово (повторный GET — 404).

@@ -38,10 +38,13 @@ package restController
 // оператора, запечённая в образ).
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
 	"log"
 	"net/http"
 	"os"
@@ -129,6 +132,15 @@ func printColumnValueFor(c printBlockColumn, row map[string]any) string {
 		return renderPrintText(c.Text, row)
 	}
 	return stringifyPrintValue(row[c.Field])
+}
+
+// printColumnValueSpans — то же кусками (красная ОШИБКА вместо пустого
+// strict-поля). Без ошибок склейка равна printColumnValue.
+func printColumnValueSpans(c printBlockColumn, row map[string]any, labels map[string]string) []printTextSpan {
+	if c.Text != "" {
+		return renderPrintTextSpans(c.Text, row, labels)
+	}
+	return []printTextSpan{{Text: stringifyPrintValue(row[c.Field])}}
 }
 
 // printBlock — один презентационный блок шаблона.
@@ -636,6 +648,16 @@ func stringifyPrintValue(v any) string {
 	return fmt.Sprintf("%v", v)
 }
 
+// joinPrintSpans склеивает куски в плоский текст (для проверок пустоты
+// и мест, где красное не нужно — например, префикс пунктов списка).
+func joinPrintSpans(segs []printTextSpan) string {
+	var sb strings.Builder
+	for _, sg := range segs {
+		sb.WriteString(sg.Text)
+	}
+	return sb.String()
+}
+
 // renderPrintText подставляет {{field}} из строки (отсутствующее — "").
 // Суффикс ! ({{field!}}) помечает обязательное поле: само значение всё равно
 // подставляется как есть (пустое — пусто), а проверка обязательности делается
@@ -647,12 +669,79 @@ func renderPrintText(s string, row map[string]any) string {
 	})
 }
 
-// validatePrintRow проверяет обязательные плейсхолдеры ({{field!}}):
-// отсутствующее или пустое значение — это ошибка сборки документа, а не
-// пустая строка. Честная ошибка вместо молчаливого неверного документа:
-// пользователь раньше замечает и зовёт администратора, а не подписывает
-// приказ с дырами. Пустая строка считается отсутствием (пробелы тримятся).
+// validatePrintRow проверяет обязательные плейсхолдеры ({{field!}}).
+// Тонкий контракт поверх сборщика: первая проблема — честной ошибкой
+// (PDF-путь и старые тесты пользуются этим).
 func validatePrintRow(tpl *printTemplate, row map[string]any) error {
+	if problems := collectPrintProblems(tpl, row); len(problems) > 0 {
+		return fmt.Errorf("print template: required field %q is empty", problems[0].Ref)
+	}
+	return nil
+}
+
+// PrintProblem — одна несмертельная проблема сборки печатной формы.
+// DOCX-путь подменяет её заглушкой прямо в документе (красная ОШИБКА /
+// чёрный квадрат) и отдаёт 200; PDF-путь роняет сборку со списком таких.
+// Kind: "field" — пустое обязательное поле {{x!}}; "image"/"slot" — битая
+// или отсутствующая картинка; "table" — слот-таблица без строк из-за ошибки
+// филлера. Label — человеческое имя из шаблона (label блока/колонки),
+// Ref — техническое имя (поле/слот). Громко (500 в обоих форматах) остаются
+// только ошибки оператора и целостности: битый шаблон, незарегистрированный
+// слот, src-файл шаблона, плохой id, нет шаблона/строки.
+type PrintProblem struct {
+	Kind    string `json:"kind"`
+	Ref     string `json:"ref"`
+	Label   string `json:"label,omitempty"`
+	Message string `json:"message"`
+}
+
+// printFieldLabels собирает человеческие имена полей из шаблона: label
+// field-блоков, подписи колонок и строк вертикальных таблиц. Первое
+// совпадение побеждает; нет label — остаётся техническое имя.
+func printFieldLabels(tpl *printTemplate) map[string]string {
+	labels := map[string]string{}
+	put := func(field, label string) {
+		if field == "" || label == "" {
+			return
+		}
+		if _, ok := labels[field]; !ok {
+			labels[field] = label
+		}
+	}
+	var walk func(blocks []printBlock)
+	walk = func(blocks []printBlock) {
+		for i := range blocks {
+			b := &blocks[i]
+			if b.Type == "field" {
+				put(b.Field, b.Label)
+			}
+			for _, c := range b.Columns {
+				put(c.Field, c.Label)
+			}
+			for _, r := range b.Rows {
+				put(r.Field, r.Label)
+			}
+			walk(b.Then)
+			if b.Else != nil {
+				walk(*b.Else)
+			}
+		}
+	}
+	walk(tpl.Blocks)
+	return labels
+}
+
+// isPrintFieldEmpty — пустота значения строки для strict-проверки:
+// отсутствующее, пробелы, нулевое время. Один предикат на сборщик
+// и рендер, чтобы не разъехались.
+func isPrintFieldEmpty(row map[string]any, name string) bool {
+	return strings.TrimSpace(stringifyPrintValue(row[name])) == ""
+}
+
+// collectPrintProblems собирает ВСЕ пустые strict-поля шаблона ({{field!}}),
+// а не роняет сборку на первом. Пустые опциональные поля — не проблемы:
+// пропуск молча (приказ не печатает «Основание: ») — так задумано.
+func collectPrintProblems(tpl *printTemplate, row map[string]any) []PrintProblem {
 	var texts []string
 	texts = append(texts, tpl.Title, tpl.Header, tpl.Footer)
 	for _, b := range tpl.Blocks {
@@ -662,6 +751,8 @@ func validatePrintRow(tpl *printTemplate, row map[string]any) error {
 			texts = append(texts, c.Text)
 		}
 	}
+	labels := printFieldLabels(tpl)
+	var out []PrintProblem
 	seen := make(map[string]bool)
 	for _, t := range texts {
 		for _, m := range rePrintPlaceholder.FindAllStringSubmatch(t, -1) {
@@ -673,12 +764,68 @@ func validatePrintRow(tpl *printTemplate, row map[string]any) error {
 				continue
 			}
 			seen[name] = true
-			if strings.TrimSpace(stringifyPrintValue(row[name])) == "" {
-				return fmt.Errorf("print template: required field %q is empty", name)
+			if isPrintFieldEmpty(row, name) {
+				out = append(out, PrintProblem{
+					Kind:    "field",
+					Ref:     name,
+					Label:   labels[name],
+					Message: "пустое обязательное поле",
+				})
 			}
 		}
 	}
-	return nil
+	return out
+}
+
+// printTextSpan — кусок отрендеренного текста; Error — подстановка ОШИБКА
+// (DOCX красит такие куски красным, PDF до них не доходит — он роняет
+// сборку со списком раньше).
+type printTextSpan struct {
+	Text  string
+	Error bool
+}
+
+// renderPrintTextSpans — как renderPrintText, но пустые strict-поля дают
+// красный сегмент `ОШИБКА (<label|имя>)` вместо "": окружающий текст цел
+// («Иванову ОШИБКА (first_genitive) Ивановичу»). Без ошибок — те же сегменты,
+// что раньше давали одну строку (вызывающий решает, резать ли раны).
+func renderPrintTextSpans(s string, row map[string]any, labels map[string]string) []printTextSpan {
+	var out []printTextSpan
+	rest := s
+	for len(rest) > 0 {
+		loc := rePrintPlaceholder.FindStringSubmatchIndex(rest)
+		if loc == nil {
+			out = append(out, printTextSpan{Text: rest})
+			break
+		}
+		if loc[0] > 0 {
+			out = append(out, printTextSpan{Text: rest[:loc[0]]})
+		}
+		m := rePrintPlaceholder.FindStringSubmatch(rest[loc[0]:loc[1]])
+		name := strings.TrimSpace(m[1])
+		if m[2] == "!" && isPrintFieldEmpty(row, name) {
+			label := labels[name]
+			if label == "" {
+				label = name
+			}
+			out = append(out, printTextSpan{Text: "ОШИБКА (" + label + ")", Error: true})
+		} else {
+			out = append(out, printTextSpan{Text: stringifyPrintValue(row[name])})
+		}
+		rest = rest[loc[1]:]
+	}
+	return out
+}
+
+// printFallbackSquare — чёрный квадрат вместо битой/отсутствующей картинки
+// (генерируется в коде, файлов в репо нет). Размер символический: в документе
+// масштабируется шириной блока как обычная картинка. Детерминирован.
+func printFallbackSquare() []byte {
+	const size = 100
+	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
 }
 
 // printID64 приводит id из строки к int64 (pgx даёт int64, JSON —
