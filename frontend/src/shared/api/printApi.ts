@@ -7,6 +7,9 @@ export interface PrintMeta {
     size: number;
     filename: string;
     mime: string;
+    /** DOCX с заглушками: файл отдан, но внутри красные ОШИБКА/квадраты.
+     * Фронт предупреждает модалкой, скачивание при этом доступно. */
+    warnings?: PrintProblem[];
 }
 
 /** Одна несмертельная проблема сборки (бэкенд: collectPrintProblems).

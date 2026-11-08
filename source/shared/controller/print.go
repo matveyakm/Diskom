@@ -44,6 +44,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"log"
 	"net/http"
@@ -817,12 +818,20 @@ func renderPrintTextSpans(s string, row map[string]any, labels map[string]string
 	return out
 }
 
-// printFallbackSquare — чёрный квадрат вместо битой/отсутствующей картинки
-// (генерируется в коде, файлов в репо нет). Размер символический: в документе
-// масштабируется шириной блока как обычная картинка. Детерминирован.
+// printFallbackSquare — красный квадрат вместо битой/отсутствующей картинки
+// (генерируется в коде, файлов в репо нет). Красный и непрозрачный,
+// чтобы маркер бросался в глаза, а не выглядел пустым местом.
+// Размер символический: в документе масштабируется шириной блока как обычная
+// картинка. Детерминирован (байт-в-байт при каждом вызове).
 func printFallbackSquare() []byte {
 	const size = 100
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	red := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			img.Set(x, y, red)
+		}
+	}
 	var buf bytes.Buffer
 	_ = png.Encode(&buf, img)
 	return buf.Bytes()
@@ -967,9 +976,13 @@ func (s *printStore) get(token string) (printFile, bool) {
 }
 
 // printResponse — ответ шага "Распечатать" (метаданные, не байты).
+// Warnings — несмертельные проблемы DOCX-сборки (те же, что PDF роняет):
+// файл отдан, но внутри красные ОШИБКА/квадраты — фронт предупреждает,
+// скачивание при этом доступно.
 type printResponse struct {
-	Token    string `json:"token"`
-	Size     int    `json:"size"`
-	Filename string `json:"filename"`
-	Mime     string `json:"mime"`
+	Token    string          `json:"token"`
+	Size     int             `json:"size"`
+	Filename string          `json:"filename"`
+	Mime     string          `json:"mime"`
+	Warnings []PrintProblem  `json:"warnings,omitempty"`
 }

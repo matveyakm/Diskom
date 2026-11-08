@@ -182,12 +182,19 @@ func (r *CRUDRepository[T]) handlePrintBuild(w http.ResponseWriter, req *http.Re
 	filename := fmt.Sprintf("%s-%d.%s", r.tableName, id, ext)
 	token := printTokenStore.put(printFile{Bytes: data, Filename: filename, Mime: mime})
 
-	r.writeJSONResponse(w, printResponse{
+	resp := printResponse{
 		Token:    token,
 		Size:     len(data),
 		Filename: filename,
 		Mime:     mime,
-	}, http.StatusOK)
+	}
+	// DOCX с заглушками: файл отдан, но предупредить надо — список едет
+	// рядом с токеном, фронт показывает модалку-предупреждение, скачивание
+	// при этом доступно.
+	if format == "docx" && len(problems) > 0 {
+		resp.Warnings = problems
+	}
+	r.writeJSONResponse(w, resp, http.StatusOK)
 }
 
 // writePrintProblems отвечает 500 со списком несмертельных проблем сборки.

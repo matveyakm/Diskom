@@ -3,6 +3,7 @@ package restController
 import (
 	"bytes"
 	"errors"
+	"image"
 	"image/png"
 	"strings"
 	"testing"
@@ -69,7 +70,8 @@ func TestRenderPrintTextSpans(t *testing.T) {
 	}
 }
 
-// Чёрный квадрат: валидный PNG ожидаемого размера, детерминированный.
+// Красный квадрат: валидный PNG ожидаемого размера, детерминированный.
+// Красный и непрозрачный — маркер должен бросаться в глаза.
 func TestPrintFallbackSquare(t *testing.T) {
 	a := printFallbackSquare()
 	b := printFallbackSquare()
@@ -82,6 +84,17 @@ func TestPrintFallbackSquare(t *testing.T) {
 	}
 	if cfg.Width != 100 || cfg.Height != 100 {
 		t.Fatalf("want 100x100, got %dx%d", cfg.Width, cfg.Height)
+	}
+	img, _, err := image.Decode(bytes.NewReader(a))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, g, bl, al := img.At(50, 50).RGBA()
+	if r>>8 != 255 || g>>8 != 0 || bl>>8 != 0 || al>>8 != 255 {
+		t.Fatalf("want opaque red, got %d,%d,%d,%d", r>>8, g>>8, bl>>8, al>>8)
+	}
+	if _, _, err := downscalePrintImage([]byte("not an image at all............")); err == nil {
+		t.Fatal("want error on garbage")
 	}
 }
 

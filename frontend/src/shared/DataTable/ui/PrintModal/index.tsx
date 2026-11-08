@@ -2,7 +2,7 @@ import {createPortal} from "react-dom";
 import {useEffect, useState} from "react";
 import type {ReactNode} from "react";
 import styles from "./PrintModal.module.scss";
-import {buildPrint, downloadPrint, extractPrintProblems, PrintFormat} from "@/shared/api/printApi";
+import {buildPrint, downloadPrint, extractPrintProblems, PrintFormat, type PrintProblem} from "@/shared/api/printApi";
 import {describeActionError} from "@/shared/api/actionPipeline";
 
 interface PrintModalProps {
@@ -46,7 +46,7 @@ const printBuildMessage = (err: unknown, format: PrintFormat): ReactNode => {
 export const PrintModal = ({docName, rowId, docTitle, onClose}: PrintModalProps) => {
     const [format, setFormat] = useState<PrintFormat>("pdf");
     const [phase, setPhase] = useState<Phase>("select");
-    const [meta, setMeta] = useState<{ token: string; size: number; filename: string } | null>(null);
+    const [meta, setMeta] = useState<{ token: string; size: number; filename: string; warnings?: PrintProblem[] } | null>(null);
     const [error, setError] = useState<ReactNode>(null);
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
@@ -62,7 +62,7 @@ export const PrintModal = ({docName, rowId, docTitle, onClose}: PrintModalProps)
         setError(null);
         try {
             const m = await buildPrint(docName, format, rowId);
-            setMeta({token: m.token, size: m.size, filename: m.filename});
+            setMeta({token: m.token, size: m.size, filename: m.filename, warnings: m.warnings});
             setPhase("ready");
         } catch (err) {
             setError(printBuildMessage(err, format));
@@ -136,12 +136,26 @@ export const PrintModal = ({docName, rowId, docTitle, onClose}: PrintModalProps)
                     )}
 
                     {phase === "ready" && meta && (
-                        <button type="button" onClick={handleDownload} className={styles.fileRow}
-                                title="Скачать">
-                            <span className={styles.fileBadge}>{format.toUpperCase()}</span>
-                            <span className={styles.fileName}>{meta.filename}</span>
-                            <span className={styles.fileSize}>{formatSize(meta.size)}</span>
-                        </button>
+                        <>
+                            {(meta.warnings?.length ?? 0) > 0 && (
+                                <div className={styles.errorText}>
+                                    <div>Документ собран с замечаниями — внутри красные метки и квадраты. Скачивание доступно.</div>
+                                    <ul>
+                                        {meta.warnings!.map((p, i) => (
+                                            <li key={`${p.kind}-${p.ref}-${i}`}>
+                                                {p.label || p.ref}: {p.message}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <button type="button" onClick={handleDownload} className={styles.fileRow}
+                                    title="Скачать">
+                                <span className={styles.fileBadge}>{format.toUpperCase()}</span>
+                                <span className={styles.fileName}>{meta.filename}</span>
+                                <span className={styles.fileSize}>{formatSize(meta.size)}</span>
+                            </button>
+                        </>
                     )}
 
                     {phase === "error" && (
