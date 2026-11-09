@@ -41,6 +41,8 @@
         { "field": "ddate", "label": "Дата"},
         { "field": "dnumber", "label": "Номер"},
         { "field": "note", "label": "Примечание"},
+        { "field": "id_employee", "label": "Сотрудник", "end_point": "employee_directory"},
+        { "field": "id_organization", "label": "Комитет", "end_point": "organization_directory"},
         { "field": "id_department", "label": "Отдел", "end_point": "department_directory"},
         { "field": "id_job_title", "label": "Должность", "end_point": "job_title_directory"}
       ]

@@ -255,10 +255,18 @@ func collectSpecIDs(rows []map[string]any, column string) []int64 {
 	return ids
 }
 
-// enrichRows resolves every spec against its directory service (in parallel)
-// and writes "<column>_name" into matching rows. Never fails the request:
-// any per-spec error only logs and leaves raw ids in place.
+// enrichRows resolves every spec against its directory service (fetches run
+// in parallel) and writes "<column>_name" into matching rows. Never fails the
+// request: any per-spec error only logs and leaves raw ids in place.
+// Merge в строки — строго последовательно после wg.Wait: параллельные записи
+// в общие map строк роняют процесс (fatal error: concurrent map writes).
 func enrichRows(client *http.Client, rows []map[string]any, specs []expandSpec) {
+	type specNames struct {
+		column string
+		names  map[string]string
+	}
+	results := make([]specNames, 0, len(specs))
+	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, spec := range specs {
 		ids := collectSpecIDs(rows, spec.column)
@@ -278,16 +286,21 @@ func enrichRows(client *http.Client, rows []map[string]any, specs []expandSpec) 
 				log.Printf("[expand] WARN: %s: %v, leaving raw ids", spec.endpoint, err)
 				return
 			}
-			for _, row := range rows {
-				key, ok := refIDKey(row[spec.column])
-				if !ok {
-					continue
-				}
-				if name, ok := names[key]; ok {
-					row[spec.column+refResultSuffix] = name
-				}
-			}
+			mu.Lock()
+			results = append(results, specNames{column: spec.column, names: names})
+			mu.Unlock()
 		}(spec, ids, base)
 	}
 	wg.Wait()
+	for _, r := range results {
+		for _, row := range rows {
+			key, ok := refIDKey(row[r.column])
+			if !ok {
+				continue
+			}
+			if name, ok := r.names[key]; ok {
+				row[r.column+refResultSuffix] = name
+			}
+		}
+	}
 }

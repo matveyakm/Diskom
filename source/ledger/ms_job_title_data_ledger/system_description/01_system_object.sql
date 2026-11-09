@@ -40,7 +40,7 @@
         { "field": "id_document", "label": "Документ", "end_point": "document_directory"},
         { "field": "ddate", "label": "Дата"},
         { "field": "name", "label": "Наименование"},
-        { "field": "id_job_title", "label": "Должность"}
+        { "field": "id_job_title", "label": "Должность", "end_point": "job_title_directory"}
       ]
     }',
     'Транзакции по реквизитам должности',

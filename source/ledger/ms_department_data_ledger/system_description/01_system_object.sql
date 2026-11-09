@@ -40,7 +40,7 @@
         { "field": "id_document", "label": "Документ", "end_point": "document_directory"},
         { "field": "ddate", "label": "Дата"},
         { "field": "name", "label": "Наименование"},
-        { "field": "id_department", "label": "Отдел"}
+        { "field": "id_department", "label": "Отдел", "end_point": "department_directory"}
       ]
     }',
     'Транзакции по реквизитам отдела',

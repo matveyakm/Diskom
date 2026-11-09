@@ -1,8 +1,12 @@
 package restController
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestParseExpand(t *testing.T) {
@@ -132,5 +136,41 @@ func TestCollectSpecIDs(t *testing.T) {
 	}
 	if got := collectSpecIDs(rows, "id_department"); !reflect.DeepEqual(got, []int64{3}) {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestEnrichRowsConcurrent(t *testing.T) {
+	// Два справочника на httptest-серверах; enrichRows ходит в них
+	// параллельно — раньше это роняло процесс (concurrent map writes).
+	// Гонять с -race.
+	emps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":[{"id":1,"name":"Иванов"},{"id":2,"name":"Петров"}]}`)
+	}))
+	defer emps.Close()
+	depts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"data":[{"id":3,"name":"Отдел"},{"id":4,"name":"Цех"}]}`)
+	}))
+	defer depts.Close()
+	t.Setenv("REF_EMPLOYEE_DIRECTORY", emps.URL)
+	t.Setenv("REF_DEPARTMENT_DIRECTORY", depts.URL)
+	rows := make([]map[string]any, 0, 50)
+	for i := 0; i < 50; i++ {
+		rows = append(rows, map[string]any{
+			"id_employee":   float64(i%2 + 1),
+			"id_department": float64(i%2 + 3),
+		})
+	}
+	specs := []expandSpec{
+		{column: "id_employee", endpoint: "employee_directory"},
+		{column: "id_department", endpoint: "department_directory"},
+	}
+	enrichRows(&http.Client{Timeout: 5 * time.Second}, rows, specs)
+	for i, row := range rows {
+		if row["id_employee_name"] != []string{"Иванов", "Петров"}[i%2] {
+			t.Fatalf("row %d: %+v", i, row)
+		}
+		if row["id_department_name"] != []string{"Отдел", "Цех"}[i%2] {
+			t.Fatalf("row %d: %+v", i, row)
+		}
 	}
 }
