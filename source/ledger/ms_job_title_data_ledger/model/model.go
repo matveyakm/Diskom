@@ -2,16 +2,23 @@ package model
 
 import "time"
 
-// Employee data ledger
+// Job title data ledger — таймлайн названий должностей (одна строка =
+// регистрация или переименование): «название на дату T» = последнее
+// с ddate ≤ T. Падежи — все 6 (отчёты склоняют, см. career).
 type Object struct {
-	Id            int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Balance       int64     `gorm:"column:balance" json:"balance"`
-	IdDocument    int64     `gorm:"column:id_document" json:"id_document"`
-	DDate         time.Time `gorm:"column:ddate" json:"ddate"`
-	Prefix        int16     `gorm:"column:prefix" json:"prefix"`
-	Name          string    `gorm:"column:name" json:"name"`
-	IdJobTitle    int64     `gorm:"column:id_job_title" json:"id_job_title"`
-	IdTransaction string    `gorm:"column:id_transaction" json:"id_transaction"`
+	Id                int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Balance           int64     `gorm:"column:balance" json:"balance"`
+	IdDocument        int64     `gorm:"column:id_document" json:"id_document"`
+	DDate             time.Time `gorm:"column:ddate" json:"ddate"`
+	Prefix            int16     `gorm:"column:prefix" json:"prefix"`
+	Name              string    `gorm:"column:name" json:"name"`
+	NameGenitive      string    `gorm:"column:name_genitive" json:"name_genitive"`
+	NameDative        string    `gorm:"column:name_dative" json:"name_dative"`
+	NameAccusative    string    `gorm:"column:name_accusative" json:"name_accusative"`
+	NameInstrumental  string    `gorm:"column:name_instrumental" json:"name_instrumental"`
+	NamePrepositional string    `gorm:"column:name_prepositional" json:"name_prepositional"`
+	IdJobTitle        int64     `gorm:"column:id_job_title" json:"id_job_title"`
+	IdTransaction     string    `gorm:"column:id_transaction" json:"id_transaction"`
 }
 
 func (o *Object) GetID() int64 {

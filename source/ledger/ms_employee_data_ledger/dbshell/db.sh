@@ -18,6 +18,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     id_employee          bigint NOT NULL,
     delta                integer NOT NULL,
     balance              bigint NOT NULL DEFAULT 0,
+    fio                  text NOT NULL DEFAULT '',
     UNIQUE (id_document, id_employee)
 	);
 
@@ -29,5 +30,6 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.id_employee          IS 'Employee ID';
   COMMENT ON COLUMN ${DB_TABLENAME}.delta                IS 'Headcount change (+1/-1), the only write input';
   COMMENT ON COLUMN ${DB_TABLENAME}.balance              IS 'Accumulated headcount, server-computed';
+  COMMENT ON COLUMN ${DB_TABLENAME}.fio                  IS 'Employee full name as of the row date';
 
 EOSQL

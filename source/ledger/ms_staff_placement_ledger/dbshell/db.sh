@@ -18,14 +18,9 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     ddate                timestamp,
 	prefix               smallint,
     id_employee          bigint NOT NULL,
-    employee_name        text NOT NULL DEFAULT '',
     id_organization      bigint NOT NULL,
     id_department        bigint NOT NULL,
-    department_name      text NOT NULL DEFAULT '',
-    department_genitive  text NOT NULL DEFAULT '',
     id_job_title         bigint NOT NULL,
-    job_title_name       text NOT NULL DEFAULT '',
-    job_title_instrumental text NOT NULL DEFAULT '',
     justification        text,
     id_transaction       text,
     UNIQUE (endpoint, id_document, id_employee, id_organization, id_department, id_job_title)
@@ -42,14 +37,9 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.ddate                IS 'Event date';
   COMMENT ON COLUMN ${DB_TABLENAME}.prefix               IS 'Prefix of DB';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_employee          IS 'Employee Id';
-  COMMENT ON COLUMN ${DB_TABLENAME}.employee_name        IS 'Employee name snapshot (nominative)';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_organization      IS 'Organization Id';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_department        IS 'Department Id';
-  COMMENT ON COLUMN ${DB_TABLENAME}.department_name      IS 'Department name snapshot (nominative)';
-  COMMENT ON COLUMN ${DB_TABLENAME}.department_genitive  IS 'Department name snapshot (genitive)';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_job_title         IS 'Job title Id';
-  COMMENT ON COLUMN ${DB_TABLENAME}.job_title_name       IS 'Job title snapshot (nominative)';
-  COMMENT ON COLUMN ${DB_TABLENAME}.job_title_instrumental IS 'Job title snapshot (instrumental)';
   COMMENT ON COLUMN ${DB_TABLENAME}.justification        IS 'Justification';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_transaction       IS 'Transaction Id';
 

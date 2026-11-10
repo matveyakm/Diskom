@@ -8,6 +8,7 @@ sudo docker compose down --volumes --rmi local
 MODULES=(
     "source/document/ms_appointment_document:ms_appointment_document"
     "source/document/ms_dismissal_document:ms_dismissal_document"
+    "source/document/ms_employee_change_document:ms_employee_change_document"
     "source/document/ms_position_removal_document:ms_position_removal_document"
     "source/document/ms_acceptance_document:ms_acceptance_document"
     "source/document/ms_symbolism_document:ms_symbolism_document"

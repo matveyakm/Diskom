@@ -166,6 +166,11 @@
                     {"id_employee":      "id_employee"},
                     {"job_title":        "job_title"},
                     {"name":             "name"},
+                    {"name_genitive": "name_genitive"},
+                    {"name_dative": "name_dative"},
+                    {"name_accusative": "name_accusative"},
+                    {"name_instrumental": "name_instrumental"},
+                    {"name_prepositional": "name_prepositional"},
                     {"prefix":           "prefix"},
                     {"id_transaction":   "id_transaction"}
                 ]

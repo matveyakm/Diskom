@@ -17,6 +17,11 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
     ddate                timestamp,
 	prefix               smallint,
     name                 text,
+    name_genitive        text NOT NULL DEFAULT '',
+    name_dative          text NOT NULL DEFAULT '',
+    name_accusative      text NOT NULL DEFAULT '',
+    name_instrumental    text NOT NULL DEFAULT '',
+    name_prepositional   text NOT NULL DEFAULT '',
     id_department        bigint NOT NULL,
     id_transaction       text,
     UNIQUE (id_document, id_department)
@@ -28,7 +33,7 @@ psql -v ON_ERROR_STOP=1 --username "${DB_USER}" --dbname "${DB_NAME}" <<-EOSQL
   COMMENT ON COLUMN ${DB_TABLENAME}.id_document          IS 'Transaction document';
   COMMENT ON COLUMN ${DB_TABLENAME}.ddate                IS 'Document date';
   COMMENT ON COLUMN ${DB_TABLENAME}.prefix               IS 'Prefix of DB';
-  COMMENT ON COLUMN ${DB_TABLENAME}.name                 IS 'Name';
+  COMMENT ON COLUMN ${DB_TABLENAME}.name                 IS 'Name (nominative)';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_department        IS 'Department ID';
   COMMENT ON COLUMN ${DB_TABLENAME}.id_transaction       IS 'Transaction Id';
 

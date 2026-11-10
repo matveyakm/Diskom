@@ -42,7 +42,8 @@
         { "field": "endpoint", "label": "Тип документа"},
         { "field": "id_employee", "label": "Сотрудник", "end_point": "employee_directory"},
         { "field": "delta", "label": "Изм."},
-        { "field": "balance", "label": "Баланс"}
+        { "field": "balance", "label": "Баланс"},
+        { "field": "fio", "label": "ФИО на дату"}
       ]
     }',
     'Остатки штата',

@@ -41,10 +41,10 @@
         { "field": "ddate", "label": "Дата", "hidden": false},
         { "field": "endpoint", "label": "Документ-основание", "hidden": false},
         { "field": "id_document", "label": "Id документа", "hidden": false},
-        { "field": "employee_name", "label": "Сотрудник", "hidden": false},
+        { "field": "id_employee", "label": "Сотрудник", "hidden": false, "end_point": "employee_directory"},
         { "field": "id_organization", "label": "Организация", "hidden": false, "end_point": "organization_directory"},
-        { "field": "department_name", "label": "Отдел", "hidden": false},
-        { "field": "job_title_name", "label": "Должность", "hidden": false},
+        { "field": "id_department", "label": "Отдел", "hidden": false, "end_point": "department_directory"},
+        { "field": "id_job_title", "label": "Должность", "hidden": false, "end_point": "job_title_directory"},
         { "field": "justification", "label": "Обоснование", "hidden": false}
       ]
     }',

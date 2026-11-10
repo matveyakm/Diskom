@@ -329,7 +329,11 @@
                     {"endpoint":         "acceptance_document"},
                     {"id_document":      "id"},
                     {"ddate":            "ddate"},
-                    {"id_employee":      "id_employee"}
+                    {"id_employee":      "id_employee"},
+                    {"fio": {"CONCAT":
+                        ["last_name", " ", "first_name", " ", "middle_name"]
+                        }
+                    }
                 ]
             },
             {

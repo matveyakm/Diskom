@@ -133,44 +133,6 @@
             },
             {
                 "Step": 2,
-                "method": "get",
-                "hide_in_preview": true,
-                "end_point": "employee_directory",
-                "filter": {"id": "id_employee"},
-                "merge": false,
-                "FK":
-                [
-                    {"employee_name": "name"}
-                ]
-            },
-            {
-                "Step": 3,
-                "method": "get",
-                "hide_in_preview": true,
-                "end_point": "job_title_directory",
-                "filter": {"id": "id_job_title"},
-                "merge": false,
-                "FK":
-                [
-                    {"job_title_name": "name"},
-                    {"job_title_instrumental": "name_instrumental"}
-                ]
-            },
-            {
-                "Step": 4,
-                "method": "get",
-                "hide_in_preview": true,
-                "end_point": "department_directory",
-                "filter": {"id": "id_department"},
-                "merge": false,
-                "FK":
-                [
-                    {"department_name": "name"},
-                    {"department_genitive": "name_genitive"}
-                ]
-            },
-            {
-                "Step": 5,
                 "method": "post",
                 "end_point": "staff_placement_ledger",
                 "map": [
@@ -179,21 +141,16 @@
                     {"id_document":            "id"},
                     {"ddate":                  "ddate"},
                     {"id_employee":            "id_employee"},
-                    {"employee_name":          "employee_name"},
                     {"id_organization":        "id_organization"},
                     {"id_department":          "id_department"},
-                    {"department_name":        "department_name"},
-                    {"department_genitive":    "department_genitive"},
                     {"id_job_title":           "id_job_title"},
-                    {"job_title_name":         "job_title_name"},
-                    {"job_title_instrumental": "job_title_instrumental"},
                     {"justification":          "justification"},
                     {"prefix":                 "prefix"},
                     {"id_transaction":         "id_transaction"}
                 ]
             },
             {
-                "Step": 6,
+                "Step": 3,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "position_removal_document",

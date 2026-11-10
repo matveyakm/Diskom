@@ -30,27 +30,94 @@ var Slots = report.Slots{"career": careerSlot, "emblem": emblemSlot}
 
 // tenure — один интервал позиции: [from, to), to == nil — открыт.
 type tenure struct {
-	person     string
-	position   string // должность, творительный падеж (снапшот)
-	department string // отдел, родительный падеж (снапшот)
-	from       time.Time
-	to         *time.Time
+	emp, dep, job int64
+	from          time.Time
+	to            *time.Time
+}
+
+// names — отображаемые имена на дату формирования отчёта.
+type names struct {
+	fio map[int64]string // сотрудник → ФИО (именительный)
+	job map[int64]string // должность → название (творительный)
+	dep map[int64]string // отдел → название (родительный)
+}
+
+// resolveNames — имена на дату T из регистров-таймлайнов: последнее значение
+// с ddate ≤ T по каждой сущности. Пустое fio/имя — как отсутствие (громко
+// на этапе использования: неверные данные хуже отсутствующего отчёта).
+func resolveNames(ctx report.Ctx, t time.Time) (names, error) {
+	n := names{fio: map[int64]string{}, job: map[int64]string{}, dep: map[int64]string{}}
+	empRows, err := ctx.Fetch("employee_data_ledger", map[string]string{
+		"ddate__lte": t.Format(time.RFC3339),
+		"sort":       "ddate",
+		"order":      "asc",
+	})
+	if err != nil {
+		return n, fmt.Errorf("career: employee_data: %w", err)
+	}
+	for _, r := range empRows {
+		id, _ := report.Int(r["id_employee"])
+		d, err := careerDay(r["ddate"])
+		if err != nil || id == 0 {
+			return n, fmt.Errorf("career: employee_data row %v: bad id/date", r["id"])
+		}
+		if d.After(t) {
+			continue
+		}
+		if s, _ := r["fio"].(string); s != "" {
+			n.fio[id] = s
+		}
+	}
+	jobRows, err := ctx.Fetch("job_title_data_ledger", map[string]string{
+		"ddate__lte": t.Format(time.RFC3339),
+		"sort":       "ddate",
+		"order":      "asc",
+	})
+	if err != nil {
+		return n, fmt.Errorf("career: job_title_data: %w", err)
+	}
+	for _, r := range jobRows {
+		id, _ := report.Int(r["id_job_title"])
+		if id == 0 {
+			return n, fmt.Errorf("career: job_title_data row %v: bad id", r["id"])
+		}
+		if s, _ := r["name_instrumental"].(string); s != "" {
+			n.job[id] = s
+		}
+	}
+	depRows, err := ctx.Fetch("department_data_ledger", map[string]string{
+		"ddate__lte": t.Format(time.RFC3339),
+		"sort":       "ddate",
+		"order":      "asc",
+	})
+	if err != nil {
+		return n, fmt.Errorf("career: department_data: %w", err)
+	}
+	for _, r := range depRows {
+		id, _ := report.Int(r["id_department"])
+		if id == 0 {
+			return n, fmt.Errorf("career: department_data row %v: bad id", r["id"])
+		}
+		if s, _ := r["name_genitive"].(string); s != "" {
+			n.dep[id] = s
+		}
+	}
+	return n, nil
 }
 
 // careerSlot — построчный текст «как в приказе»: ФИО, затем строки
 // «- В период с … по … являлся/является <должность-Т> <отдел-Р>».
-// Источник — ТОЛЬКО staff_placement_ledger (один Fetch, никаких забегов по
-// справочникам и документам: отображаемые имена лежат снапшотами в самих
-// строках регистра — employee_name, job_title_instrumental,
-// department_genitive). События спариваются FIFO по тройке
-// (сотрудник, отдел, должность): open открывает интервал, close закрывает
-// самый старый открытый. Параллельные позиции на разных тройках живут
-// независимыми очередями; повторное назначение на ту же тройку без
-// снятия — глубиной очереди 2.
-// Остаток НЕ считается (этот отчёт — не про численность): накопления нет,
-// колонки balance в регистре нет.
-// Сирота-close (закрытие без открытия) и неизвестный event — громкая
-// ошибка: неверные данные хуже отсутствующего отчёта.
+// Источник — ТОЛЬКО регистры (никаких справочных забегов и документов):
+//
+//	staff_placement_ledger — события open/close (тройка id — ключ спаривания);
+//	employee_data_ledger — таймлайн ФИО («ФИО на дату T» = последнее fio
+//	  сотрудника с ddate ≤ T, где T — ddate отчёта, дата его формирования);
+//	job_title_data_ledger / department_data_ledger — таймлайны названий
+//	  («название на дату T» — последняя строка с ddate ≤ T).
+//
+// События спариваются FIFO по тройке (сотрудник, отдел, должность).
+// Сирота-close, неизвестный event, нулевая тройка, отсутствие ФИО/названия
+// на дату T — громкая ошибка: неверные данные хуже отсутствующего отчёта.
 func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	rec := ctx.Record()
 	from, err := careerDay(rec["date_from"])
@@ -72,6 +139,15 @@ func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("career: ledger: %w", err)
+	}
+	// T — дата формирования отчёта (ddate строки): имена берём на неё.
+	formed, err := careerDay(rec["ddate"])
+	if err != nil {
+		return nil, fmt.Errorf("career: ddate: %w", err)
+	}
+	names, err := resolveNames(ctx, formed)
+	if err != nil {
+		return nil, err
 	}
 	tenures, err := pairEvents(events)
 	if err != nil {
@@ -101,15 +177,27 @@ func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 		if end != nil && end.After(to) {
 			end = nil // на дату отчёта ещё открыт
 		}
+		person, ok := names.fio[t.emp]
+		if !ok {
+			return nil, fmt.Errorf("career: нет ФИО сотрудника %d на %s", t.emp, formed.Format("02.01.2006"))
+		}
+		position, ok := names.job[t.job]
+		if !ok {
+			return nil, fmt.Errorf("career: нет названия должности %d на %s", t.job, formed.Format("02.01.2006"))
+		}
+		department, ok := names.dep[t.dep]
+		if !ok {
+			return nil, fmt.Errorf("career: нет названия отдела %d на %s", t.dep, formed.Format("02.01.2006"))
+		}
 		var text string
 		if end == nil {
 			text = fmt.Sprintf("- В период с %s по настоящее время является %s %s",
-				start.Format("02.01.2006"), t.position, t.department)
+				start.Format("02.01.2006"), position, department)
 		} else {
 			text = fmt.Sprintf("- В период с %s по %s являлся %s %s",
-				start.Format("02.01.2006"), end.Format("02.01.2006"), t.position, t.department)
+				start.Format("02.01.2006"), end.Format("02.01.2006"), position, department)
 		}
-		lines = append(lines, line{person: t.person, from: start, text: text})
+		lines = append(lines, line{person: person, from: start, text: text})
 	}
 	sort.SliceStable(lines, func(i, j int) bool {
 		if lines[i].person != lines[j].person {
@@ -166,16 +254,10 @@ func pairEvents(rows []map[string]any) ([]tenure, error) {
 		if err != nil {
 			return nil, fmt.Errorf("career: row %d: bad date: %w", id, err)
 		}
-		person, _ := r["employee_name"].(string)
-		position, _ := r["job_title_instrumental"].(string)
-		department, _ := r["department_genitive"].(string)
-		if person == "" || position == "" || department == "" {
-			return nil, fmt.Errorf("career: row %d: пустой снапшот имени (сотрудник/должность/отдел)", id)
-		}
 		key := fmt.Sprintf("%d|%d|%d", emp, dep, job)
 		switch ev {
 		case "open":
-			open[key] = append(open[key], tenure{person: person, position: position, department: department, from: d})
+			open[key] = append(open[key], tenure{emp: emp, dep: dep, job: job, from: d})
 		case "close":
 			q := open[key]
 			if len(q) == 0 {
