@@ -19,9 +19,11 @@ import (
 	"time"
 )
 
-// reportMaxPages caps a report fetch walk (page limit 100 → max 5000 rows).
+// reportMaxPages caps a report fetch walk (page limit 100 → max 20000 rows).
 // Больше — ошибка "сузьте фильтры": отчёт не должен молча резать данные.
-const reportMaxPages = 50
+// Запас под тысячи проводок карьерного регистра; обход последовательный,
+// таймаута на весь отчёт нет (5с — только на один запрос).
+const reportMaxPages = 200
 
 // reportPageLimit is the page size for report fetches (server max).
 const reportPageLimit = 100

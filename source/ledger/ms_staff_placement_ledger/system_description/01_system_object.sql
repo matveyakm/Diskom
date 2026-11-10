@@ -24,8 +24,8 @@
     printing_template,
     id_transaction
   ) values (
-    'Транзакции изменеия штатного расписания',
-    'Транзакции изменеия штатного расписания',
+    'Журнал событий штатного расписания',
+    'Журнал событий штатного расписания',
     1,
     0,
     'ЭТР-',
@@ -37,17 +37,18 @@
     'document.png',
     '{
       "columns": [
-        { "field": "balance", "label": "", "hidden": false},
-        { "field": "id_document", "label": "Документ", "end_point": "document_directory", "hidden": false},
+        { "field": "event", "label": "Событие", "hidden": false},
         { "field": "ddate", "label": "Дата", "hidden": false},
-        { "field": "id_employee", "label": "Сотрудник", "hidden": false, "end_point": "employee_directory"},
+        { "field": "endpoint", "label": "Документ-основание", "hidden": false},
+        { "field": "id_document", "label": "Id документа", "hidden": false},
+        { "field": "employee_name", "label": "Сотрудник", "hidden": false},
         { "field": "id_organization", "label": "Организация", "hidden": false, "end_point": "organization_directory"},
-        { "field": "id_department", "label": "Отдел", "hidden": false, "end_point": "department_directory"},
-        { "field": "id_job_title", "label": "Должность", "hidden": false, "end_point": "job_title_directory"},
+        { "field": "department_name", "label": "Отдел", "hidden": false},
+        { "field": "job_title_name", "label": "Должность", "hidden": false},
         { "field": "justification", "label": "Обоснование", "hidden": false}
       ]
     }',
-    'Транзакции изменеия штатного расписания',
+    'Журнал событий штатного расписания (открытие/закрытие позиций)',
     '',
     '',
     '',

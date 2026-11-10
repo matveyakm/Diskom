@@ -51,7 +51,12 @@
         { "field": "id", "label": "", "hidden": true, "required": false },
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
         { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
-        { "field": "name", "label": "Название", "hidden": false, "required": false, "default": "" },
+        { "field": "name", "label": "Название (именительный)", "hidden": false, "required": false, "default": "" },
+        { "field": "name_genitive", "label": "Родительный (кого? чего?)", "hidden": false, "required": false, "default": "" },
+        { "field": "name_dative", "label": "Дательный (кому? чему?)", "hidden": false, "required": false, "default": "" },
+        { "field": "name_accusative", "label": "Винительный (кого? что?)", "hidden": false, "required": false, "default": "" },
+        { "field": "name_instrumental", "label": "Творительный (кем? чем?)", "hidden": false, "required": false, "default": "" },
+        { "field": "name_prepositional", "label": "Предложный (о ком? о чём?)", "hidden": false, "required": false, "default": "" },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false, "default": "" },
         { "field": "id_user", "label": "", "hidden": true, "required": false, "default": 1 },
         { "field": "id_basis", "label": "", "hidden": true, "required": false, "default": 0 },
@@ -117,6 +122,11 @@
                     {"ddate":"ddate"},
                     {"dnumber":"dnumber"},
                     {"name":"name"},
+                    {"name_genitive":"name_genitive"},
+                    {"name_dative":"name_dative"},
+                    {"name_accusative":"name_accusative"},
+                    {"name_instrumental":"name_instrumental"},
+                    {"name_prepositional":"name_prepositional"},
                     {"note":"note"},
                     {"prefix":"prefix"},
                     {"id_transaction":"id_transaction"}
@@ -132,7 +142,12 @@
                     {"status": 1},
                     {"id_basis": "id"},
                     {"endpoint_basis": "create_department_document"},
-                    {"name": "name"}
+                    {"name": "name"},
+                    {"name_genitive": "name_genitive"},
+                    {"name_dative": "name_dative"},
+                    {"name_accusative": "name_accusative"},
+                    {"name_instrumental": "name_instrumental"},
+                    {"name_prepositional": "name_prepositional"}
                 ],
                 "FK": [
                     {"id_department": "id"}

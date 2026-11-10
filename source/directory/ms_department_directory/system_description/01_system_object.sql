@@ -48,7 +48,12 @@
     '{
       "fields": [
         { "field": "id", "label": "", "hidden": true, "required": false },
-        { "field": "name", "label": "Название", "hidden": false, "required": true},
+        { "field": "name", "label": "Название (именительный)", "hidden": false, "required": true},
+        { "field": "name_genitive", "label": "Родительный (кого? чего?)", "hidden": false, "required": false},
+        { "field": "name_dative", "label": "Дательный (кому? чему?)", "hidden": false, "required": false},
+        { "field": "name_accusative", "label": "Винительный (кого? что?)", "hidden": false, "required": false},
+        { "field": "name_instrumental", "label": "Творительный (кем? чем?)", "hidden": false, "required": false},
+        { "field": "name_prepositional", "label": "Предложный (о ком? о чём?)", "hidden": false, "required": false},
         { "field": "description", "label": "Описание", "hidden": false, "required": false}
       ]
     }',

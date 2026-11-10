@@ -24,8 +24,8 @@
     printing_template,
     id_transaction
   ) values (
-    'Снятие с должности',
-    'Снятие с должности',
+    'Увольнение из штата',
+    'Увольнение из штата (уход из штата, без закрытия позиций)',
     1,
     0,
     'СН-',
@@ -45,8 +45,8 @@
         { "field": "id_job_title", "label": "Должность", "end_point": "job_title_directory"}
       ]
     }',
-    'Журнал документов снятия с должности',
-    'Документ снятия с должности',
+    'Журнал документов увольнения из штата',
+    'Документ увольнения из штата',
     '{
       "fields": [
         { "field": "id", "label": "Код", "hidden": true, "required": false },
@@ -173,7 +173,10 @@
             "step": 2,
             "method": "delete",
             "end_point": "staff_placement_ledger",
-            "filter": "id_document"
+            "filter": "id_document",
+            "query": {
+                "endpoint": "dismissal_document"
+            }
         },
         {
             "step": 3,
