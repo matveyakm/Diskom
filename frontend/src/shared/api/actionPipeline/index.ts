@@ -155,10 +155,28 @@ const executeStep = async (
 
     const url = `/api/${step.end_point}`;
     const params: Record<string, string> = {};
+    // Сколько параметров пришло именно из filter (не из query/map-литералов):
+    // шаг, чей filter ни во что не резолвнулся, для get/put/delete
+    // пропускается молча (нечего чистить/читать — идемпотентный no-op),
+    // а не шлёт запрос с пустым/битым scope. POST не пропускается никогда
+    // (создание filter не требует).
+    let filterParams = 0;
+    const hasFilterSpec =
+        (typeof step.filter === "string" && step.filter !== "") ||
+        (step.filter !== null &&
+            typeof step.filter === "object" &&
+            !Array.isArray(step.filter) &&
+            Object.keys(step.filter as Record<string, unknown>).length > 0);
 
     // Строковый фильтр — same-name (?id=<ctx.id>).
-    if (typeof step.filter === "string" && context[step.filter] !== undefined) {
-        params[step.filter] = String(context[step.filter]);
+    // Пустое/нулевое значение — отсутствие связи (как нулевой FK ниже),
+    // а не фильтр: иначе чистка непроведённого падала бы в 400/404.
+    if (typeof step.filter === "string" && step.filter !== "") {
+        const v = context[step.filter];
+        if (v !== undefined && v !== null && v !== "" && v !== 0 && v !== "0") {
+            params[step.filter] = String(v);
+            filterParams++;
+        }
     }
 
     // Объектный фильтр — переименование (?id=<ctx.id_employee>).
@@ -171,10 +189,20 @@ const executeStep = async (
                 const v = context[source];
                 if (v === null || v === undefined || v === "" || v === 0 || v === "0") continue;
                 params[target] = String(v);
+                filterParams++;
             } else if (source !== undefined && source !== null) {
                 params[target] = String(source);
+                filterParams++;
             }
         }
+    }
+
+    // Фильтр задан, но ни во что не резолвнулся — шагу нечего делать:
+    // GET не должен мержить чужую первую строку, PUT/DELETE — бить
+    // с пустым scope (раньше было 400 и рвалась вся цепочка).
+    if (hasFilterSpec && filterParams === 0 && (method === "get" || method === "put" || method === "delete")) {
+        console.log(`[actionPipeline] Step skipped: filter of ${step.end_point} resolved to nothing`);
+        return;
     }
 
     // DELETE: query строится ещё и из map (target←source из контекста;
