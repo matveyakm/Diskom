@@ -221,6 +221,9 @@ func parseInValues(raw string) ([]string, bool, error) {
 
 // parseSortOrder validates ?sort=&order= into an ORDER BY clause.
 // Empty sort keeps the historical default. Errors are 400.
+// Non-id sorts get a deterministic tiebreak (`, id <DIR>`): без него
+// пагинация OFFSET/LIMIT при равных значениях роняет и дублирует строки
+// между страницами (поймано живьём на тысячах проводок career-отчёта).
 func parseSortOrder(params map[string][]string) (string, error) {
 	sort := firstParam(params, "sort")
 	if strings.TrimSpace(sort) == "" {
@@ -237,7 +240,11 @@ func parseSortOrder(params map[string][]string) (string, error) {
 	if order != "asc" && order != "desc" {
 		return "", fmt.Errorf("invalid order %q, want asc|desc", order)
 	}
-	return sort + " " + strings.ToUpper(order), nil
+	clause := sort + " " + strings.ToUpper(order)
+	if sort != "id" {
+		clause += ", id " + strings.ToUpper(order)
+	}
+	return clause, nil
 }
 
 // parseSearch validates ?q=&q_fields= into fields + ILIKE pattern.

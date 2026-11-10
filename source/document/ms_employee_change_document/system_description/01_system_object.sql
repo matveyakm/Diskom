@@ -108,6 +108,8 @@
             }
         ]
     }',
+    -- Чистка своих проводок в начале проведения (идемпотентный повтор:
+    -- обрыв связи посреди чинится повтором, а не ручной чисткой).
     '{
     "action": "onAcceptance",
         "processing":
@@ -125,6 +127,16 @@
             },
             {
                 "Step": 2,
+                "method": "delete",
+                "hide_in_preview": true,
+                "end_point": "employee_data_ledger",
+                "filter": {"id_document": "id"},
+                "query": {
+                    "endpoint": "employee_change_document"
+                }
+            },
+            {
+                "Step": 3,
                 "method": "post",
                 "end_point": "employee_data_ledger",
                 "map": [
@@ -140,7 +152,7 @@
                 ]
             },
             {
-                "Step": 3,
+                "Step": 4,
                 "method": "put",
                 "end_point": "employee_directory",
                 "filter": {"id": "id_employee"},
@@ -152,7 +164,7 @@
                 ]
             },
             {
-                "Step": 4,
+                "Step": 5,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "employee_change_document",

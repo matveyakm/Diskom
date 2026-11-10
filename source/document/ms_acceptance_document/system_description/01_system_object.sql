@@ -274,6 +274,9 @@
         ]
     }',
     -- Превью confirm: шаги с "hide_in_preview": true скрываются (контракт: frontend/src/shared/api/actionPipeline/effects.ts).
+    -- Чистка своих проводок в начале проведения (идемпотентный повтор).
+    -- Сотрудника в справочнике не трогает: повтор после обрыва может
+    -- оставить сироту (дубль ФИО без проводок) — см. parked.
     '{
     "action": "onAcceptance",
         "processing":
@@ -322,6 +325,16 @@
             },
             {
                 "Step": 3,
+                "method": "delete",
+                "hide_in_preview": true,
+                "end_point": "employee_data_ledger",
+                "filter": {"id_document": "id"},
+                "query": {
+                    "endpoint": "acceptance_document"
+                }
+            },
+            {
+                "Step": 4,
                 "method": "post",
                 "end_point": "employee_data_ledger",
                 "map": [
@@ -337,7 +350,7 @@
                 ]
             },
             {
-                "Step": 4,
+                "Step": 5,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "acceptance_document",

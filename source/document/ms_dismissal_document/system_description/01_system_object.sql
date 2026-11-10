@@ -53,7 +53,7 @@
         { "field": "ddate", "label": "Дата", "hidden": false, "required": true, "default": "now()" },
         { "field": "dnumber", "readonly": true, "label": "Номер", "hidden": false, "required": true },
         { "field": "note", "label": "Примечание", "hidden": false, "required": false },
-        { "field": "id_employee", "label": "Сотрудник", "hidden": false, "required": false, "type": "select", "end_point": "employee_directory" },
+        { "field": "id_employee", "label": "Сотрудник", "hidden": false, "required": true, "type": "select", "end_point": "employee_directory" },
         { "field": "id_organization", "label": "Комитет", "hidden": false, "required": false, "type": "select", "end_point": "organization_directory" },
         { "field": "id_department", "label": "Отдел", "hidden": false, "required": false, "type": "select", "end_point": "department_directory" },
         { "field": "id_job_title", "label": "Должность", "hidden": false, "required": false, "type": "select", "end_point": "job_title_directory" },
@@ -100,6 +100,8 @@
             }
         ]
     }',
+    -- Чистка своих проводок в начале проведения (идемпотентный повтор:
+    -- обрыв связи посреди чинится повтором, а не ручной чисткой).
     '{
     "action": "onAcceptance",
         "processing":
@@ -131,6 +133,16 @@
             },
             {
                 "Step": 2,
+                "method": "delete",
+                "hide_in_preview": true,
+                "end_point": "employee_data_ledger",
+                "filter": {"id_document": "id"},
+                "query": {
+                    "endpoint": "dismissal_document"
+                }
+            },
+            {
+                "Step": 3,
                 "method": "post",
                 "end_point": "employee_data_ledger",
                 "map": [
@@ -142,7 +154,7 @@
                 ]
             },
             {
-                "Step": 3,
+                "Step": 4,
                 "method": "put",
                 "hide_in_preview": true,
                 "end_point": "dismissal_document",

@@ -86,12 +86,16 @@ func TestParseSortOrder(t *testing.T) {
 		t.Fatalf("default sort = %q,%v", def, err)
 	}
 	got, err := parseSortOrder(paramsOf(map[string]string{"sort": "ddate", "order": "desc"}))
-	if err != nil || got != "ddate DESC" {
+	if err != nil || got != "ddate DESC, id DESC" {
 		t.Fatalf("sort ddate desc = %q,%v", got, err)
 	}
 	got, err = parseSortOrder(paramsOf(map[string]string{"sort": "note"}))
-	if err != nil || got != "note ASC" {
+	if err != nil || got != "note ASC, id ASC" {
 		t.Fatalf("sort default order = %q,%v", got, err)
+	}
+	got, err = parseSortOrder(paramsOf(map[string]string{"sort": "id", "order": "asc"}))
+	if err != nil || got != "id ASC" {
+		t.Fatalf("sort id needs no tiebreak = %q,%v", got, err)
 	}
 	for _, bad := range []map[string]string{
 		{"sort": "id; DROP TABLE t"},
