@@ -18,6 +18,7 @@ package print
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"shared/report"
@@ -36,9 +37,20 @@ type tenure struct {
 	to         *time.Time
 }
 
-// careerSlot — таблица «Сотрудник | С | По | Должность | Отдел»: интервалы,
-// пересекающие [date_from, date_to]. Открытые на date_to интервалы —
-// «по настоящее время». Сортировка: сотрудник, затем начало интервала.
+// careerSlot — построчный текст «как в приказе»: ФИО, затем строки
+// «- В период с … по … являлся/является <должность-Т> <отдел-Р>».
+// Источник — ТОЛЬКО staff_placement_ledger (один Fetch, никаких забегов по
+// справочникам и документам: отображаемые имена лежат снапшотами в самих
+// строках регистра — employee_name, job_title_instrumental,
+// department_genitive). События спариваются FIFO по тройке
+// (сотрудник, отдел, должность): open открывает интервал, close закрывает
+// самый старый открытый. Параллельные позиции на разных тройках живут
+// независимыми очередями; повторное назначение на ту же тройку без
+// снятия — глубиной очереди 2.
+// Остаток НЕ считается (этот отчёт — не про численность): накопления нет,
+// колонки balance в регистре нет.
+// Сирота-close (закрытие без открытия) и неизвестный event — громкая
+// ошибка: неверные данные хуже отсутствующего отчёта.
 func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	rec := ctx.Record()
 	from, err := careerDay(rec["date_from"])
@@ -65,7 +77,12 @@ func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]tenure, 0, len(tenures))
+	type line struct {
+		person string
+		from   time.Time
+		text   string
+	}
+	var lines []line
 	for _, t := range tenures {
 		if t.to != nil && !t.to.After(from) {
 			continue // закрыт до начала периода
@@ -84,38 +101,37 @@ func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 		if end != nil && end.After(to) {
 			end = nil // на дату отчёта ещё открыт
 		}
-		c := t
-		c.from = start
-		c.to = end
-		out = append(out, c)
+		var text string
+		if end == nil {
+			text = fmt.Sprintf("- В период с %s по настоящее время является %s %s",
+				start.Format("02.01.2006"), t.position, t.department)
+		} else {
+			text = fmt.Sprintf("- В период с %s по %s являлся %s %s",
+				start.Format("02.01.2006"), end.Format("02.01.2006"), t.position, t.department)
+		}
+		lines = append(lines, line{person: t.person, from: start, text: text})
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].person != out[j].person {
-			return out[i].person < out[j].person
+	sort.SliceStable(lines, func(i, j int) bool {
+		if lines[i].person != lines[j].person {
+			return lines[i].person < lines[j].person
 		}
-		if !out[i].from.Equal(out[j].from) {
-			return out[i].from.Before(out[j].from)
-		}
-		if out[i].to == nil || out[j].to == nil {
-			return out[j].to == nil
-		}
-		return out[i].to.Before(*out[j].to)
+		return lines[i].from.Before(lines[j].from)
 	})
-	rows := make([]map[string]any, 0, len(out))
-	for _, t := range out {
-		end := "по настоящее время"
-		if t.to != nil {
-			end = t.to.Format("02.01.2006")
+	var sb strings.Builder
+	last := ""
+	for _, l := range lines {
+		if l.person != last {
+			if last != "" {
+				sb.WriteString("\n")
+			}
+			sb.WriteString(l.person)
+			sb.WriteString("\n")
+			last = l.person
 		}
-		rows = append(rows, map[string]any{
-			"person":     t.person,
-			"from":       t.from.Format("02.01.2006"),
-			"to":         end,
-			"position":   t.position,
-			"department": t.department,
-		})
+		sb.WriteString(l.text)
+		sb.WriteString("\n")
 	}
-	return rows, nil
+	return sb.String(), nil
 }
 
 // pairEvents — FIFO-спаривание open/close по тройке. Порядок: (день, id).

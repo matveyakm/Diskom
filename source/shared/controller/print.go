@@ -163,8 +163,9 @@ type printBlock struct {
 	Src     string             `json:"src,omitempty"`
 	// Slot — дырка, заполняемая filler-ом сервиса (shared/report.SlotFunc):
 	// "slot": "emblem" + опциональные "params" (данные, не код).
-	// Сейчас поддерживается только для image (байты PNG/JPG); слот на любом
-	// другом блоке — ошибка валидации (table-слоты — следующий пилот).
+	// image — байты PNG/JPG; table — строки []map; text — готовый текст
+	// (многострочный через \n, рендеры режут как обычный текст).
+	// Слот на любом другом блоке — ошибка валидации.
 	Slot       string            `json:"slot,omitempty"`
 	SlotParams map[string]string `json:"params,omitempty"`
 	// RowsData — материализованные строки слот-таблицы (ставит только
@@ -349,11 +350,11 @@ func validatePrintBlock(where string, b printBlock, tplFont string) error {
 	if err := validatePrintStyle(where, b.printTextStyle, family); err != nil {
 		return err
 	}
-	// Дырки слотов — только для image (картинка из байтов) и table
-	// (строки из filler-а). Молча игнорировать чужой slot запрещено:
-	// fail-closed на своём синтаксисе.
-	if b.Slot != "" && b.Type != "image" && b.Type != "table" {
-		return fmt.Errorf("%s: slot is only supported for image|table blocks", where)
+	// Дырки слотов — для image (картинка из байтов), table (строки из
+	// filler-а) и text (готовый текст из filler-а). Молча игнорировать
+	// чужой slot запрещено: fail-closed на своём синтаксисе.
+	if b.Slot != "" && b.Type != "image" && b.Type != "table" && b.Type != "text" {
+		return fmt.Errorf("%s: slot is only supported for image|table|text blocks", where)
 	}
 	if b.Type == "if" {
 		if b.Ref != "" {
@@ -370,6 +371,14 @@ func validatePrintBlock(where string, b printBlock, tplFont string) error {
 	}
 	switch b.Type {
 	case "heading", "text":
+		if b.Type == "text" && b.Slot != "" {
+			// Текст-слот: текст готовит filler, в шаблоне его быть не
+			// должно (как columns+slot у слот-таблицы, не rows).
+			if strings.TrimSpace(b.Text) != "" {
+				return fmt.Errorf("%s: text takes either text or slot, not both", where)
+			}
+			break
+		}
 		if strings.TrimSpace(b.Text) == "" {
 			// Пустой текст — только осознанный распор: обязан нести высоту
 			// (иначе это забытый текст, а не пустое место). Заголовок

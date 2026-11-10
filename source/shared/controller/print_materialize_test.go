@@ -36,10 +36,14 @@ func TestPrintIfValidation(t *testing.T) {
 	             "then": [{"type": "text", "text": "A"}], "else": [{"type": "text", "text": "B"}]}],
 	   "else": []}
 	]}`)
-	// Слот-картинка — ок.
-	mustParsePrint(t, `{"blocks": [
-	  {"type": "image", "slot": "emblem", "params": {"committee": "1"}, "width": 22}
-	]}`)
+  // Слот-картинка — ок.
+  mustParsePrint(t, `{"blocks": [
+    {"type": "image", "slot": "emblem", "params": {"committee": "1"}, "width": 22}
+  ]}`)
+  // Текст-слот — ок; текст+слот вместе — нет.
+  mustParsePrint(t, `{"blocks": [
+    {"type": "text", "slot": "career", "size": 14}
+  ]}`)
 	for _, bad := range []string{
 		// if без if-объекта/equals/then/else.
 		`{"blocks": [{"type": "if", "then": [{"type": "text", "text": "A"}], "else": []}]}`,
@@ -259,6 +263,48 @@ func TestMaterializeTableSlot(t *testing.T) {
 	}
 	if len(pdf) < 1000 {
 		t.Fatalf("pdf too small: %d", len(pdf))
+	}
+}
+
+func TestMaterializeTextSlot(t *testing.T) {
+	raw := `{"blocks": [{"type": "text", "slot": "career", "size": 14}]}`
+	r := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"career": func(ctx report.Ctx, p report.Params) (any, error) {
+			return "Иванов Иван Иванович\n- В период с 02.03.2026 по настоящее время является Активистом", nil
+		},
+	}}
+	got, _, _, err := r.materializePrint(mustParsePrint(t, raw), map[string]any{}, r.ReportSlots)
+	if err != nil {
+		t.Fatalf("materialize: %v", err)
+	}
+	if len(got.Blocks) != 1 || !strings.Contains(got.Blocks[0].Text, "Иванов") {
+		t.Fatalf("text not materialized: %+v", got.Blocks)
+	}
+	// Не-строка — громко; пусто — валидно; ошибка filler-а — problems, не 500.
+	r2 := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"s": func(ctx report.Ctx, p report.Params) (any, error) { return 42, nil },
+	}}
+	slotRaw := mustParsePrint(t, `{"blocks": [{"type": "text", "slot": "s", "size": 14}]}`)
+	if _, _, _, err := r2.materializePrint(slotRaw, map[string]any{}, r2.ReportSlots); err == nil {
+		t.Fatal("non-string must fail")
+	}
+	r3 := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"s": func(ctx report.Ctx, p report.Params) (any, error) { return "", nil },
+	}}
+	got3, _, _, err3 := r3.materializePrint(slotRaw, map[string]any{}, r3.ReportSlots)
+	if err3 != nil || len(got3.Blocks) != 1 || got3.Blocks[0].Text != "" {
+		t.Fatalf("empty must stay empty: %+v %v", got3.Blocks, err3)
+	}
+	// Рендеры режут \n как обычный текст.
+	docx, err := renderPrintDOCX(got, map[string]any{}, map[string][]byte{})
+	if err != nil {
+		t.Fatalf("docx: %v", err)
+	}
+	doc := mustZipDoc(t, docx)
+	for _, want := range []string{"Иванов Иван Иванович", "02.03.2026", "Активистом"} {
+		if !strings.Contains(doc, want) {
+			t.Fatalf("docx lacks %q", want)
+		}
 	}
 }
 

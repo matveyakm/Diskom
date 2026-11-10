@@ -155,6 +155,35 @@ func (r *CRUDRepository[T]) materializeBlocks(
 			out = append(out, nb)
 			continue
 		}
+		if b.Type == "text" && b.Slot != "" {
+			// Текст-слот: filler готовит готовый текст (многострочный
+			// через \n); рендеры режут его как обычный text-блок.
+			// Пустой текст валиден («нет данных» — рисуется только шапка).
+			fn, ok := slots[b.Slot]
+			if !ok {
+				return nil, fmt.Errorf("%s: no filler registered for slot %q", here, b.Slot)
+			}
+			val, err := fn(r.reportContext(record), report.Params(b.SlotParams))
+			if err != nil {
+				*problems = append(*problems, PrintProblem{
+					Kind:    "text",
+					Ref:     b.Slot,
+					Message: err.Error(),
+				})
+				nb := b
+				nb.Text = ""
+				out = append(out, nb)
+				continue
+			}
+			s, ok := val.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s: slot %q must return text (string)", here, b.Slot)
+			}
+			nb := b
+			nb.Text = s
+			out = append(out, nb)
+			continue
+		}
 		out = append(out, b)
 	}
 	return out, nil

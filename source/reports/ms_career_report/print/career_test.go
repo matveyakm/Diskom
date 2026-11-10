@@ -3,6 +3,7 @@ package print
 import (
 	"errors"
 	"shared/report"
+	"strings"
 	"testing"
 	"time"
 )
@@ -59,7 +60,20 @@ func careerRec() map[string]any {
 	}
 }
 
-func TestCareerPairing(t *testing.T) {
+func careerText(t *testing.T, rows []map[string]any) string {
+	t.Helper()
+	got, err := careerSlot(&stubCtx{record: careerRec(), rows: rows}, nil)
+	if err != nil {
+		t.Fatalf("career = %v", err)
+	}
+	s, ok := got.(string)
+	if !ok {
+		t.Fatalf("slot must return string, got %T", got)
+	}
+	return s
+}
+
+func TestCareerText(t *testing.T) {
 	rows := []map[string]any{
 		evRow(1, "open", "2026-03-02T00:00:00Z", 1, 1, 1),
 		evRow(2, "open", "2026-03-02T00:00:00Z", 1, 2, 1), // параллельная тройка
@@ -68,23 +82,13 @@ func TestCareerPairing(t *testing.T) {
 		evRow(5, "close", "2026-07-12T00:00:00Z", 1, 1, 2),
 		evRow(6, "close", "2026-05-10T00:00:00Z", 1, 1, 1),
 	}
-	got, err := careerSlot(&stubCtx{record: careerRec(), rows: rows}, nil)
-	if err != nil {
-		t.Fatalf("career = %v", err)
-	}
-	out := got.([]map[string]any)
-	if len(out) != 3 {
-		t.Fatalf("want 3 intervals, got %d: %v", len(out), out)
-	}
-	// 1|1|1: 02.03–10.05; 1|2|1: 02.03–12.06; 1|1|2: 10.05–12.07.
-	if out[0]["from"] != "02.03.2026" || out[0]["to"] != "10.05.2026" {
-		t.Fatalf("first interval = %v", out[0])
-	}
-	if out[1]["from"] != "02.03.2026" || out[1]["to"] != "12.06.2026" {
-		t.Fatalf("second interval = %v", out[1])
-	}
-	if out[2]["from"] != "10.05.2026" || out[2]["to"] != "12.07.2026" {
-		t.Fatalf("third interval = %v", out[2])
+	s := careerText(t, rows)
+	want := "Иванов Иван Иванович\n" +
+		"- В период с 02.03.2026 по 10.05.2026 являлся Активистом Отдела\n" +
+		"- В период с 02.03.2026 по 12.06.2026 являлся Активистом Отдела\n" +
+		"- В период с 10.05.2026 по 12.07.2026 являлся Активистом Отдела\n"
+	if s != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", s, want)
 	}
 }
 
@@ -101,18 +105,16 @@ func TestCareerOpenAndClip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("career = %v", err)
 	}
-	out := got.([]map[string]any)
-	if len(out) != 1 {
-		t.Fatalf("want 1 interval (second opens after period), got %v", out)
-	}
-	if out[0]["from"] != "01.03.2026" || out[0]["to"] != "по настоящее время" {
-		t.Fatalf("clipped = %v", out[0])
+	want := "Иванов Иван Иванович\n" +
+		"- В период с 01.03.2026 по настоящее время является Активистом Отдела\n"
+	if got.(string) != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", got, want)
 	}
 }
 
 func TestCareerLoud(t *testing.T) {
 	rec := careerRec()
-	// Сирота-close, неизвестное событие, пустой снапшот, нулевой id, from>to.
+	// Сирота-close, неизвестное событие, пустой снапшот, нулевой id тройки.
 	bad := [][]map[string]any{
 		{evRow(1, "close", "2026-03-02T00:00:00Z", 1, 1, 1)},
 		{evRow(1, "moved", "2026-03-02T00:00:00Z", 1, 1, 1)},
@@ -137,5 +139,10 @@ func TestCareerLoud(t *testing.T) {
 		"date_to":   time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
 	}, rows: nil}, nil); err == nil {
 		t.Fatal("from>to: want error")
+	}
+	// Пустой регистр — валидная пустота (только шапка), не ошибка.
+	got, err := careerSlot(&stubCtx{record: rec, rows: nil}, nil)
+	if err != nil || !strings.EqualFold(got.(string), "") {
+		t.Fatalf("empty must be empty-non-error: %q %v", got, err)
 	}
 }
