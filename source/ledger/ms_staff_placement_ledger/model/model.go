@@ -5,9 +5,9 @@ import "time"
 // Staff placement ledger: append-only journal of position open/close events.
 // One row per event; the career report pairs open/close rows FIFO per
 // (employee, department, job title) triple. Display names are resolved
-// at report time from registers (employee_data fio timeline +
-// *_data_ledger name timelines as of the report date) — no snapshots here:
-// snapshots froze event-time names and contradicted formation-date display.
+// at report time from register timelines as of T = max(report ddate,
+// report date_to) — no snapshots here: snapshots froze event-time names
+// and contradicted formation-date display (see career filler).
 type Object struct {
 	Id             int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Endpoint       string    `gorm:"column:endpoint" json:"endpoint"`

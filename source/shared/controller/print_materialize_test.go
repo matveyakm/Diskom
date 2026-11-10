@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -294,6 +295,19 @@ func TestMaterializeTextSlot(t *testing.T) {
 	got3, _, _, err3 := r3.materializePrint(slotRaw, map[string]any{}, r3.ReportSlots)
 	if err3 != nil || len(got3.Blocks) != 1 || got3.Blocks[0].Text != "" {
 		t.Fatalf("empty must stay empty: %+v %v", got3.Blocks, err3)
+	}
+	r4 := &CRUDRepository[struct{}]{ReportSlots: report.Slots{
+		"s": func(ctx report.Ctx, p report.Params) (any, error) { return nil, errors.New("no data") },
+	}}
+	got4, _, problems, err4 := r4.materializePrint(slotRaw, map[string]any{}, r4.ReportSlots)
+	if err4 != nil {
+		t.Fatalf("filler error must not fail: %v", err4)
+	}
+	if len(got4.Blocks) != 1 || got4.Blocks[0].Text != "" {
+		t.Fatalf("failed slot must be empty: %+v", got4.Blocks)
+	}
+	if len(problems) != 1 || problems[0].Kind != "text" || problems[0].Ref != "s" {
+		t.Fatalf("want one text problem, got %+v", problems)
 	}
 	// Рендеры режут \n как обычный текст.
 	docx, err := renderPrintDOCX(got, map[string]any{}, map[string][]byte{})

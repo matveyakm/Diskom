@@ -1,19 +1,22 @@
 package print
 
-// Filler слота "career": интервалы должностей сотрудников за период.
+// Filler слота "career": построчный текст интервалов должностей за период:
+// ФИО, затем строки «- В период с … по … являлся/является <должность> <отдел>».
 //
-// Источник — ТОЛЬКО staff_placement_ledger (один Fetch, никаких забегов по
-// справочникам и документам: отображаемые имена лежат снапшотами в самих
-// строках регистра — employee_name, job_title_instrumental,
-// department_genitive). События спариваются FIFO по тройке
+// Имена берутся из регистров-таймлайнов на дату T, где T = max(ddate отчёта,
+// date_to): отчёт показывает имена, актуальные не раньше конца своего периода,
+// но замороженные параметрами запуска (перепечать даёт тот же текст).
+// max, а не ddate: иначе найм после создания отчёта в будущий период
+// ронял бы печать громкой ошибкой вместо показа интервала.
+// Регистры: employee_data_ledger (ФИО), job_title_data_ledger (должность,
+// творительный падеж), department_data_ledger (отдел, родительный падеж).
+// События staff_placement_ledger спариваются FIFO по тройке id
 // (сотрудник, отдел, должность): open открывает интервал, close закрывает
 // самый старый открытый. Параллельные позиции на разных тройках живут
 // независимыми очередями; повторное назначение на ту же тройку без
-// снятия — глубиной очереди 2.
-// Остаток НЕ считается (этот отчёт — не про численность): накопления нет,
-// колонки balance в регистре нет.
-// Сирота-close (закрытие без открытия) и неизвестный event — громкая
-// ошибка: неверные данные хуже отсутствующего отчёта.
+// снятия — глубиной очереди 2. Остаток не считается (не численность).
+// Сирота-close, неизвестный event, нулевая тройка, отсутствие имени
+// на дату T — громкая ошибка: неверные данные хуже отсутствующего отчёта.
 
 import (
 	"fmt"
@@ -25,7 +28,7 @@ import (
 )
 
 // Slots — реестр заполнителей сервиса: дырка → функция (связь совпадением
-// имён; смысл задаёт позиция картинки/таблицы в шаблоне).
+// имён; смысл задаёт позиция блока в шаблоне).
 var Slots = report.Slots{"career": careerSlot, "emblem": emblemSlot}
 
 // tenure — один интервал позиции: [from, to), to == nil — открыт.
@@ -43,8 +46,9 @@ type names struct {
 }
 
 // resolveNames — имена на дату T из регистров-таймлайнов: последнее значение
-// с ddate ≤ T по каждой сущности. Пустое fio/имя — как отсутствие (громко
-// на этапе использования: неверные данные хуже отсутствующего отчёта).
+// с ddate ≤ T по каждой сущности. Порядок берётся из самих данных
+// (сортировка (день, id) на нашей стороне — от серверного порядка не зависим).
+// Пустое fio/имя — как отсутствие (громко на этапе использования).
 func resolveNames(ctx report.Ctx, t time.Time) (names, error) {
 	n := names{fio: map[int64]string{}, job: map[int64]string{}, dep: map[int64]string{}}
 	empRows, err := ctx.Fetch("employee_data_ledger", map[string]string{
@@ -55,12 +59,16 @@ func resolveNames(ctx report.Ctx, t time.Time) (names, error) {
 	if err != nil {
 		return n, fmt.Errorf("career: employee_data: %w", err)
 	}
-	for _, r := range empRows {
+	ordered, err := orderByDayID(empRows)
+	if err != nil {
+		return n, fmt.Errorf("career: employee_data: %w", err)
+	}
+	for _, r := range ordered {
 		id, _ := report.Int(r["id_employee"])
-		d, err := careerDay(r["ddate"])
-		if err != nil || id == 0 {
-			return n, fmt.Errorf("career: employee_data row %v: bad id/date", r["id"])
+		if id == 0 {
+			return n, fmt.Errorf("career: employee_data row %v: bad id", r["id"])
 		}
+		d, _ := careerDay(r["ddate"])
 		if d.After(t) {
 			continue
 		}
@@ -76,7 +84,11 @@ func resolveNames(ctx report.Ctx, t time.Time) (names, error) {
 	if err != nil {
 		return n, fmt.Errorf("career: job_title_data: %w", err)
 	}
-	for _, r := range jobRows {
+	ordered, err = orderByDayID(jobRows)
+	if err != nil {
+		return n, fmt.Errorf("career: job_title_data: %w", err)
+	}
+	for _, r := range ordered {
 		id, _ := report.Int(r["id_job_title"])
 		if id == 0 {
 			return n, fmt.Errorf("career: job_title_data row %v: bad id", r["id"])
@@ -93,7 +105,11 @@ func resolveNames(ctx report.Ctx, t time.Time) (names, error) {
 	if err != nil {
 		return n, fmt.Errorf("career: department_data: %w", err)
 	}
-	for _, r := range depRows {
+	ordered, err = orderByDayID(depRows)
+	if err != nil {
+		return n, fmt.Errorf("career: department_data: %w", err)
+	}
+	for _, r := range ordered {
 		id, _ := report.Int(r["id_department"])
 		if id == 0 {
 			return n, fmt.Errorf("career: department_data row %v: bad id", r["id"])
@@ -103,6 +119,34 @@ func resolveNames(ctx report.Ctx, t time.Time) (names, error) {
 		}
 	}
 	return n, nil
+}
+
+// orderByDayID — копия строк, отсортированная по (день, id): победитель
+// last-wins детерминирован независимо от порядка выдачи сервера.
+// Битые даты — громкая ошибка с id строки (проверка после сортировки,
+// чтобы порядок обхода ошибок тоже был детерминирован).
+func orderByDayID(rows []map[string]any) ([]map[string]any, error) {
+	ordered := make([]map[string]any, 0, len(rows))
+	ordered = append(ordered, rows...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		di, erri := careerDay(ordered[i]["ddate"])
+		dj, errj := careerDay(ordered[j]["ddate"])
+		if erri != nil || errj != nil {
+			return erri == nil
+		}
+		if !di.Equal(dj) {
+			return di.Before(dj)
+		}
+		ii, _ := report.Int(ordered[i]["id"])
+		ji, _ := report.Int(ordered[j]["id"])
+		return ii < ji
+	})
+	for _, r := range ordered {
+		if _, err := careerDay(r["ddate"]); err != nil {
+			return nil, fmt.Errorf("row %v: bad date: %w", r["id"], err)
+		}
+	}
+	return ordered, nil
 }
 
 // careerSlot — построчный текст «как в приказе»: ФИО, затем строки
@@ -140,10 +184,14 @@ func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("career: ledger: %w", err)
 	}
-	// T — дата формирования отчёта (ddate строки): имена берём на неё.
+	// T — max(ddate строки, date_to): имена актуальны не раньше конца
+	// периода, но заморожены параметрами запуска (см. шапку файла).
 	formed, err := careerDay(rec["ddate"])
 	if err != nil {
 		return nil, fmt.Errorf("career: ddate: %w", err)
+	}
+	if to.After(formed) {
+		formed = to
 	}
 	names, err := resolveNames(ctx, formed)
 	if err != nil {
@@ -224,21 +272,10 @@ func careerSlot(ctx report.Ctx, _ report.Params) (any, error) {
 
 // pairEvents — FIFO-спаривание open/close по тройке. Порядок: (день, id).
 func pairEvents(rows []map[string]any) ([]tenure, error) {
-	ordered := make([]map[string]any, 0, len(rows))
-	ordered = append(ordered, rows...)
-	sort.SliceStable(ordered, func(i, j int) bool {
-		di, erri := careerDay(ordered[i]["ddate"])
-		dj, errj := careerDay(ordered[j]["ddate"])
-		if erri != nil || errj != nil {
-			return erri == nil
-		}
-		if !di.Equal(dj) {
-			return di.Before(dj)
-		}
-		ii, _ := report.Int(ordered[i]["id"])
-		ji, _ := report.Int(ordered[j]["id"])
-		return ii < ji
-	})
+	ordered, err := orderByDayID(rows)
+	if err != nil {
+		return nil, fmt.Errorf("career: %w", err)
+	}
 	open := make(map[string][]tenure)
 	var out []tenure
 	for _, r := range ordered {

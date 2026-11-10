@@ -122,7 +122,8 @@ func TestCareerRenameTimeline(t *testing.T) {
 	s.placed = []map[string]any{
 		evRow(1, "open", "2026-03-02T00:00:00Z", 1, 1, 1),
 	}
-	// Переименование 01.06: до отчёта (ddate 10.11) — новое имя везде.
+	// Переименование 01.06: до конца периода (to 31.12) — новое имя везде,
+	// хотя отчёт создан раньше (ddate 10.11): T = max(ddate, to).
 	s.emp = append(s.emp, map[string]any{
 		"id": float64(2), "id_employee": float64(1),
 		"ddate": "2026-06-01T00:00:00Z", "fio": "Петрова Анна Ивановна",
@@ -130,11 +131,13 @@ func TestCareerRenameTimeline(t *testing.T) {
 	if got := careerText(t, s); !strings.HasPrefix(got, "Петрова Анна Ивановна\n") {
 		t.Fatalf("rename must win: %q", got)
 	}
-	// Переименование после формирования — невидимо (замороженный взгляд).
+	// Переименование после конца периода — невидимо (замороженный взгляд).
 	s2 := careerStub()
-	s2.record["ddate"] = time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	s2.placed = s.placed
-	s2.emp = s.emp
+	s2.emp = append(s2.emp, map[string]any{
+		"id": float64(2), "id_employee": float64(1),
+		"ddate": "2027-02-01T00:00:00Z", "fio": "Петрова Анна Ивановна",
+	})
 	if got := careerText(t, s2); !strings.HasPrefix(got, "Иванов Иван Иванович\n") {
 		t.Fatalf("future rename must not leak: %q", got)
 	}
