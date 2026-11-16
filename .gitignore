@@ -1,7 +1,9 @@
+certs/
 certs/local.key
 certs/local.crt
 certs/discom.spbgu.localhost+1.pem
 certs/discom.spbgu.localhost+1-key.pem
 **/__pycache__/**
 
+.env
 **.env
